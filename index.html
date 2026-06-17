@@ -255,6 +255,13 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 }
 .assassin-target-btn:hover{border-color:var(--red);background:#3a1a1a;color:#ff9999}
 .assassin-target-btn.selected{border-color:var(--red-bright);background:#4a1a1a;color:var(--red-bright);box-shadow:0 0 16px rgba(255,96,96,0.4)}
+.import-textarea{
+  width:100%;height:200px;padding:10px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-card);color:var(--text);
+  font-size:14px;font-family:monospace;resize:vertical;outline:none;
+  box-sizing:border-box;
+}
+.import-textarea:focus{border-color:var(--gold)}
 </style>
 </head>
 <body>
@@ -370,6 +377,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       </table>
     </div>
     <div id="pagination-area"></div>
+    <div class="btn-row" style="justify-content:center;margin-top:10px">
+      <button class="btn small" onclick="exportData()">导出数据</button>
+      <button class="btn small" onclick="importData()">导入数据</button>
+    </div>
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
   <div class="card">
@@ -1818,6 +1829,74 @@ function confirmClearStats() {
   localStorage.removeItem('avalon_history_v2');
   toast('已清除所有统计');
   renderStats();
+}
+
+/* ==================== DATA EXPORT / IMPORT ==================== */
+function exportData() {
+  var data = {};
+  var keys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
+  for (var i = 0; i < keys.length; i++) {
+    var val = localStorage.getItem(keys[i]);
+    if (val !== null) {
+      try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
+    }
+  }
+  var json = JSON.stringify(data, null, 2);
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(json).then(function() {
+      toast('数据已复制到剪贴板');
+    }).catch(function() {
+      showExportModal(json);
+    });
+  } else {
+    showExportModal(json);
+  }
+}
+
+function showExportModal(json) {
+  var h = '<h2>导出数据</h2>';
+  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">复制下方 JSON 文本：</p>';
+  h += '<textarea class="import-textarea" readonly onclick="this.select()">' + json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>';
+  h += '<div class="modal-actions"><button class="btn" onclick="closeModal()">关闭</button></div>';
+  showModal(h);
+}
+
+function importData() {
+  var h = '<h2>导入数据</h2>';
+  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">粘贴 JSON 数据后点击导入。将覆盖现有的阿瓦隆数据。</p>';
+  h += '<textarea class="import-textarea" id="import-textarea" placeholder="在此粘贴 JSON 数据…"></textarea>';
+  h += '<div class="modal-actions">';
+  h += '<button class="btn primary" onclick="doImport()">确认导入</button>';
+  h += '<button class="btn" onclick="closeModal()">取消</button>';
+  h += '</div>';
+  showModal(h);
+}
+
+function doImport() {
+  var ta = document.getElementById('import-textarea');
+  if (!ta) return;
+  var raw = ta.value.trim();
+  if (!raw) { toast('请粘贴 JSON 数据', 'warn'); return; }
+
+  var data;
+  try { data = JSON.parse(raw); } catch(e) { toast('JSON 格式错误，请检查', 'warn'); return; }
+  if (!data || typeof data !== 'object') { toast('数据格式无效', 'warn'); return; }
+
+  var validKeys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
+  var imported = 0;
+  for (var i = 0; i < validKeys.length; i++) {
+    var k = validKeys[i];
+    if (k in data) {
+      localStorage.setItem(k, JSON.stringify(data[k]));
+      imported++;
+    }
+  }
+  if (imported === 0) { toast('未识别到有效数据', 'warn'); return; }
+
+  closeModal();
+  toast('已导入 ' + imported + ' 条数据，即将刷新页面');
+  setTimeout(function() { location.reload(); }, 800);
 }
 
 /* ==================== INIT ==================== */
