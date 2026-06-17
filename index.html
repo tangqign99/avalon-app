@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>阿瓦隆辅助</title>
+<link rel="manifest" href="./manifest.json">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-dark:#12100e;--bg-panel:#1e1a14;--bg-card:#2a241c;
+  --gold:#c9a84c;--gold-light:#e8d48b;--gold-dark:#8b7320;
+  --text:#ddd6c8;--text-dim:#8a8070;--text-bright:#f5efe0;
+  --blue:#4a90d9;--red:#d94a4a;--red-bright:#ff6060;
+  --green:#4ac94a;--green-bright:#60ff60;--orange:#d98a20;
+  --border:rgba(201,168,76,0.25);--radius:12px;--radius-sm:8px;
+  --font:system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font);background:var(--bg-dark);color:var(--text);
+  display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent;
+  user-select:none;-webkit-user-select:none;
+}
+header{
+  background:linear-gradient(180deg,#2a241c,#1e1a14);
+  border-bottom:1px solid var(--border);padding:8px 14px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;
+}
+header h1{font-size:22px;color:var(--gold);letter-spacing:3px;font-weight:700}
+.nav-btns{display:flex;gap:6px}
+.nav-btns button{
+  background:var(--bg-card);border:1px solid var(--border);color:var(--gold);
+  padding:7px 13px;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;min-height:44px;
+}
+.nav-btns button:hover,.nav-btns button.active{background:var(--gold-dark);color:var(--gold-light)}
+main{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+main::-webkit-scrollbar{width:6px}
+main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.page{display:none;flex-direction:column;gap:14px}
+.page.active{display:flex}
+.card{background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card h2{font-size:17px;color:var(--gold-light);margin-bottom:10px;letter-spacing:1px}
+.card h3{font-size:15px;color:var(--gold);margin-bottom:8px}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:11px 18px;border-radius:var(--radius);font-size:16px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;min-width:44px;min-height:44px;
+  border:2px solid var(--border);background:var(--bg-card);color:var(--text);
+  white-space:nowrap;
+}
+.btn:hover{transform:scale(1.03)}
+.btn:active{transform:scale(0.97)}
+.btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 12px rgba(201,168,76,0.4)}
+.btn.primary{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold);font-size:18px;padding:13px 28px}
+.btn.danger{background:#3a1a1a;color:#ff9999;border-color:#994444}
+.btn.success{background:#1a3a1a;color:#99ff99;border-color:#449944}
+.btn.self{background:#1a3050;color:#99bbff;border-color:#446699}
+.btn.small{padding:7px 12px;font-size:13px;min-height:36px}
+.btn:disabled{opacity:0.4;cursor:default;pointer-events:none}
+.btn.warn{padding:6px 10px;font-size:12px;border-color:#994444;color:#ff9999;background:#2a1a1a}
+.btn.active-page{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
+.count-grid{display:flex;gap:10px;flex-wrap:wrap}
+.count-btn{
+  width:58px;height:58px;border-radius:50%;font-size:24px;font-weight:700;
+  border:2px solid var(--border);background:var(--bg-card);color:var(--text);
+  cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;
+}
+.count-btn:hover{transform:scale(1.08)}
+.count-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 16px rgba(201,168,76,0.5)}
+.player-setup-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.player-setup-row .idx{color:var(--gold);font-weight:700;min-width:46px;font-size:14px}
+.player-setup-row select{
+  flex:1;padding:10px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-card);color:var(--text);
+  font-size:15px;cursor:pointer;min-height:44px;
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23c9a84c'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+}
+.player-setup-row .self-tag{color:var(--blue);font-weight:700;font-size:13px;min-width:42px;text-align:center}
+.add-name-row{display:flex;gap:8px;align-items:center;margin-top:4px;padding:4px 0}
+.add-name-input{
+  flex:1;padding:9px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-card);color:var(--text);
+  font-size:15px;min-height:44px;outline:none;
+}
+.add-name-input:focus{border-color:var(--gold)}
+.role-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.role-checkbox-grid label{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-card);font-size:18px;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;flex-shrink:0;
+}
+.role-checkbox-grid label:hover{border-color:var(--gold)}
+.role-checkbox-grid label.checked{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
+.role-checkbox-grid input[type=checkbox]{accent-color:var(--gold);width:32px;height:32px}
+.role-horizontal{display:flex;flex-direction:column;gap:24px}
+.role-group{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:space-evenly}
+.faction-label{font-weight:700;font-size:14px;padding:4px 12px;border-radius:var(--radius-sm);margin-right:4px}
+.faction-label.good{background:rgba(102,153,255,0.2);color:#99bbff}
+.faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
+.round-tracker{display:flex;gap:10px;justify-content:center;padding:6px 0}
+.round-dot{
+  width:44px;height:44px;border-radius:50%;border:2px solid var(--border);
+  background:var(--bg-card);display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:700;color:var(--text-dim);transition:all 0.2s;position:relative;
+}
+.round-dot.current{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 14px rgba(201,168,76,0.5)}
+.round-dot.success{background:#1a3a1a;border-color:#449944;color:#99ff99}
+.round-dot.fail{background:#3a3a1a;border-color:#994444;color:#ff9999}
+.round-dot .badge{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;font-size:10px;line-height:18px;text-align:center;font-weight:700}
+.badge.win{background:#449944;color:#fff}
+.badge.lose{background:#994444;color:#fff}
+.game-layout{display:flex;gap:14px;flex:1}
+.game-main{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.game-side{width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+@media(max-width:900px){.game-layout{flex-direction:column}.game-side{width:100%}}
+.step-label{font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px}
+.vote-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg-card);border-radius:var(--radius);margin-bottom:5px}
+.vote-row .voter-name{font-size:15px;font-weight:600;min-width:80px}
+.vote-row .on-team{color:var(--gold);font-size:12px;margin-left:4px}
+.vote-btns{display:flex;gap:8px}
+.vote-btn{
+  width:50px;height:50px;border-radius:50%;border:3px solid transparent;
+  font-size:24px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;
+}
+.vote-btn.approve{border-color:#336633;background:#1a2a1a;color:#88cc88}
+.vote-btn.approve.selected{border-color:var(--green-bright);background:#1a4a1a;color:var(--green-bright);box-shadow:0 0 16px rgba(96,255,96,0.35)}
+.vote-btn.reject{border-color:#663333;background:#2a1a1a;color:#cc8888}
+.vote-btn.reject.selected{border-color:var(--red-bright);background:#4a1a1a;color:var(--red-bright);box-shadow:0 0 16px rgba(255,96,96,0.35)}
+.vote-num{font-size:14px;color:#c9b85c;min-width:16px;text-align:center;align-self:center;font-weight:700}
+.mission-result-area{display:flex;gap:14px;justify-content:center;padding:14px}
+.mission-btn{
+  width:80px;height:80px;border-radius:50%;border:3px solid var(--border);
+  font-size:38px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;background:var(--bg-card);
+}
+.mission-btn:hover{transform:scale(1.06)}
+.mission-btn.success-btn{border-color:#336633}
+.mission-btn.success-btn:hover,.mission-btn.success-btn.selected{border-color:var(--green-bright);background:#1a3a1a;box-shadow:0 0 20px rgba(96,255,96,0.4)}
+.mission-btn.fail-btn{border-color:#663333}
+.mission-btn.fail-btn:hover,.mission-btn.fail-btn.selected{border-color:var(--red-bright);background:#3a1a1a;box-shadow:0 0 20px rgba(255,96,96,0.4)}
+.fail-count-row{text-align:center;margin-top:8px}
+.fail-count-btns{display:flex;gap:8px;justify-content:center;padding:8px}
+.fail-count-btn{
+  width:44px;height:44px;border-radius:50%;border:2px solid var(--border);
+  background:var(--bg-card);color:var(--text);font-size:18px;font-weight:700;
+  cursor:pointer;transition:all 0.15s;
+}
+.fail-count-btn.selected{border-color:var(--red);background:#3a1a1a;color:#ff9999}
+.launch-fail-banner{
+  text-align:center;padding:10px 16px;background:#3a1a1a;border:1px solid #994444;
+  border-radius:var(--radius);color:#ff9999;font-size:15px;font-weight:700;margin-bottom:10px;
+}
+.launch-fail-banner .count{color:var(--red-bright);font-size:20px}
+.tendency-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-sm);background:var(--bg-card);margin-bottom:4px}
+.tendency-item .tend-name{flex:1;font-size:14px;font-weight:600;color:var(--text-bright)}
+.tendency-item .tend-score{font-size:16px;font-weight:700;min-width:32px;text-align:right}
+.tendency-item .tend-bar-wrap{width:100px;height:8px;border-radius:4px;background:#333;overflow:hidden;flex-shrink:0}
+.tendency-item .tend-bar-fill{height:100%;border-radius:4px;transition:width 0.4s}
+.tend-bar-fill.trust{background:var(--green)}
+.tend-bar-fill.neutral{background:var(--orange)}
+.tend-bar-fill.suspect{background:var(--red)}
+.tend-score.trust{color:var(--green-bright)}
+.tend-score.neutral{color:var(--orange)}
+.tend-score.suspect{color:var(--red-bright)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
+.stat-card .stat-value{font-size:28px;font-weight:700;color:var(--gold-light)}
+.stat-card .stat-label{font-size:12px;color:var(--text-dim);margin-top:3px}
+.stat-card .stat-sub{font-size:18px;color:var(--text);margin-top:2px}
+.history-table{width:100%;border-collapse:collapse;font-size:13px}
+.history-table th,.history-table td{padding:7px 10px;text-align:center;border-bottom:1px solid var(--border)}
+.history-table th{color:var(--gold);font-size:12px;background:var(--bg-card)}
+.history-table tr:hover{background:rgba(201,168,76,0.05)}
+.pagination{display:flex;gap:6px;justify-content:center;align-items:center;padding:10px 0;flex-wrap:wrap}
+.pagination .page-btn{
+  min-width:36px;height:36px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;
+  cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text);
+  display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+}
+.pagination .page-btn:hover{border-color:var(--gold)}
+.pagination .page-btn.active{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
+.pagination .page-ellipsis{color:var(--text-dim);width:36px;text-align:center;font-size:14px}
+.player-stat-expand{border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:8px;background:var(--bg-card)}
+.player-stat-expand table{width:100%;font-size:13px;border-collapse:collapse}
+.player-stat-expand td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.toast{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:300;
+  padding:10px 22px;border-radius:var(--radius);font-size:14px;font-weight:600;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;
+}
+.toast.show{opacity:1}
+.toast.info{background:var(--blue);color:#fff}
+.toast.warn{background:var(--orange);color:#fff}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg-panel);border:1px solid var(--gold);border-radius:var(--radius);padding:20px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 48px rgba(0,0,0,0.7)}
+.modal h2{color:var(--gold);font-size:19px;margin-bottom:14px}
+.modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.edit-player-row{display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap}
+.edit-player-row .ep-name{min-width:80px;font-weight:600;font-size:14px}
+.edit-player-row select{
+  flex:1;min-width:110px;padding:7px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-card);color:var(--text);
+  font-size:13px;cursor:pointer;min-height:40px;
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23c9a84c'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;padding-right:22px;
+}
+.edit-player-row .edit-flip{font-size:11px;color:var(--text-dim);white-space:nowrap;display:flex;align-items:center;gap:3px}
+.edit-player-row .edit-flip input{accent-color:var(--orange);width:14px;height:14px;cursor:pointer}
+.all-approve-row{text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.identity-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:250;display:none;align-items:center;justify-content:center}
+.identity-overlay.active{display:flex}
+.identity-card{background:var(--bg-panel);border:2px solid var(--gold);border-radius:var(--radius);padding:24px 20px;max-width:480px;width:90%;text-align:center;box-shadow:0 8px 64px rgba(0,0,0,0.8)}
+.identity-card h2{color:var(--gold-light);font-size:20px;margin-bottom:6px}
+.identity-card .sub{color:var(--text-dim);font-size:13px;margin-bottom:14px}
+.identity-role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.identity-role-btn{
+  padding:12px 10px;border-radius:var(--radius-sm);font-size:15px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;min-height:44px;
+  border:2px solid var(--border);background:var(--bg-card);color:var(--text);
+}
+.identity-role-btn:hover{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light)}
+.identity-role-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 12px rgba(201,168,76,0.4)}
+.end-player-row{display:flex;align-items:center;gap:8px;padding:5px 0;flex-wrap:wrap}
+.end-player-row .ep-name{min-width:100px;font-weight:600;font-size:15px}
+.end-player-row select{
+  flex:1;min-width:120px;padding:8px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--bg-card);color:var(--text);
+  font-size:14px;cursor:pointer;min-height:44px;
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23c9a84c'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;
+}
+.end-flip-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--orange);font-weight:700;white-space:nowrap;background:rgba(255,165,0,0.1);padding:3px 10px;border-radius:4px;border:1px solid rgba(255,165,0,0.25)}
+.end-flip-row input[type=checkbox]{accent-color:var(--orange);width:18px;height:18px;cursor:pointer}
+.winner-toggle{display:flex;gap:12px;justify-content:center}
+.winner-btn{
+  padding:14px 32px;border-radius:var(--radius);font-size:18px;font-weight:700;
+  cursor:pointer;transition:all 0.15s;border:2px solid var(--border);
+  background:var(--bg-card);color:var(--text);
+}
+.winner-btn.good:hover,.winner-btn.good.selected{background:#1a3a1a;border-color:var(--green);color:var(--green-bright)}
+.winner-btn.evil:hover,.winner-btn.evil.selected{background:#3a3a1a;border-color:var(--red);color:var(--red-bright)}
+.assassin-target-btn{
+  padding:14px 18px;border-radius:var(--radius);font-size:17px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;min-height:52px;border:2px solid var(--border);
+  background:var(--bg-card);color:var(--text);width:100%;text-align:center;
+}
+.assassin-target-btn:hover{border-color:var(--red);background:#3a1a1a;color:#ff9999}
+.assassin-target-btn.selected{border-color:var(--red-bright);background:#4a1a1a;color:var(--red-bright);box-shadow:0 0 16px rgba(255,96,96,0.4)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>阿瓦隆</h1>
+  <div class="nav-btns">
+    <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
+    <button id="nav-game" onclick="showPage('game')">游戏</button>
+    <button id="nav-tend" onclick="showPage('tend')">倾向</button>
+    <button id="nav-end" onclick="showPage('end')">结束</button>
+    <button id="nav-stats" onclick="showPage('stats')">统计</button>
+  </div>
+</header>
+
+<main id="main-content">
+
+<section class="page active" id="page-setup">
+  <div class="card">
+    <h2>玩家人数</h2>
+    <div class="count-grid" id="count-grid"></div>
+  </div>
+  <div class="card">
+    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择，或添加新名字）</span></h2>
+    <div id="player-names"></div>
+    <div class="add-name-row">
+      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
+      <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>本局角色 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（勾选的才会出现在结束面板身份选项中）</span></h2>
+    <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
+  </div>
+  <div class="card" style="text-align:center">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:8px">
+      任务轮次：<span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
+    </p>
+    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游戏</button>
+  </div>
+</section>
+
+<section class="page" id="page-game">
+  <div class="round-tracker" id="round-tracker"></div>
+  <div id="launch-fail-area"></div>
+  <div class="game-layout">
+    <div class="game-main">
+      <div class="card" id="step-container"></div>
+    </div>
+    <div class="game-side">
+      <div class="card" style="padding:10px">
+        <h3 style="margin-bottom:6px">倾向值 <span style="font-size:11px;color:var(--text-dim)">(0-100)</span></h3>
+        <div id="tendency-mini"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="page-tend">
+  <div class="card">
+    <h2>倾向值面板</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
+      从「我」的视角评估其他玩家。绿≥60 黄40-59 红&lt;40。初始50。
+      <span id="my-role-display" style="color:var(--gold-light)"></span>
+    </p>
+    <div id="tendency-full"></div>
+  </div>
+</section>
+
+<section class="page" id="page-end">
+  <div class="card" id="end-assassin-card" style="display:none">
+    <h2>刺杀结果</h2>
+    <p style="font-size:14px;margin-bottom:8px">刺杀目标：<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
+    <p style="font-size:14px;margin-bottom:10px">刺杀目标是不是梅林？</p>
+    <div class="winner-toggle">
+      <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅林 → 反方胜</button>
+      <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
+    </div>
+  </div>
+  <div class="card" id="end-lancelot-card" style="display:none">
+    <h2>兰斯洛特反转</h2>
+    <p style="font-size:14px;margin-bottom:10px">本局兰斯洛特是否反转？（红兰斯洛特和蓝兰斯洛特阵营互换）</p>
+    <div class="winner-toggle">
+      <button class="winner-btn good" onclick="setLancelotFlip(true)">&#9989; 是，反转</button>
+      <button class="winner-btn evil" onclick="setLancelotFlip(false)">&#10060; 否，不反转</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>游戏结束</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果：<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
+    <div class="winner-toggle" id="winner-toggle"></div>
+  </div>
+  <div class="card">
+    <h2>记录身份 <span style="font-size:12px;color:var(--text-dim)">（游戏后填入各人真实身份）</span></h2>
+    <div id="end-identity-grid"></div>
+  </div>
+  <div style="text-align:center">
+    <button class="btn primary" onclick="saveGameRecord()" style="font-size:18px;padding:13px 40px">保存对局记录</button>
+  </div>
+</section>
+
+<section class="page" id="page-stats">
+  <div class="card">
+    <h2>战绩概览</h2>
+    <div class="stat-grid" id="stats-overview"></div>
+  </div>
+  <div class="card">
+    <h2>历史对局</h2>
+    <div style="overflow-x:auto">
+      <table class="history-table" id="history-table">
+        <thead><tr><th>日期</th><th>人数</th><th>胜方</th><th>详情</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="pagination-area"></div>
+    <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
+  </div>
+  <div class="card">
+    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开，胜率按最终阵营判定）</span></h2>
+    <div class="btn-row" id="player-stat-btns"></div>
+    <div id="player-stat-detail"></div>
+  </div>
+  <div class="card">
+    <h2>胜率排行榜</h2>
+    <div id="win-rate-leaderboard" style="overflow-x:auto"></div>
+  </div>
+  <div style="text-align:center">
+    <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
+  </div>
+</section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="identity-overlay" id="identity-overlay">
+  <div class="identity-card" id="identity-card"></div>
+</div>
+
+<div class="identity-overlay" id="assassin-overlay">
+  <div class="identity-card" id="assassin-card"></div>
+</div>
+
+<script>
+/* ==================== DATA ==================== */
+var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
+var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','浩文','宝强','小洪'];
+var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
+var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
+var MULTI_ROLES = ['忠臣','爪牙'];
+var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
+var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
+var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'];
+
+var namePool = DEFAULT_NAME_POOL.slice();
+
+var state = {
+  playerCount: 7,
+  playerNames: [],
+  selfIndex: -1,
+  myRole: null,
+  activeRoles: DEFAULT_ACTIVE_ROLES.slice(),
+  missions: [],
+  currentRound: 0,
+  tendencies: {},
+  winner: null,
+  consecutiveRejects: {},
+  _firstLeaderPicked: false,
+  _lastLeaderIdx: -1,
+  assassinTarget: null,
+  assassinFromMission: false,
+  _historyPage: 0,
+  _historyPageSize: 5
+};
+
+function initState(n) {
+  n = n || 7;
+  state.playerCount = n;
+  state.playerNames = [];
+  for (var i = 0; i < n; i++) state.playerNames[i] = '玩家' + (i + 1);
+  state.selfIndex = -1;
+  state.myRole = null;
+  state.activeRoles = DEFAULT_ACTIVE_ROLES.slice();
+  state.missions = [];
+  state.currentRound = 0;
+  state.tendencies = {};
+  state.winner = null;
+  state.consecutiveRejects = {};
+  state._firstLeaderPicked = false;
+  state._lastLeaderIdx = -1;
+  state.assassinTarget = null;
+  state.assassinFromMission = false;
+  state.lancelotFlipped = false;
+  state._lancelotAsked = false;
+  state._historyPage = 0;
+  for (var i = 0; i < n; i++) {
+    state.tendencies[i] = 50;
+    state.consecutiveRejects[i] = 0;
+  }
+}
+
+/* ==================== PLAYER LABEL ==================== */
+function playerLabel(idx) {
+  return (idx + 1) + '号 ' + state.playerNames[idx];
+}
+
+/* ==================== STORAGE ==================== */
+function loadNamePool() {
+  try { var d = localStorage.getItem('avalon_name_pool'); if (d) namePool = JSON.parse(d); } catch(e) {}
+}
+function saveNamePool() {
+  localStorage.setItem('avalon_name_pool', JSON.stringify(namePool));
+}
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('avalon_history_v2') || '[]'); } catch(e) { return []; }
+}
+function saveHistory(data) {
+  localStorage.setItem('avalon_history_v2', JSON.stringify(data));
+}
+function saveLastGame() {
+  var cfg = {
+    date: new Date().toISOString().slice(0, 10),
+    playerCount: state.playerCount,
+    playerNames: state.playerNames.slice(),
+    selfIndex: state.selfIndex
+  };
+  localStorage.setItem('avalon_last_game', JSON.stringify(cfg));
+}
+function loadLastGame() {
+  try {
+    var d = localStorage.getItem('avalon_last_game');
+    if (!d) return null;
+    var cfg = JSON.parse(d);
+    var today = new Date().toISOString().slice(0, 10);
+    if (cfg.date !== today) return null;
+    return cfg;
+  } catch(e) { return null; }
+}
+loadNamePool();
+
+/* ==================== UTILS ==================== */
+function $(id) { return document.getElementById(id); }
+function toast(msg, type) {
+  type = type || 'info';
+  var t = $('toast'); t.textContent = msg; t.className = 'toast ' + type + ' show';
+  setTimeout(function() { t.classList.remove('show'); }, 2200);
+}
+function setActiveNav(page) {
+  document.querySelectorAll('.nav-btns button').forEach(function(b) { b.classList.remove('active'); });
+  var btn = document.getElementById('nav-' + page);
+  if (btn) btn.classList.add('active');
+}
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  var pg = document.getElementById('page-' + page);
+  if (pg) pg.classList.add('active');
+  setActiveNav(page);
+  if (page === 'setup') renderSetup();
+  if (page === 'game') renderGame();
+  if (page === 'tend') renderTendencyFull();
+  if (page === 'end') renderEnd();
+  if (page === 'stats') { state._historyPage = 0; renderStats(); }
+}
+
+/* ==================== SETUP RENDER ==================== */
+function renderSetup() {
+  var h = '';
+  for (var i = 5; i <= 10; i++) {
+    h += '<div class="count-btn' + (state.playerCount === i ? ' selected' : '') + '" onclick="setPlayerCount(' + i + ')">' + i + '</div>';
+  }
+  $('count-grid').innerHTML = h;
+
+  var autoSelf = -1;
+  h = '';
+  for (var i = 0; i < state.playerCount; i++) {
+    var curName = state.playerNames[i];
+    if (curName === '阿弟') autoSelf = i;
+
+    // Collect names already taken by other players
+    var takenNames = {};
+    for (var k = 0; k < state.playerCount; k++) {
+      if (k === i) continue;
+      takenNames[state.playerNames[k]] = true;
+    }
+
+    h += '<div class="player-setup-row">';
+    h += '<span class="idx">' + (i + 1) + '号</span>';
+    h += '<select onchange="setPlayerName(' + i + ',this.value)">';
+    for (var j = 0; j < namePool.length; j++) {
+      var nm = namePool[j];
+      if (takenNames[nm] && nm !== curName) continue;
+      h += '<option value="' + nm + '"' + (nm === curName ? ' selected' : '') + '>' + nm + '</option>';
+    }
+    if (namePool.indexOf(curName) === -1) {
+      h += '<option value="' + curName + '" selected>' + curName + '</option>';
+    }
+    h += '</select>';
+    if (autoSelf === i) h += '<span class="self-tag">★ 我</span>';
+    else h += '<span style="min-width:42px"></span>';
+    h += '</div>';
+  }
+  $('player-names').innerHTML = h;
+  if (autoSelf >= 0) state.selfIndex = autoSelf;
+
+  h = '<div class="role-horizontal">';
+  h += '<div class="role-group good-group">';
+  h += '<span class="faction-label good">好人方</span>';
+  for (var i = 0; i < GOOD_ROLES.length; i++) {
+    var r = GOOD_ROLES[i];
+    var checked = state.activeRoles.indexOf(r) !== -1;
+    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">';
+    h += '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onclick="event.stopPropagation();toggleRole(\'' + r + '\')">';
+    h += r + '</label>';
+  }
+  h += '</div>';
+  h += '<div class="role-group evil-group">';
+  h += '<span class="faction-label evil">反方</span>';
+  for (var i = 0; i < EVIL_ROLES.length; i++) {
+    var r = EVIL_ROLES[i];
+    var checked = state.activeRoles.indexOf(r) !== -1;
+    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">';
+    h += '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onclick="event.stopPropagation();toggleRole(\'' + r + '\')">';
+    h += r + '</label>';
+  }
+  h += '</div></div>';
+  $('role-checkbox-grid').innerHTML = h;
+
+  var mc = MISSION_COUNTS[state.playerCount];
+  $('mission-info').textContent = mc ? mc.join('-') : '请先选择人数';
+}
+
+function setPlayerCount(n) {
+  var oldNames = state.playerNames;
+  var oldSelf = state.selfIndex;
+  state.playerCount = n;
+  state.playerNames = [];
+  for (var i = 0; i < n; i++) {
+    state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
+  }
+  state.selfIndex = oldSelf < n ? oldSelf : -1;
+  state.tendencies = {};
+  state.consecutiveRejects = {};
+  state.roundTendencies = [];
+  for (var i = 0; i < n; i++) {
+    if (!(i in state.tendencies)) state.tendencies[i] = 50;
+    state.consecutiveRejects[i] = 0;
+  }
+  state.missions = [];
+  state.currentRound = 0;
+  state.winner = null;
+  renderSetup();
+}
+
+function setPlayerName(idx, name) {
+  state.playerNames[idx] = name;
+  if (name === '阿弟') state.selfIndex = idx;
+  renderSetup();
+}
+
+function toggleRole(role) {
+  var pos = state.activeRoles.indexOf(role);
+  if (pos !== -1) state.activeRoles.splice(pos, 1);
+  else state.activeRoles.push(role);
+  renderSetup();
+}
+
+function addNameToPool() {
+  var input = $('add-name-input');
+  var name = input.value.trim();
+  if (!name) { toast('请输入名字', 'warn'); return; }
+  if (namePool.indexOf(name) !== -1) { toast('名字已存在', 'warn'); return; }
+  namePool.push(name);
+  saveNamePool();
+  input.value = '';
+  renderSetup();
+  toast('已添加「' + name + '」');
+}
+/* ==================== GAME START ==================== */
+function startGame() {
+  if (!MISSION_COUNTS[state.playerCount]) { toast('请选择玩家人数', 'warn'); return; }
+  if (state.activeRoles.length === 0) { toast('请至少选择一个本局角色', 'warn'); return; }
+  for (var i = 0; i < state.playerCount; i++) {
+    if (state.playerNames[i] === '阿弟') { state.selfIndex = i; break; }
+  }
+  if (state.selfIndex < 0) { toast('请确保玩家列表中有「阿弟」作为「我」', 'warn'); return; }
+  showIdentityModal();
+}
+
+function showIdentityModal() {
+  var h = '<h2>我的身份是？</h2>';
+  h += '<p class="sub">选定后将用于倾向值分析（权重翻倍），仅自己可见</p>';
+  h += '<div class="identity-role-grid">';
+  for (var j = 0; j < ALL_ROLES.length; j++) {
+    var r = ALL_ROLES[j];
+    h += '<button class="identity-role-btn" onclick="setMyRole(\'' + r + '\')">' + r + '</button>';
+  }
+  h += '</div>';
+  h += '<div style="margin-top:12px"><button class="btn" onclick="skipIdentity()" style="color:var(--text-dim);font-size:13px">跳过，不记录自己身份</button></div>';
+  $('identity-card').innerHTML = h;
+  $('identity-overlay').classList.add('active');
+}
+
+function setMyRole(role) {
+  state.myRole = role;
+  $('identity-overlay').classList.remove('active');
+  doStartGame();
+}
+
+function skipIdentity() {
+  state.myRole = null;
+  $('identity-overlay').classList.remove('active');
+  doStartGame();
+}
+
+function doStartGame() {
+  state.missions = MISSION_COUNTS[state.playerCount].map(function(size, i) {
+    return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, launchFailures: 0, launchAttempts: [] };
+  });
+  state.currentRound = 0;
+  state.winner = null;
+  state._firstLeaderPicked = false;
+  state._lastLeaderIdx = -1;
+  state.assassinTarget = null;
+  state.assassinFromMission = false;
+  for (var i = 0; i < state.playerCount; i++) {
+    state.tendencies[i] = 50;
+    state.consecutiveRejects[i] = 0;
+  }
+  state.roundTendencies = [];
+  saveLastGame();
+  showPage('game');
+  var msg = '游戏开始！共 ' + state.playerCount + ' 名玩家，5 轮任务';
+  if (state.myRole) msg += '（你的身份：' + state.myRole + '）';
+  toast(msg);
+}
+
+/* ==================== GAME RENDER ==================== */
+function renderGame() {
+  renderRoundTracker();
+  renderStepPanel();
+  renderTendencyMini();
+  $('launch-fail-area').innerHTML = '';
+}
+
+function renderRoundTracker() {
+  var mc = MISSION_COUNTS[state.playerCount];
+  var h = '';
+  for (var i = 0; i < 5; i++) {
+    var m = state.missions[i];
+    var cls = '';
+    var extra = '';
+    if (i === state.currentRound && !m.result) cls = 'current';
+    else if (m && m.result === 'success') { cls = 'success'; extra = '<span class="badge win">&#10003;</span>'; }
+    else if (m && m.result === 'fail') { cls = 'fail'; extra = '<span class="badge lose">&#10007;</span>'; }
+    h += '<div class="round-dot ' + cls + '" onclick="switchRound(' + i + ')">' + mc[i] + extra + '</div>';
+  }
+  $('round-tracker').innerHTML = h;
+}
+
+function switchRound(i) {
+  if (state.missions[i] && state.missions[i].result) {
+    state.currentRound = i;
+    renderGame();
+    return;
+  }
+  if (i !== state.currentRound) return;
+  state.currentRound = i;
+  renderGame();
+}
+
+function renderStepPanel() {
+  var m = state.missions[state.currentRound];
+  if (!m) return;
+  var c = $('step-container');
+  var reqSize = m.size;
+  var pc = state.playerCount;
+  var h = '';
+
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  h += '<span class="step-label">第' + (state.currentRound + 1) + '轮 · 需要 ' + reqSize + ' 人出任务</span>';
+  h += '<span style="font-size:13px;color:var(--text-dim)">' + (m.result ? (m.result === 'success' ? '已完成 ✓' : '已失败 ✕') : '进行中');
+  if (m.launchFailures > 0) h += ' · 发车失败 ' + m.launchFailures + ' 次';
+  h += '</span></div>';
+
+  if (m.result) {
+    h += '<div style="text-align:center;padding:16px">';
+    h += '<div style="font-size:52px;margin-bottom:6px">' + (m.result === 'success' ? '&#128737;' : '&#128481;') + '</div>';
+    h += '<div style="font-size:17px;color:' + (m.result === 'success' ? '#99ff99' : '#ff9999') + '">';
+    h += '任务' + (m.result === 'success' ? '成功' : '失败');
+    if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
+    h += '</div>';
+    if (state.winner) {
+      h += '<div style="margin-top:10px;font-size:16px;font-weight:700;color:var(--gold-light)">';
+      h += '游戏结束：' + (state.winner === 'good' ? '好人方获胜' : '反方获胜');
+      if (state.winner === 'evil' && state.assassinTarget !== null) {
+        h += '（刺杀' + playerLabel(state.assassinTarget) + '）';
+      }
+      h += '</div>';
+      h += '<div style="margin-top:8px"><button class="btn primary" onclick="showPage(\'end\')">进入结束面板</button></div>';
+    }
+    h += '</div>';
+    c.innerHTML = h;
+    return;
+  }
+
+  var votesConfirmed = Object.keys(m.votes).length > 0;
+
+  if (m.leader === null) {
+    if (state._firstLeaderPicked) {
+      var nextLeader = (state._lastLeaderIdx + 1) % pc;
+      selectLeader(nextLeader);
+      return;
+    }
+    h += '<div style="margin-bottom:10px"><div class="step-label">步骤A：选择队长</div><div class="btn-row">';
+    for (var i = 0; i < pc; i++) {
+      h += '<button class="btn' + (i === state.selfIndex ? ' self' : '') + '" onclick="selectLeader(' + i + ')">' + playerLabel(i) + '</button>';
+    }
+    h += '</div></div>';
+    c.innerHTML = h;
+    return;
+  }
+
+  var leaderName = playerLabel(m.leader);
+
+  if (votesConfirmed) {
+    h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
+    h += '<span style="color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+  } else {
+    h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
+    h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
+    h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
+
+    h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div><div class="btn-row">';
+    for (var i = 0; i < pc; i++) {
+      var inTeam = m.team.indexOf(i) !== -1;
+      var sel = inTeam ? ' selected' : '';
+      h += '<button class="btn' + sel + (i === state.selfIndex ? ' self' : '') + '" onclick="toggleTeamMember(' + i + ')">';
+      h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
+      h += '</button>';
+    }
+    h += '</div></div>';
+
+    h += '<div style="text-align:center;margin-bottom:12px">';
+    h += '<button class="btn primary" onclick="confirmTeam()"';
+    if (m.team.length !== reqSize) h += ' disabled';
+    h += '>确认队伍 (' + m.team.length + '/' + reqSize + ')</button></div>';
+  }
+
+  if (votesConfirmed) {
+    h += '<hr style="border-color:var(--border);margin-bottom:10px">';
+    h += '<div class="step-label">步骤C：全员投票 <span style="font-size:11px;color:var(--text-dim);font-weight:400">（默认反对，点击切换赞成）</span></div>';
+    for (var i = 0; i < pc; i++) {
+      var v = m.votes[i];
+      var onTeam = m.team.indexOf(i) !== -1;
+      h += '<div class="vote-row">';
+      h += '<span class="voter-name">' + playerLabel(i) + '</span>';
+      if (onTeam) h += '<span class="on-team">⚔队伍</span>';
+      h += '<div class="vote-btns">';
+      h += '<span class="vote-num">' + (i + 1) + '</span>';
+      h += '<div class="vote-btn approve' + (v === 'approve' ? ' selected' : '') + '" onclick="castVote(' + i + ',\'approve\')">&#128077;</div>';
+      h += '<div class="vote-btn reject' + (v !== 'approve' ? ' selected' : '') + '" onclick="castVote(' + i + ',\'reject\')">&#128078;</div>';
+      h += '</div></div>';
+    }
+    h += '<div style="display:flex;justify-content:flex-end;padding-right:8px;margin-top:4px"><button class="btn small success" onclick="allApprove()">全员赞成</button></div>';
+    h += '<div style="text-align:center;margin-top:8px">';
+    h += '<button class="btn primary" onclick="confirmVotes()">投票完成</button></div>';
+  }
+
+  c.innerHTML = h;
+}
+
+/* ==================== TENDENCY RENDER ==================== */
+function renderTendencyItem(idx, score) {
+  var cls, barCls;
+  if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
+  else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
+  else { cls = 'suspect'; barCls = 'suspect'; }
+  var isSelf = idx === state.selfIndex;
+  var h = '<div class="tendency-item">';
+  h += '<span class="tend-name">' + (isSelf ? '★ ' : '') + playerLabel(idx) + '</span>';
+  h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
+  h += '<span class="tend-score ' + cls + '">' + score + '</span>';
+  h += '</div>';
+  return h;
+}
+
+function renderTendencyMini() {
+  var el = $('tendency-mini');
+  if (!el) return;
+  var h = '';
+  for (var i = 0; i < state.playerCount; i++) {
+    h += renderTendencyItem(i, state.tendencies[i] || 50);
+  }
+  el.innerHTML = h;
+}
+
+function renderTendencyFull() {
+  var el = $('tendency-full');
+  var h = '';
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === state.selfIndex) continue;
+    h += renderTendencyItem(i, state.tendencies[i] || 50);
+  }
+  if (state.selfIndex >= 0) {
+    h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">';
+    h += renderTendencyItem(state.selfIndex, state.tendencies[state.selfIndex] || 50);
+    h += '</div>';
+  }
+  el.innerHTML = h || '<p style="color:var(--text-dim)">暂无数据，请先开始游戏</p>';
+  if (state.myRole) {
+    $('my-role-display').textContent = '我的身份：' + state.myRole + '（权重翻倍）';
+  } else {
+    $('my-role-display').textContent = '';
+  }
+}
+
+/* ==================== GAME ACTIONS ==================== */
+function selectLeader(idx) {
+  var m = state.missions[state.currentRound];
+  m.leader = idx;
+  m.team = [];
+  m.votes = {};
+  m.result = null;
+  m.failCount = 0;
+  m.launchFailures = 0;
+  m.launchAttempts = [];
+  state._firstLeaderPicked = true;
+  state._lastLeaderIdx = idx;
+  renderStepPanel();
+}
+
+function reSelectLeader() {
+  var m = state.missions[state.currentRound];
+  m.leader = null;
+  m.team = [];
+  m.votes = {};
+  state._firstLeaderPicked = false;
+  renderStepPanel();
+}
+
+function toggleTeamMember(idx) {
+  var m = state.missions[state.currentRound];
+  var pos = m.team.indexOf(idx);
+  if (pos !== -1) m.team.splice(pos, 1);
+  else if (m.team.length < m.size) m.team.push(idx);
+  renderStepPanel();
+}
+
+function confirmTeam() {
+  var m = state.missions[state.currentRound];
+  if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
+  m.votes = {};
+  for (var i = 0; i < state.playerCount; i++) {
+    m.votes[i] = 'reject';
+  }
+  renderStepPanel();
+}
+
+function castVote(idx, type) {
+  var m = state.missions[state.currentRound];
+  m.votes[idx] = type;
+  renderStepPanel();
+}
+
+function allApprove() {
+  var m = state.missions[state.currentRound];
+  for (var i = 0; i < state.playerCount; i++) {
+    m.votes[i] = 'approve';
+  }
+  renderStepPanel();
+}
+
+function confirmVotes() {
+  var m = state.missions[state.currentRound];
+  var pc = state.playerCount;
+
+  var approves = 0;
+  var rejects = 0;
+  for (var i = 0; i < pc; i++) {
+    if (m.votes[i] === 'approve') approves++;
+    else rejects++;
+  }
+
+  m.launchAttempts.push({
+    team: m.team.slice(),
+    votes: Object.assign({}, m.votes),
+    leader: m.leader
+  });
+
+  applyLaunchTendencies();
+
+  if (approves > rejects) {
+    renderStepPanelWithResult();
+  } else {
+    m.launchFailures++;
+
+    if (m.launchFailures >= 5) {
+      m.result = 'fail';
+      m.failCount = 0;
+      updateFinalTendencies();
+      checkGameEnd();
+      renderGame();
+      var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮连续 <span class="count">5</span> 次发车失败，任务自动失败！</div>';
+      $('launch-fail-area').innerHTML = banner;
+      return;
+    }
+
+    m.leader = (m.leader + 1) % pc;
+    state._lastLeaderIdx = m.leader;
+    m.team = [];
+    m.votes = {};
+
+    renderGame();
+    var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮第 <span class="count">' + m.launchFailures + '</span> 次发车失败！赞成 ' + approves + ' / 反对 ' + rejects + '（赞成≤反对）队长轮换至 ' + playerLabel(m.leader) + '</div>';
+    $('launch-fail-area').innerHTML = banner;
+    toast('发车失败！队长轮换', 'warn');
+  }
+}
+
+function applyLaunchTendencies() {
+  var m = state.missions[state.currentRound];
+  var si = state.selfIndex;
+  var lastAttempt = m.launchAttempts[m.launchAttempts.length - 1];
+  var myVote = si >= 0 ? lastAttempt.votes[si] : null;
+  var weight = state.myRole ? 2 : 1;
+
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === si) continue;
+    if (!(i in state.tendencies)) state.tendencies[i] = 50;
+    var vote = lastAttempt.votes[i];
+
+    if (myVote) {
+      if (vote === myVote) state.tendencies[i] += 2 * weight;
+      else state.tendencies[i] -= 2 * weight;
+    }
+
+    if (state.tendencies[i] < 0) state.tendencies[i] = 0;
+    if (state.tendencies[i] > 100) state.tendencies[i] = 100;
+  }
+  renderTendencyMini();
+}
+
+function renderStepPanelWithResult() {
+  var m = state.missions[state.currentRound];
+  var c = $('step-container');
+  var h = '';
+
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  h += '<span class="step-label">第' + (state.currentRound + 1) + '轮 · 需要 ' + m.size + ' 人出任务</span>';
+  h += '<span style="font-size:13px;color:var(--text-dim)">进行中</span></div>';
+
+  h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + playerLabel(m.leader) + '</span>';
+  h += '<span style="font-size:13px;color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+
+  var approves = Object.values(m.votes).filter(function(v) { return v === 'approve'; }).length;
+  var rejects = state.playerCount - approves;
+  h += '<div style="font-size:14px;color:var(--green-bright);margin-bottom:10px">发车成功！赞成 ' + approves + ' / 反对 ' + rejects + '</div>';
+
+  h += '<hr style="border-color:var(--border);margin-bottom:10px">';
+  h += '<div class="step-label">步骤D：任务结果</div>';
+  h += '<div class="mission-result-area">';
+  h += '<div class="mission-btn success-btn' + (m.result === 'success' ? ' selected' : '') + '" onclick="setMissionResult(\'success\')">&#128737;</div>';
+  h += '<div class="mission-btn fail-btn' + (m.result === 'fail' ? ' selected' : '') + '" onclick="setMissionResult(\'fail\')">&#128481;</div>';
+  h += '</div>';
+  h += '<div id="fail-count-row" class="fail-count-row" style="display:none">';
+  h += '<div class="step-label">失败票数量</div>';
+  h += '<div class="fail-count-btns" id="fail-count-btns"></div></div>';
+  h += '<div style="text-align:center;margin-top:10px"><button class="btn primary" id="btn-finalize" style="display:none" onclick="finalizeMission()">确认任务结果，进入下一轮</button></div>';
+  c.innerHTML = h;
+
+  if (m.result === 'fail') showFailCountSelector();
+}
+
+function setMissionResult(result) {
+  var m = state.missions[state.currentRound];
+  m.result = result;
+  if (result === 'fail') {
+    m.failCount = 0;
+    showFailCountSelector();
+  } else {
+    m.failCount = 0;
+    document.getElementById('fail-count-row').style.display = 'none';
+  }
+  document.getElementById('btn-finalize').style.display = 'inline-flex';
+}
+
+function showFailCountSelector() {
+  var m = state.missions[state.currentRound];
+  document.getElementById('fail-count-row').style.display = 'block';
+  var fc = '';
+  for (var i = 1; i <= m.team.length; i++) {
+    fc += '<div class="fail-count-btn' + (m.failCount === i ? ' selected' : '') + '" onclick="setFailCount(' + i + ')">' + i + '</div>';
+  }
+  document.getElementById('fail-count-btns').innerHTML = fc;
+  document.getElementById('btn-finalize').style.display = 'inline-flex';
+}
+
+function setFailCount(n) {
+  var m = state.missions[state.currentRound];
+  m.failCount = n;
+  var btns = document.querySelectorAll('#fail-count-btns .fail-count-btn');
+  btns.forEach(function(b) {
+    b.className = 'fail-count-btn' + (parseInt(b.textContent) === n ? ' selected' : '');
+  });
+}
+
+function finalizeMission() {
+  var m = state.missions[state.currentRound];
+  if (!m.result) { toast('请选择任务结果', 'warn'); return; }
+  if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
+
+  updateFinalTendencies();
+
+  // Capture tendency snapshot for this round
+  var snap = {};
+  for (var i = 0; i < state.playerCount; i++) {
+    snap[i] = state.tendencies[i] || 50;
+  }
+  state.roundTendencies.push(snap);
+
+  checkGameEnd();
+  renderGame();
+}
+
+function updateFinalTendencies() {
+  var m = state.missions[state.currentRound];
+  var si = state.selfIndex;
+  var myVote = si >= 0 ? m.votes[si] : null;
+  var result = m.result;
+  var weight = state.myRole ? 2 : 1;
+
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === si) continue;
+    if (!(i in state.tendencies)) state.tendencies[i] = 50;
+
+    var vote = m.votes[i];
+    var inTeam = m.team.indexOf(i) !== -1;
+
+    if (result === 'success') {
+      if (vote === 'approve') state.tendencies[i] += 5;
+      if (vote === 'reject') state.tendencies[i] -= 5;
+      if (inTeam) state.tendencies[i] += 3;
+    } else {
+      if (vote === 'approve') state.tendencies[i] -= 8;
+      if (vote === 'reject') state.tendencies[i] += 8;
+      if (inTeam && vote === 'approve') state.tendencies[i] -= 10;
+      if (!inTeam && vote === 'reject') state.tendencies[i] += 5;
+      if (inTeam) state.tendencies[i] -= 3;
+    }
+
+    if (myVote) {
+      if (vote === myVote) state.tendencies[i] += 2 * weight;
+      else state.tendencies[i] -= 2 * weight;
+    }
+
+    if (state.tendencies[i] < 0) state.tendencies[i] = 0;
+    if (state.tendencies[i] > 100) state.tendencies[i] = 100;
+  }
+  renderTendencyMini();
+}
+
+function checkGameEnd() {
+  var successCount = state.missions.filter(function(mm) { return mm.result === 'success'; }).length;
+  var failCount = state.missions.filter(function(mm) { return mm.result === 'fail'; }).length;
+
+  if (failCount >= 3) {
+    state.winner = 'evil';
+    toast('坏人方成功破坏 3 轮任务！游戏结束');
+    return;
+  }
+  if (successCount >= 3) {
+    showAssassinPhase();
+    return;
+  }
+
+  state.currentRound++;
+  if (state.currentRound >= 5) state.currentRound = 4;
+}
+
+/* ==================== ASSASSIN PHASE ==================== */
+function showAssassinPhase() {
+  var h = '<h2>&#128481; 刺客刺杀环节</h2>';
+  h += '<p class="sub">好人方已完成 3 轮任务，请刺客选择刺杀目标</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
+  for (var i = 0; i < state.playerCount; i++) {
+    h += '<button class="assassin-target-btn' + (state.assassinTarget === i ? ' selected' : '') + '" onclick="pickAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
+  }
+  h += '</div>';
+  h += '<div style="text-align:center;margin-top:14px">';
+  h += '<button class="btn primary" onclick="confirmAssassinTarget()"';
+  if (state.assassinTarget === null) h += ' disabled';
+  h += '>确认刺杀目标</button></div>';
+
+  $('assassin-card').innerHTML = h;
+  $('assassin-overlay').classList.add('active');
+}
+
+function pickAssassinTarget(idx) {
+  state.assassinTarget = idx;
+  var btns = document.querySelectorAll('#assassin-card .assassin-target-btn');
+  btns.forEach(function(b, i) {
+    b.className = 'assassin-target-btn' + (i === idx ? ' selected' : '');
+  });
+  var confirmBtn = document.querySelector('#assassin-card .btn.primary');
+  if (confirmBtn) confirmBtn.disabled = false;
+}
+
+function confirmAssassinTarget() {
+  if (state.assassinTarget === null) return;
+  $('assassin-overlay').classList.remove('active');
+  state.assassinFromMission = true;
+  showPage('end');
+}
+
+/* ==================== END PANEL ==================== */
+function getTakenUniqueRoles(exceptIdx) {
+  var taken = {};
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === exceptIdx) continue;
+    var sel = document.getElementById('end-role-' + i);
+    var role = sel ? sel.value : '';
+    if (role && UNIQUE_ROLES.indexOf(role) !== -1) {
+      taken[role] = true;
+    }
+  }
+  return taken;
+}
+
+function renderEndIdentityDropdowns() {
+  var grid = $('end-identity-grid');
+  var h = '';
+  for (var i = 0; i < state.playerCount; i++) {
+    var taken = getTakenUniqueRoles(i);
+    var curSel = document.getElementById('end-role-' + i);
+    var curVal = curSel ? curSel.value : '';
+
+    h += '<div class="end-player-row">';
+    h += '<span class="ep-name">' + playerLabel(i) + '</span>';
+    h += '<select id="end-role-' + i + '" onchange="onEndRoleChange(' + i + ')">';
+    h += '<option value="">-- 未选 --</option>';
+    for (var j = 0; j < state.activeRoles.length; j++) {
+      var r = state.activeRoles[j];
+      if (UNIQUE_ROLES.indexOf(r) !== -1 && taken[r] && r !== curVal) continue;
+      h += '<option value="' + r + '"' + (r === curVal ? ' selected' : '') + '>' + r + '</option>';
+    }
+    h += '</select>';
+    h += '</div>';
+  }
+  grid.innerHTML = h;
+
+  for (var i = 0; i < state.playerCount; i++) {
+    var sel = document.getElementById('end-role-' + i);
+    if (sel && sel.value) onEndRoleChange(i);
+  }
+}
+
+function renderEnd() {
+  if (state.assassinFromMission && state.assassinTarget !== null && !state.winner) {
+    $('end-assassin-card').style.display = 'block';
+    $('end-target-name').textContent = playerLabel(state.assassinTarget);
+  } else {
+    $('end-assassin-card').style.display = 'none';
+  }
+
+  if (state.assassinFromMission && !state.winner) {
+    $('winner-toggle').innerHTML = '';
+  } else {
+    var h = '<button class="winner-btn good' + (state.winner === 'good' ? ' selected' : '') + '" onclick="setWinner(\'good\')">&#128737; 好人方获胜</button>';
+    h += '<button class="winner-btn evil' + (state.winner === 'evil' ? ' selected' : '') + '" onclick="setWinner(\'evil\')">&#128481; 反方获胜</button>';
+    $('winner-toggle').innerHTML = h;
+  }
+
+  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+  if (!state._lancelotAsked && hasLancelot && !(state.assassinFromMission && !state.winner)) {
+    $('end-lancelot-card').style.display = 'block';
+    state._lancelotAsked = true;
+  } else {
+    $('end-lancelot-card').style.display = 'none';
+  }
+
+  var sc = state.missions.filter(function(m) { return m.result === 'success'; }).length;
+  var fc = state.missions.filter(function(m) { return m.result === 'fail'; }).length;
+  $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
+
+  renderEndIdentityDropdowns();
+}
+
+function onEndRoleChange(idx) {
+  var sel = document.getElementById('end-role-' + idx);
+  var role = sel ? sel.value : '';
+  if (role && UNIQUE_ROLES.indexOf(role) !== -1) {
+    renderEndIdentityDropdowns();
+  }
+}
+
+function setLancelotFlip(val) {
+  state.lancelotFlipped = val;
+  state._lancelotAsked = true;
+  $('end-lancelot-card').style.display = 'none';
+  renderEnd();
+  toast(val ? '兰斯洛特已反转' : '兰斯洛特未反转');
+}
+
+function resolveAssassin(isMerlin) {
+  state.winner = isMerlin ? 'evil' : 'good';
+  state.assassinFromMission = false;
+  $('end-assassin-card').style.display = 'none';
+  $('end-lancelot-card').style.display = 'block';
+  toast(isMerlin ? '刺杀成功！反方获胜' : '刺杀失败！好人方获胜');
+}
+
+function setWinner(w) {
+  state.winner = w;
+  renderEnd();
+}
+
+function saveGameRecord() {
+  if (!state.winner) { toast('请确定获胜方', 'warn'); return; }
+
+  var identities = [];
+  var allFilled = true;
+  for (var i = 0; i < state.playerCount; i++) {
+    var sel = document.getElementById('end-role-' + i);
+    var role = sel ? sel.value : '';
+    identities.push({ name: state.playerNames[i], index: i, role: role });
+    if (!role) allFilled = false;
+  }
+  if (!allFilled) { toast('请为所有玩家选择身份', 'warn'); return; }
+
+  var lancelotFlips = {};
+  for (var i = 0; i < state.playerCount; i++) {
+    var role = identities[i].role;
+    if (role === '兰斯洛特(蓝)' || role === '兰斯洛特(红)') {
+      lancelotFlips[i] = state.lancelotFlipped;
+    }
+  }
+
+  var history = loadHistory();
+  var record = {
+    date: new Date().toISOString().slice(0, 10),
+    playerCount: state.playerCount,
+    winner: state.winner,
+    identities: identities,
+    lancelotFlips: lancelotFlips,
+    activeRoles: state.activeRoles.slice(),
+    roundTendencies: state.roundTendencies || [],
+    assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
+    assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
+    missions: state.missions.map(function(m) {
+      return {
+        round: m.round,
+        size: m.size,
+        leader: m.leader !== null ? playerLabel(m.leader) : '',
+        team: m.team.map(function(i) { return playerLabel(i); }),
+        result: m.result,
+        failCount: m.failCount,
+        launchFailures: m.launchFailures,
+        votes: Object.keys(m.votes).reduce(function(acc, k) {
+          acc[playerLabel(parseInt(k))] = m.votes[k];
+          return acc;
+        }, {})
+      };
+    })
+  };
+  history.push(record);
+  saveHistory(history);
+  toast('对局记录已保存');
+
+  var savedCount = state.playerCount;
+  var savedNames = state.playerNames.slice();
+  var savedSelf = state.selfIndex;
+  var savedRoles = state.activeRoles.slice();
+  initState(savedCount);
+  state.activeRoles = savedRoles;
+  state.playerNames = savedNames;
+  state.selfIndex = savedSelf;
+  state.myRole = null;
+  showPage('setup');
+}
+
+/* ==================== STATS PANEL ==================== */
+function renderStats() {
+  var history = loadHistory();
+  var total = history.length;
+  var goodWins = history.filter(function(h) { return h.winner === 'good'; }).length;
+  var evilWins = history.filter(function(h) { return h.winner === 'evil'; }).length;
+  var winRate = total > 0 ? Math.round(goodWins / total * 100) : 0;
+
+  var h = '<div class="stat-card"><div class="stat-value">' + total + '</div><div class="stat-label">总对局</div></div>';
+  h += '<div class="stat-card"><div class="stat-value" style="color:#99ff99">' + goodWins + '</div><div class="stat-label">好人胜场</div>';
+  h += '<div class="stat-sub">' + winRate + '%</div></div>';
+  h += '<div class="stat-card"><div class="stat-value" style="color:#ff9999">' + evilWins + '</div><div class="stat-label">反方胜场</div>';
+  h += '<div class="stat-sub">' + (total > 0 ? Math.round(evilWins / total * 100) : 0) + '%</div></div>';
+  $('stats-overview').innerHTML = h;
+
+  var ps = state._historyPageSize;
+  var totalPages = Math.ceil(history.length / ps);
+  if (state._historyPage >= totalPages && totalPages > 0) state._historyPage = totalPages - 1;
+  if (state._historyPage < 0) state._historyPage = 0;
+
+  var start = history.length - 1 - state._historyPage * ps;
+  var end = Math.max(-1, start - ps);
+
+  var tbody = document.querySelector('#history-table tbody');
+  h = '';
+  for (var i = start; i > end; i--) {
+    var rec = history[i];
+    if (!rec) continue;
+    var winnerLabel = rec.winner === 'good' ? '<span style="color:#99ff99">好人方</span>' : '<span style="color:#ff9999">反方</span>';
+    h += '<tr>';
+    h += '<td>' + rec.date + '</td>';
+    h += '<td>' + rec.playerCount + '人</td>';
+    h += '<td>' + winnerLabel + '</td>';
+    h += '<td><button class="btn small" onclick="showGameDetail(' + i + ')">详情</button></td>';
+    h += '<td><button class="btn small danger" onclick="deleteGameRecord(' + i + ')">删除</button></td>';
+    h += '</tr>';
+  }
+  tbody.innerHTML = h;
+  document.getElementById('no-history').style.display = history.length === 0 ? 'block' : 'none';
+
+  // Pagination
+  var pageArea = $('pagination-area');
+  if (totalPages <= 1) {
+    pageArea.innerHTML = '';
+  } else {
+    var ph = '<div class="pagination">';
+    ph += '<button class="page-btn" onclick="goHistoryPage(' + (state._historyPage - 1) + ')"' + (state._historyPage === 0 ? ' disabled' : '') + '>‹</button>';
+
+    var pageButtons = [];
+    if (totalPages <= 7) {
+      for (var p = 0; p < totalPages; p++) pageButtons.push(p);
+    } else {
+      pageButtons.push(0);
+      if (state._historyPage > 3) pageButtons.push('...');
+      var pStart = Math.max(1, state._historyPage - 1);
+      var pEnd = Math.min(totalPages - 2, state._historyPage + 1);
+      for (var p = pStart; p <= pEnd; p++) pageButtons.push(p);
+      if (state._historyPage < totalPages - 4) pageButtons.push('...');
+      pageButtons.push(totalPages - 1);
+    }
+
+    for (var k = 0; k < pageButtons.length; k++) {
+      var bp = pageButtons[k];
+      if (bp === '...') {
+        ph += '<span class="page-ellipsis">…</span>';
+      } else {
+        ph += '<button class="page-btn' + (bp === state._historyPage ? ' active' : '') + '" onclick="goHistoryPage(' + bp + ')">' + (bp + 1) + '</button>';
+      }
+    }
+
+    ph += '<button class="page-btn" onclick="goHistoryPage(' + (state._historyPage + 1) + ')"' + (state._historyPage >= totalPages - 1 ? ' disabled' : '') + '>›</button>';
+    ph += '</div>';
+    pageArea.innerHTML = ph;
+  }
+
+  var playerSet = {};
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    for (var j = 0; j < rec.identities.length; j++) {
+      var id = rec.identities[j];
+      var nm = id.name;
+      if (!playerSet[nm]) playerSet[nm] = [];
+      playerSet[nm].push({
+        winner: rec.winner,
+        role: id.role,
+        flipped: rec.lancelotFlips && rec.lancelotFlips[id.index],
+        recIndex: i
+      });
+    }
+  }
+  var names = Object.keys(playerSet);
+  h = '';
+  for (var i = 0; i < names.length; i++) {
+    h += '<button class="btn small" onclick="togglePlayerStat(\'' + names[i] + '\')">' + names[i] + '</button>';
+  }
+  $('player-stat-btns').innerHTML = h;
+  state._playerSetCache = playerSet;
+
+  // Win rate leaderboard
+  var lb = [];
+  for (var nm in playerSet) {
+    var items = playerSet[nm];
+    var totalGames = items.length;
+    var wins = 0;
+    for (var g = 0; g < items.length; g++) {
+      var faction = getFinalFaction(items[g].role, items[g].flipped);
+      if (items[g].winner === faction) wins++;
+    }
+    var rate = totalGames > 0 ? wins / totalGames : 0;
+    lb.push({ name: nm, total: totalGames, wins: wins, rate: rate });
+  }
+  lb.sort(function(a, b) {
+    if (b.rate !== a.rate) return b.rate - a.rate;
+    return b.total - a.total;
+  });
+
+  var lh = '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr>';
+  lh += '<th style="text-align:center;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);width:60px">排名</th>';
+  lh += '<th style="text-align:left;padding:8px;border-bottom:1px solid var(--border)">玩家名</th>';
+  lh += '<th style="text-align:center;padding:8px;border-bottom:1px solid var(--border);width:70px">总场次</th>';
+  lh += '<th style="text-align:center;padding:8px;border-bottom:1px solid var(--border);width:70px">胜场</th>';
+  lh += '<th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);width:80px">胜率</th>';
+  lh += '</tr></thead><tbody>';
+
+  for (var r = 0; r < lb.length; r++) {
+    var p = lb[r];
+    var rateColor = p.rate >= 0.6 ? 'var(--green-bright)' : p.rate >= 0.4 ? 'var(--gold-light)' : 'var(--red-bright)';
+    lh += '<tr>';
+    lh += '<td style="text-align:center;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim)">' + (r + 1) + '</td>';
+    lh += '<td style="text-align:left;padding:8px;border-bottom:1px solid var(--border);font-weight:600">' + p.name + '</td>';
+    lh += '<td style="text-align:center;padding:8px;border-bottom:1px solid var(--border)">' + p.total + '</td>';
+    lh += '<td style="text-align:center;padding:8px;border-bottom:1px solid var(--border)">' + p.wins + '</td>';
+    lh += '<td style="text-align:right;padding:8px;border-bottom:1px solid var(--border);font-weight:700;color:' + rateColor + '">' + Math.round(p.rate * 100) + '%</td>';
+    lh += '</tr>';
+  }
+
+  if (lb.length === 0) {
+    lh += '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-dim)">暂无数据</td></tr>';
+  }
+  lh += '</tbody></table>';
+  $('win-rate-leaderboard').innerHTML = lh;
+}
+
+function goHistoryPage(p) {
+  var history = loadHistory();
+  var totalPages = Math.ceil(history.length / state._historyPageSize);
+  if (p < 0 || p >= totalPages) return;
+  state._historyPage = p;
+  renderStats();
+}
+
+/* ==================== PLAYER STAT ==================== */
+function getFinalFaction(role, flipped) {
+  if (role === '兰斯洛特(蓝)') return flipped ? 'evil' : 'good';
+  if (role === '兰斯洛特(红)') return flipped ? 'good' : 'evil';
+  return GOOD_ROLES.indexOf(role) !== -1 ? 'good' : 'evil';
+}
+
+function togglePlayerStat(name) {
+  var detailEl = $('player-stat-detail');
+  var safeId = 'ps-' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+  var existing = document.getElementById(safeId);
+
+  // Close if clicking the same player
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  // Close any other open detail
+  var allDetails = detailEl.querySelectorAll('.player-stat-expand');
+  for (var d = 0; d < allDetails.length; d++) allDetails[d].remove();
+
+  var data = state._playerSetCache[name];
+  if (!data) return;
+
+  var total = data.length;
+  var totalWins = 0;
+  var gamesGood = 0, winsGood = 0;
+  var gamesEvil = 0, winsEvil = 0;
+  var roleStats = {};
+
+  for (var i = 0; i < data.length; i++) {
+    var d = data[i];
+    var role = d.role;
+    var flipped = d.flipped || false;
+    var finalFaction = getFinalFaction(role, flipped);
+
+    if (finalFaction === 'good') {
+      gamesGood++;
+      if (d.winner === 'good') winsGood++;
+    } else {
+      gamesEvil++;
+      if (d.winner === 'evil') winsEvil++;
+    }
+
+    if (d.winner === finalFaction) totalWins++;
+
+    if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
+    roleStats[role].total++;
+    if (d.winner === getFinalFaction(role, false)) roleStats[role].wins++;
+  }
+
+  var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
+  var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
+  var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
+
+  var h = '<strong>总场次：</strong>' + total + ' 局<br>';
+  h += '<strong>总胜场：</strong>' + totalWins + ' 场 <span style="color:var(--gold-light)">(' + totalRate + '%)</span><br>';
+  h += '<strong>好人方胜率：</strong>' + winsGood + '/' + gamesGood + ' <span style="color:var(--green-bright)">(' + goodRate + '%)</span><br>';
+  h += '<strong>反方胜率：</strong>' + winsEvil + '/' + gamesEvil + ' <span style="color:var(--red-bright)">(' + evilRate + '%)</span><br><br>';
+  h += '<strong>各身份胜率：</strong><table>';
+  for (var j = 0; j < ALL_ROLES.length; j++) {
+    var r = ALL_ROLES[j];
+    var rs = roleStats[r];
+    if (rs) {
+      h += '<tr><td>' + r + '</td><td>' + rs.wins + '/' + rs.total + '</td><td>' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
+    } else {
+      h += '<tr><td>' + r + '</td><td>-</td><td>-</td></tr>';
+    }
+  }
+  h += '</table>';
+
+  var div = document.createElement('div');
+  div.id = safeId;
+  div.className = 'player-stat-expand';
+  div.innerHTML = h;
+  detailEl.appendChild(div);
+}
+
+/* ==================== GAME DETAIL & EDIT ==================== */
+function showGameDetail(idx) {
+  var history = loadHistory();
+  var rec = history[idx];
+  if (!rec) return;
+
+  var h = '<h2>对局详情</h2>';
+  h += '<p><strong>日期：</strong>' + rec.date + ' | <strong>人数：</strong>' + rec.playerCount + '人 | <strong>胜方：</strong>' + (rec.winner === 'good' ? '好人方' : '反方') + '</p>';
+  if (rec.assassinTarget) {
+    h += '<p><strong>刺杀目标：</strong>' + rec.assassinTarget + ' | <strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">刺杀成功</span>' : '<span style="color:#99ff99">刺杀失败</span>') + '</p>';
+  }
+  if (rec.activeRoles) {
+    h += '<p><strong>使用角色：</strong>' + rec.activeRoles.join('、') + '</p>';
+  }
+
+  h += '<h3 style="margin-top:10px">身份分配</h3>';
+  for (var i = 0; i < rec.identities.length; i++) {
+    var id = rec.identities[i];
+    var final = getFinalFaction(id.role, rec.lancelotFlips && rec.lancelotFlips[id.index]);
+    var flipNote = '';
+    if (rec.lancelotFlips && rec.lancelotFlips[id.index]) {
+      flipNote = ' <span style="color:var(--orange);font-size:11px">[反转→' + (final === 'good' ? '好人方' : '反方') + ']</span>';
+    }
+    h += '<div>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + flipNote + '</div>';
+  }
+
+  h += '<h3 style="margin-top:10px">任务记录</h3>';
+  for (var i = 0; i < rec.missions.length; i++) {
+    var m = rec.missions[i];
+    h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
+    if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
+    h += '</div>';
+  }
+
+  if (rec.roundTendencies && rec.roundTendencies.length > 0) {
+    h += '<h3 style="margin-top:10px">倾向值变化</h3>';
+    h += '<table style="font-size:12px;width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid var(--border)"><th style="padding:4px 6px;text-align:left">玩家</th>';
+    for (var r = 0; r < rec.roundTendencies.length; r++) {
+      h += '<th style="padding:4px 6px;text-align:center">第' + (r + 1) + '轮</th>';
+    }
+    h += '</tr>';
+    for (var i = 0; i < rec.identities.length; i++) {
+      var id = rec.identities[i];
+      h += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 6px;font-weight:600">' + (id.index + 1) + '号 ' + id.name + '</td>';
+      for (var r = 0; r < rec.roundTendencies.length; r++) {
+        var val = rec.roundTendencies[r][id.index];
+        if (val !== undefined) {
+          var color = val >= 50 ? 'var(--green-bright)' : 'var(--red-bright)';
+          h += '<td style="padding:4px 6px;text-align:center;color:' + color + ';font-weight:700">' + val + '</td>';
+        } else {
+          h += '<td style="padding:4px 6px;text-align:center;color:var(--text-dim)">-</td>';
+        }
+      }
+      h += '</tr>';
+    }
+    h += '</table>';
+  }
+
+  h += '<div class="modal-actions">';
+  h += '<button class="btn" onclick="showEditGameRecord(' + idx + ')">编辑</button>';
+  h += '<button class="btn" onclick="closeModal()">关闭</button>';
+  h += '</div>';
+  showModal(h);
+}
+
+function showEditGameRecord(idx) {
+  closeModal();
+  var history = loadHistory();
+  var rec = history[idx];
+  if (!rec) return;
+
+  var h = '<h2>编辑对局</h2>';
+  h += '<p style="font-size:13px;color:var(--text-dim)">' + rec.date + ' · ' + rec.playerCount + '人</p>';
+
+  h += '<h3 style="margin-top:8px">胜方</h3>';
+  h += '<div class="winner-toggle" style="margin-bottom:8px">';
+  h += '<button class="winner-btn good' + (rec.winner === 'good' ? ' selected' : '') + '" id="edit-winner-good" onclick="editToggleWinner(\'good\')">&#128737; 好人方</button>';
+  h += '<button class="winner-btn evil' + (rec.winner === 'evil' ? ' selected' : '') + '" id="edit-winner-evil" onclick="editToggleWinner(\'evil\')">&#128481; 反方</button>';
+  h += '</div>';
+
+  if (rec.assassinTarget) {
+    h += '<h3 style="margin-top:8px">刺杀</h3>';
+    h += '<p style="font-size:13px">目标：' + rec.assassinTarget + '</p>';
+    h += '<div class="btn-row" style="margin-bottom:8px">';
+    h += '<button class="btn small' + (rec.assassinSuccess ? ' selected' : '') + '" id="edit-assassin-success" onclick="editToggleAssassin(true)">刺杀成功</button>';
+    h += '<button class="btn small' + (!rec.assassinSuccess ? ' selected' : '') + '" id="edit-assassin-fail" onclick="editToggleAssassin(false)">刺杀失败</button>';
+    h += '</div>';
+  }
+
+  h += '<h3 style="margin-top:8px">玩家身份</h3>';
+  var activeRoles = rec.activeRoles || ALL_ROLES.slice(0, 8);
+  for (var i = 0; i < rec.identities.length; i++) {
+    var id = rec.identities[i];
+    // Collect names already taken by other players
+    var takenEditNames = {};
+    for (var k = 0; k < rec.identities.length; k++) {
+      if (k === i) continue;
+      takenEditNames[rec.identities[k].name] = true;
+    }
+    h += '<div class="edit-player-row">';
+    h += '<span class="ep-name">' + (id.index + 1) + '号</span>';
+    h += '<select id="edit-name-' + i + '" style="flex:0;min-width:72px;padding:7px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:40px">';
+    for (var k = 0; k < namePool.length; k++) {
+      var nm = namePool[k];
+      if (takenEditNames[nm] && nm !== id.name) continue;
+      h += '<option value="' + nm + '"' + (nm === id.name ? ' selected' : '') + '>' + nm + '</option>';
+    }
+    if (namePool.indexOf(id.name) === -1) {
+      h += '<option value="' + id.name + '" selected>' + id.name + '</option>';
+    }
+    h += '</select>';
+    h += '<select id="edit-role-' + i + '">';
+    h += '<option value="">-- 未选 --</option>';
+    for (var j = 0; j < activeRoles.length; j++) {
+      h += '<option value="' + activeRoles[j] + '"' + (activeRoles[j] === id.role ? ' selected' : '') + '>' + activeRoles[j] + '</option>';
+    }
+    h += '</select>';
+    h += '</div>';
+  }
+
+  var hasLancelot = activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || activeRoles.indexOf('兰斯洛特(红)') !== -1;
+  var anyFlipped = false;
+  if (rec.lancelotFlips) {
+    for (var k = 0; k < rec.identities.length; k++) {
+      if (rec.lancelotFlips[rec.identities[k].index]) { anyFlipped = true; break; }
+    }
+  }
+  h += '<h3 style="margin-top:8px">兰斯洛特反转</h3>';
+  h += '<div class="winner-toggle" style="margin-bottom:8px">';
+  h += '<button class="winner-btn good' + (anyFlipped ? ' selected' : '') + '" id="edit-lancelot-yes" onclick="setEditLancelotFlip(true)">&#9989; 是，反转</button>';
+  h += '<button class="winner-btn evil' + (!anyFlipped ? ' selected' : '') + '" id="edit-lancelot-no" onclick="setEditLancelotFlip(false)">&#10060; 否，不反转</button>';
+  h += '</div>';
+
+  h += '<div class="modal-actions">';
+  h += '<button class="btn primary" onclick="saveEditGameRecord(' + idx + ')">保存修改</button>';
+  h += '<button class="btn" onclick="showGameDetail(' + idx + ')">取消</button>';
+  h += '</div>';
+
+  // Store current edit state
+  state._editRec = JSON.parse(JSON.stringify(rec));
+  state._editRec._lancelotFlipped = anyFlipped;
+  state._editIdx = idx;
+
+  showModal(h);
+}
+
+function setEditLancelotFlip(val) {
+  state._editRec._lancelotFlipped = val;
+  var yBtn = document.getElementById('edit-lancelot-yes');
+  var nBtn = document.getElementById('edit-lancelot-no');
+  if (yBtn) yBtn.className = 'winner-btn good' + (val ? ' selected' : '');
+  if (nBtn) nBtn.className = 'winner-btn evil' + (!val ? ' selected' : '');
+}
+
+function editToggleWinner(w) {
+  state._editRec.winner = w;
+  var gBtn = document.getElementById('edit-winner-good');
+  var eBtn = document.getElementById('edit-winner-evil');
+  if (gBtn) gBtn.className = 'winner-btn good' + (w === 'good' ? ' selected' : '');
+  if (eBtn) eBtn.className = 'winner-btn evil' + (w === 'evil' ? ' selected' : '');
+}
+
+function editToggleAssassin(val) {
+  state._editRec.assassinSuccess = val;
+  var sBtn = document.getElementById('edit-assassin-success');
+  var fBtn = document.getElementById('edit-assassin-fail');
+  if (sBtn) sBtn.className = 'btn small' + (val ? ' selected' : '');
+  if (fBtn) fBtn.className = 'btn small' + (!val ? ' selected' : '');
+}
+
+function saveEditGameRecord(idx) {
+  var history = loadHistory();
+  var rec = state._editRec;
+  if (!rec) return;
+
+  // Collect identities from form
+  for (var i = 0; i < rec.identities.length; i++) {
+    var sel = document.getElementById('edit-role-' + i);
+    var nameSel = document.getElementById('edit-name-' + i);
+    if (sel) rec.identities[i].role = sel.value;
+    if (nameSel) rec.identities[i].name = nameSel.value;
+  }
+
+  // Apply global Lancelot flip
+  rec.lancelotFlips = {};
+  for (var i = 0; i < rec.identities.length; i++) {
+    var role = rec.identities[i].role;
+    if (role === '兰斯洛特(蓝)' || role === '兰斯洛特(红)') {
+      rec.lancelotFlips[rec.identities[i].index] = rec._lancelotFlipped || false;
+    }
+  }
+  delete rec._lancelotFlipped;
+
+  // If winner was changed, recalculate assassinSuccess
+  if (rec.assassinTarget) {
+    if (rec.winner === 'evil') rec.assassinSuccess = true;
+    else rec.assassinSuccess = false;
+  }
+
+  history[idx] = rec;
+  saveHistory(history);
+  closeModal();
+  toast('对局记录已更新');
+  renderStats();
+}
+
+function deleteGameRecord(idx) {
+  var h = '<h2>确认删除</h2>';
+  h += '<p>确定要删除这条对局记录吗？此操作不可撤销。</p>';
+  h += '<div class="modal-actions">';
+  h += '<button class="btn danger" onclick="confirmDeleteGame(' + idx + ')">确认删除</button>';
+  h += '<button class="btn" onclick="closeModal()">取消</button>';
+  h += '</div>';
+  showModal(h);
+}
+
+function confirmDeleteGame(idx) {
+  closeModal();
+  var history = loadHistory();
+  if (idx < 0 || idx >= history.length) return;
+  history.splice(idx, 1);
+  saveHistory(history);
+  toast('已删除该对局记录');
+  renderStats();
+}
+
+/* ==================== MODAL ==================== */
+function showModal(html) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay active';
+  overlay.innerHTML = '<div class="modal" id="temp-modal">' + html + '</div>';
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+function closeModal() {
+  var overlays = document.querySelectorAll('.modal-overlay');
+  overlays.forEach(function(o) { o.remove(); });
+}
+
+function clearStats() {
+  var h = '<h2>确认清除</h2><p>确定要清除所有统计记录吗？此操作不可撤销。</p>';
+  h += '<div class="modal-actions">';
+  h += '<button class="btn danger" onclick="confirmClearStats()">确认清除</button>';
+  h += '<button class="btn" onclick="closeModal()">取消</button></div>';
+  showModal(h);
+}
+
+function confirmClearStats() {
+  closeModal();
+  localStorage.removeItem('avalon_history_v2');
+  toast('已清除所有统计');
+  renderStats();
+}
+
+/* ==================== INIT ==================== */
+(function() {
+  var last = loadLastGame();
+  if (last && last.playerCount >= 5 && last.playerCount <= 10) {
+    state.playerCount = last.playerCount;
+    state.playerNames = last.playerNames.slice();
+    state.selfIndex = last.selfIndex;
+    state.tendencies = {};
+    state.consecutiveRejects = {};
+    for (var i = 0; i < state.playerCount; i++) {
+      state.tendencies[i] = 50;
+      state.consecutiveRejects[i] = 0;
+    }
+  }
+  showPage('setup');
+})();
+</script>
+</body>
+</html>
