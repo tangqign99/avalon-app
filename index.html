@@ -380,6 +380,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <div class="btn-row" style="justify-content:center;margin-top:10px">
       <button class="btn small" onclick="exportData()">导出数据</button>
       <button class="btn small" onclick="importData()">导入数据</button>
+      <button class="btn small" onclick="syncFromCloud()">从云端同步</button>
     </div>
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
@@ -1841,16 +1842,25 @@ function exportData() {
       try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
     }
   }
-  var json = JSON.stringify(data, null, 2);
+  var json = JSON.stringify(data);
+
+  // 静默推送至本地 sync server
+  fetch('http://localhost:8090/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: json
+  }).catch(function() {});
+
+  var prettyJson = JSON.stringify(data, null, 2);
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(json).then(function() {
+    navigator.clipboard.writeText(prettyJson).then(function() {
       toast('数据已复制到剪贴板');
     }).catch(function() {
-      showExportModal(json);
+      showExportModal(prettyJson);
     });
   } else {
-    showExportModal(json);
+    showExportModal(prettyJson);
   }
 }
 
@@ -1897,6 +1907,35 @@ function doImport() {
   closeModal();
   toast('已导入 ' + imported + ' 条数据，即将刷新页面');
   setTimeout(function() { location.reload(); }, 800);
+}
+
+function syncFromCloud() {
+  showModal('<h2>从云端同步</h2><p style="font-size:14px;margin-bottom:10px">正在从仓库拉取最新数据...</p>');
+  fetch('https://tangqign99.github.io/avalon-app/data.json?t=' + Date.now())
+    .then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function(data) {
+      if (!data || typeof data !== 'object') { toast('云端数据格式无效', 'warn'); closeModal(); return; }
+      var validKeys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
+      var synced = 0;
+      for (var i = 0; i < validKeys.length; i++) {
+        var k = validKeys[i];
+        if (k in data) {
+          localStorage.setItem(k, JSON.stringify(data[k]));
+          synced++;
+        }
+      }
+      if (synced === 0) { toast('云端未找到有效数据', 'warn'); closeModal(); return; }
+      closeModal();
+      toast('已同步 ' + synced + ' 条数据，即将刷新页面');
+      setTimeout(function() { location.reload(); }, 800);
+    })
+    .catch(function(err) {
+      closeModal();
+      toast('同步失败：' + err.message, 'warn');
+    });
 }
 
 /* ==================== INIT ==================== */
