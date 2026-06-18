@@ -124,6 +124,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .round-dot .badge{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;font-size:10px;line-height:18px;text-align:center;font-weight:700}
 .badge.win{background:#449944;color:#fff}
 .badge.lose{background:#994444;color:#fff}
+.badge.flip{background:#c99a2e;color:#fff;font-size:11px;width:20px;height:20px;line-height:20px}
 .game-layout{display:flex;gap:14px;flex:1}
 .game-main{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
 .game-side{width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
@@ -497,18 +498,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       </div>
     </div>
     <div class="game-side">
+      <div id="lady-lake-holder-info" style="display:none;padding:8px 12px;background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(201,168,76,0.03));border:1px solid var(--gold);border-radius:var(--radius);margin-bottom:8px;text-align:center;font-size:14px;font-weight:700;color:var(--gold-light)"></div>
       <div class="card" style="padding:10px">
-        <h3 style="margin-bottom:6px">倾向值 <span style="font-size:11px;color:var(--text-dim)">(0-100)</span></h3>
-        <div id="tendency-mini"></div>
         <div id="lady-lake-results" style="margin-top:6px"></div>
-        <div class="identity-predict-section" id="identity-predict-section">
-          <h3>身份预测</h3>
-          <div id="predict-player-dropdowns"></div>
-        </div>
-      </div>
-      <div class="card" style="padding:10px">
-        <h3 style="margin-bottom:6px">梅林预测 <span style="font-size:11px;color:var(--text-dim)">（概率降序）</span></h3>
-        <div id="merlin-predict-mini"></div>
       </div>
       <div id="lady-lake-entry" style="display:none">
         <div class="card lady-check-entry">
@@ -545,10 +537,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   </div>
   <div class="card" id="end-lancelot-card" style="display:none">
     <h2>兰斯洛特反转</h2>
-    <p style="font-size:14px;margin-bottom:10px">本局兰斯洛特是否反转？（红兰斯洛特和蓝兰斯洛特阵营互换）</p>
+    <p id="end-lancelot-info" style="font-size:14px;margin-bottom:10px">游戏中抽到反转卡 <span id="end-lancelot-count" style="font-weight:700;color:var(--gold-light)">0</span> 次</p>
     <div class="winner-toggle">
-      <button class="winner-btn good" onclick="setLancelotFlip(true)">&#9989; 是，反转</button>
-      <button class="winner-btn evil" onclick="setLancelotFlip(false)">&#10060; 否，不反转</button>
+      <button class="winner-btn good" id="end-lancelot-yes" onclick="setLancelotFlip(true)">&#9989; 是，反转</button>
+      <button class="winner-btn evil" id="end-lancelot-no" onclick="setLancelotFlip(false)">&#10060; 否，不反转</button>
     </div>
   </div>
   <div class="card">
@@ -635,7 +627,7 @@ var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德',
 var MULTI_ROLES = ['忠臣','爪牙'];
 var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
-var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'];
+var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'];
 
 var namePool = DEFAULT_NAME_POOL.slice();
 
@@ -973,6 +965,8 @@ function doStartGame() {
   state.assassinFromMission = false;
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
+  state.lancelotFlipCount = 0;
+  state.lancelotRoundFlips = [false, false, false, false, false];
   state.ladyLakeChecks = [];
   state.ladyLakeHolder = -1;
   state.roundTendencies = [];
@@ -998,19 +992,18 @@ function doStartGame() {
 function renderGame() {
   renderRoundTracker();
   renderStepPanel();
-  renderTendencyMini();
-  renderMerlinPredictMini();
   renderLadyLakeResults();
+  renderLadyLakeHolderInfo();
   renderLadyLakeEntry();
   renderTimerDisplay();
   renderReviewEntry();
-  renderIdentityPrediction();
   $('launch-fail-area').innerHTML = '';
 }
 
 function renderRoundTracker() {
   var mc = MISSION_COUNTS[state.playerCount];
   var h = '';
+  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   for (var i = 0; i < 5; i++) {
     var m = state.missions[i];
     var cls = '';
@@ -1018,6 +1011,10 @@ function renderRoundTracker() {
     if (i === state.currentRound && !m.result) cls = 'current';
     else if (m && m.result === 'success') { cls = 'success'; extra = '<span class="badge win">&#10003;</span>'; }
     else if (m && m.result === 'fail') { cls = 'fail'; extra = '<span class="badge lose">&#10007;</span>'; }
+    // 反转标记（第2轮起，即i>=1）
+    if (hasLancelot && i >= 1 && state.lancelotRoundFlips[i]) {
+      extra += '<span class="badge flip" title="第' + (i + 1) + '轮抽到反转卡">&#128260;</span>';
+    }
     h += '<div class="round-dot ' + cls + '" onclick="switchRound(' + i + ')">' + mc[i] + extra + '</div>';
   }
   $('round-tracker').innerHTML = h;
@@ -1075,6 +1072,7 @@ function renderStepPanel() {
     for (var i = 0; i < pc; i++) {
       h += '<button class="btn' + (i === state.selfIndex ? ' self' : '') + '" onclick="selectLeader(' + i + ')">' + playerLabel(i) + '</button>';
     }
+    h += '<button class="btn random-leader-btn" onclick="randomFirstLeader()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-weight:700">&#127922; 随机</button>';
     h += '</div></div>';
     c.innerHTML = h;
     return;
@@ -1296,8 +1294,22 @@ function renderLadyLakeResults() {
 function renderLadyLakeEntry() {
   var el = $('lady-lake-entry');
   if (!el) return;
-  // 湖中女神已改为发言环节内联验人，不再显示独立入口按钮
-  el.style.display = 'none';
+  if (state.ladyOfLakeEnabled && state.currentRound >= 2) {
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function renderLadyLakeHolderInfo() {
+  var el = $('lady-lake-holder-info');
+  if (!el) return;
+  if (state.ladyOfLakeEnabled && state.ladyLakeHolder >= 0) {
+    el.style.display = 'block';
+    el.innerHTML = '湖中女神：' + (state.ladyLakeHolder + 1) + '号 ' + state.playerNames[state.ladyLakeHolder];
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 function showLadyCheck() {
@@ -1702,7 +1714,7 @@ function playBeepSound() {
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.type = 'sine';
-    osc.frequency.value = 880;
+    osc.frequency.value = 440;
     gain.gain.value = 0.3;
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.15);
@@ -1712,11 +1724,11 @@ function playBeepSound() {
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
       osc2.type = 'sine';
-      osc2.frequency.value = 1100;
+      osc2.frequency.value = 880;
       gain2.gain.value = 0.3;
       osc2.start(ctx.currentTime);
-      osc2.stop(ctx.currentTime + 0.2);
-    }, 180);
+      osc2.stop(ctx.currentTime + 0.15);
+    }, 170);
   } catch(e) {}
 }
 
@@ -1834,6 +1846,19 @@ function selectLeader(idx) {
   renderStepPanel();
 }
 
+function randomFirstLeader() {
+  var pc = state.playerCount;
+  var idx = Math.floor(Math.random() * pc);
+  showModal(
+    '<h2>随机队长</h2>' +
+    '<p style="font-size:16px;text-align:center;margin:16px 0">随机选中：<strong>' + (idx + 1) + '号 ' + state.playerNames[idx] + '</strong></p>' +
+    '<div class="modal-actions">' +
+    '<button class="btn primary" onclick="closeModal();selectLeader(' + idx + ')">确认</button>' +
+    '<button class="btn" onclick="closeModal()">手动选号</button>' +
+    '</div>'
+  );
+}
+
 function reSelectLeader() {
   var m = state.missions[state.currentRound];
   m.leader = null;
@@ -1854,6 +1879,13 @@ function toggleTeamMember(idx) {
 function confirmTeam() {
   var m = state.missions[state.currentRound];
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
+
+  // 湖中女神：第一轮队长确认后自动设定持有者
+  if (state.currentRound === 0 && state.ladyOfLakeEnabled && state.ladyLakeHolder === -1) {
+    var pc = state.playerCount;
+    state.ladyLakeHolder = (m.leader - 1 + pc) % pc;
+  }
+
   // Start speech phase before voting
   state._teamConfirmedPending = true;
   if (state.timerMode === 'per') {
@@ -2058,6 +2090,10 @@ function finalizeMission() {
   state.roundTendencies.push(snap);
 
   checkGameEnd();
+  // 兰斯洛特反转询问（第2轮起，即currentRound>=1）
+  if (!state.winner && (state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1) && state.currentRound >= 1) {
+    showLancelotFlipModal(state.currentRound);
+  }
   renderGame();
 }
 
@@ -2213,6 +2249,16 @@ function renderEnd() {
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   if (!state._lancelotAsked && hasLancelot && !(state.assassinFromMission && !state.winner)) {
     $('end-lancelot-card').style.display = 'block';
+    if ($('end-lancelot-count')) $('end-lancelot-count').textContent = state.lancelotFlipCount;
+    // 自动应用游戏中累计的反转状态
+    if (state.lancelotFlipCount > 0) {
+      state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+    }
+    // 高亮当前状态按钮
+    var yBtn = $('end-lancelot-yes');
+    var nBtn = $('end-lancelot-no');
+    if (yBtn) yBtn.className = 'winner-btn good' + (state.lancelotFlipped ? ' selected' : '');
+    if (nBtn) nBtn.className = 'winner-btn evil' + (!state.lancelotFlipped ? ' selected' : '');
     state._lancelotAsked = true;
   } else {
     $('end-lancelot-card').style.display = 'none';
@@ -2233,10 +2279,40 @@ function onEndRoleChange(idx) {
   }
 }
 
+function showLancelotFlipModal(roundNum) {
+  var flips = state.lancelotFlipCount;
+  var currentlyFlipped = (flips % 2 !== 0);
+  var flipStatus = currentlyFlipped ? '（当前状态：已反转）' : '（当前状态：未反转）';
+  showModal(
+    '<h2>兰斯洛特反转卡</h2>' +
+    '<p style="font-size:15px;text-align:center;margin:10px 0">第 ' + (roundNum + 1) + ' 轮结束，是否抽到反转卡？</p>' +
+    '<p style="font-size:13px;text-align:center;color:var(--text-dim)">已抽到 ' + flips + ' 次 ' + flipStatus + '</p>' +
+    '<p style="font-size:11px;text-align:center;color:var(--text-dim)">抽到2次恢复原阵营</p>' +
+    '<div class="modal-actions">' +
+    '<button class="btn primary" onclick="closeModal();applyLancelotFlip()">&#9989; 是，反转</button>' +
+    '<button class="btn" onclick="closeModal()">&#10060; 否，不反转</button>' +
+    '</div>'
+  );
+}
+
+function applyLancelotFlip() {
+  state.lancelotFlipCount++;
+  state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+  if (state.currentRound >= 0 && state.currentRound < 5) {
+    state.lancelotRoundFlips[state.currentRound] = true;
+  }
+  toast(state.lancelotFlipped ? '兰斯洛特阵营已反转（第 ' + state.lancelotFlipCount + ' 次）' : '兰斯洛特阵营恢复原状（反转2次）');
+  renderRoundTracker();
+}
+
 function setLancelotFlip(val) {
   state.lancelotFlipped = val;
   state._lancelotAsked = true;
   $('end-lancelot-card').style.display = 'none';
+  var yBtn = $('end-lancelot-yes');
+  var nBtn = $('end-lancelot-no');
+  if (yBtn) yBtn.className = 'winner-btn good' + (val ? ' selected' : '');
+  if (nBtn) nBtn.className = 'winner-btn evil' + (!val ? ' selected' : '');
   renderEnd();
   toast(val ? '兰斯洛特已反转' : '兰斯洛特未反转');
 }
@@ -3206,7 +3282,7 @@ function syncFromCloud() {
   var last = loadLastGame();
   if (last && last.playerCount >= 5 && last.playerCount <= 10) {
     state.playerCount = last.playerCount;
-    state.activeRoles = (last.playerCount === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'] : DEFAULT_ACTIVE_ROLES.slice();
+    state.activeRoles = (last.playerCount === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
     state.playerNames = last.playerNames.slice();
     state.selfIndex = last.selfIndex;
     state.tendencies = {};
