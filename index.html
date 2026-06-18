@@ -332,13 +332,24 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .merlin-pct-col{font-size:13px;font-weight:700;color:var(--gold-light);min-width:44px;text-align:right}
 
 /* 湖中女神 */
-.lady-check-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);margin-top:10px;cursor:pointer;transition:all 0.15s}
-.lady-check-row:hover{border-color:var(--gold)}
-.lady-check-row.checked{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
-.lady-check-row input[type=checkbox]{accent-color:var(--gold);width:28px;height:28px}
-.lady-check-row .lady-label{font-size:15px;font-weight:600}
-.lady-check-row .lady-hint{font-size:12px;color:var(--text-dim);margin-left:4px}
-.lady-check-row.checked .lady-hint{color:var(--gold-light);opacity:0.7}
+.lady-toggle-btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:16px 20px;border-radius:var(--radius);
+  border:2px solid var(--border);background:var(--bg-card);
+  font-size:20px;font-weight:700;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;min-height:68px;
+  font-family:var(--font);color:var(--text);
+}
+.lady-toggle-btn:hover{border-color:var(--gold);transform:scale(1.03)}
+.lady-toggle-btn:active{transform:scale(0.97)}
+.lady-toggle-btn.checked{
+  background:linear-gradient(135deg,var(--gold-dark),rgba(180,140,40,0.7));
+  color:var(--gold-light);
+  border-color:var(--gold);
+  box-shadow:0 0 20px rgba(201,168,76,0.55);
+  text-shadow:0 0 8px rgba(232,212,139,0.5);
+}
+.lady-toggle-hint{font-size:12px;color:var(--text-dim);margin-top:6px;text-align:center}
 .lady-check-entry{margin-top:8px;text-align:center}
 .lady-check-entry button{min-height:44px}
 .lady-check-result{padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;display:inline-block;margin:4px 2px}
@@ -490,6 +501,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   }
   .role-horizontal{gap:18px}
   .faction-label{font-size:13px;padding:3px 10px}
+  .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px}
 }
 
 /* Deduction / 身份推演 */
@@ -634,11 +646,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   </div>
   <div class="card">
     <h2>可选规则</h2>
-    <div id="lady-check-row" class="lady-check-row" onclick="toggleLadyOfLake()">
-      <input type="checkbox" id="lady-checkbox" onclick="event.stopPropagation();toggleLadyOfLake()">
-      <span class="lady-label">湖中女神</span>
-      <span class="lady-hint">（头衔非身份，初始持有者为最后队长右侧玩家）</span>
-    </div>
+    <button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button>
+    <p class="lady-toggle-hint">头衔非身份，初始持有者为最后队长右侧玩家</p>
     <div class="timer-setup" id="timer-setup">
       <h3>计时模式</h3>
       <div class="timer-mode-row">
@@ -1058,12 +1067,9 @@ function renderSetup() {
 
   var mc = MISSION_COUNTS[state.playerCount];
   $('mission-info').textContent = mc ? mc.join('-') : '请先选择人数';
-  // Sync lady-check-row checkbox UI
+  // Sync lady toggle button UI
   var ladyRow = document.getElementById('lady-check-row');
   if (ladyRow) {
-    ladyRow.style.display = '';
-    var cb = document.getElementById('lady-checkbox');
-    if (cb) cb.checked = state.ladyOfLakeEnabled;
     if (state.ladyOfLakeEnabled) { ladyRow.classList.add('checked'); }
     else { ladyRow.classList.remove('checked'); }
   }
@@ -1123,8 +1129,6 @@ function addNameToPool() {
 function toggleLadyOfLake() {
   state.ladyOfLakeEnabled = !state.ladyOfLakeEnabled;
   var row = document.getElementById('lady-check-row');
-  var cb = document.getElementById('lady-checkbox');
-  cb.checked = state.ladyOfLakeEnabled;
   if (state.ladyOfLakeEnabled) { row.classList.add('checked'); }
   else { row.classList.remove('checked'); }
 }
