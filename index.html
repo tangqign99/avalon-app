@@ -3086,6 +3086,15 @@ function confirmDeleteGame(idx) {
   if (idx < 0 || idx >= history.length) return;
   history.splice(idx, 1);
   saveHistory(history);
+
+  // 同步更新 data.json 以便云端同步
+  var syncData = {
+    avalon_name_pool: JSON.parse(localStorage.getItem('avalon_name_pool') || '{}'),
+    avalon_history_v2: history,
+    avalon_last_game: JSON.parse(localStorage.getItem('avalon_last_game') || 'null')
+  };
+  updateLocalDataJson(syncData);
+
   toast('已删除该对局记录');
   renderStats();
 }
