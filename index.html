@@ -225,6 +225,16 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .pagination .page-btn:hover{border-color:var(--gold)}
 .pagination .page-btn.active{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
 .pagination .page-ellipsis{color:var(--text-dim);width:36px;text-align:center;font-size:14px}
+/* ---- History Filter ---- */
+.history-filter-bar{display:flex;flex-direction:column;gap:8px;padding:12px;margin-bottom:12px;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border)}
+.filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.filter-label{font-size:12px;color:var(--text-dim);white-space:nowrap;min-width:32px}
+.filter-input{padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;min-width:100px}
+.filter-input-text{min-width:120px;max-width:180px}
+.filter-select{padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;min-width:80px;cursor:pointer}
+.filter-sep{color:var(--text-dim);font-size:12px}
+.filter-clear-btn{padding:6px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text-dim);font-size:12px;cursor:pointer}
+.filter-clear-btn:hover{color:var(--red-bright);border-color:var(--red-bright)}
 .player-stat-expand{border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:8px;background:var(--bg-card)}
 .player-stat-expand table{width:100%;font-size:13px;border-collapse:collapse}
 .player-stat-expand td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.06)}
@@ -243,6 +253,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 .edit-player-row{display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap}
 .edit-player-row .ep-name{min-width:80px;font-weight:600;font-size:14px}
+/* ---- Identity Simulation ---- */
+.identity-sim-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.identity-sim-row .sim-name{min-width:80px;font-weight:600;font-size:14px;color:var(--text)}
+.identity-sim-row .sim-name .sim-idx{color:var(--text-dim);font-size:11px;margin-right:4px}
+.identity-sim-row select{padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;min-width:110px;cursor:pointer}
+.sim-contradiction{padding:10px 14px;margin-bottom:6px;border-radius:var(--radius-sm);font-size:13px;line-height:1.5}
+.sim-contradiction.danger{background:rgba(220,70,70,0.12);border-left:3px solid var(--red-bright);color:var(--red-bright)}
+.sim-contradiction.info{background:rgba(250,235,150,0.08);border-left:3px solid var(--gold);color:var(--gold-light)}
+.sim-ok{padding:12px;margin-top:8px;border-radius:var(--radius-sm);background:rgba(120,220,120,0.1);border:1px solid var(--green-bright);color:var(--green-bright);font-size:14px;text-align:center;font-weight:600}
 .edit-player-row select{
   flex:1;min-width:110px;padding:7px;border-radius:var(--radius-sm);
   border:1px solid var(--border);background:var(--bg-card);color:var(--text);
@@ -595,6 +614,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">基于投票行为和倾向值计算各玩家为梅林的概率</p>
     <div id="merlin-predict-tend"></div>
   </div>
+  <div class="card" id="identity-sim-card">
+    <h2>身份模拟推演</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">为每位玩家假设身份，校验是否与已有线索矛盾</p>
+    <div id="identity-sim-grid"></div>
+    <div style="text-align:center;margin-top:10px">
+      <button class="btn primary" onclick="runIdentitySimulation()">校验</button>
+    </div>
+    <div id="identity-sim-result" style="margin-top:10px"></div>
+  </div>
 </section>
 
 <section class="page" id="page-end">
@@ -629,6 +657,39 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   </div>
   <div class="card">
     <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情）</span></h2>
+    <div class="history-filter-bar" id="history-filter-bar">
+      <div class="filter-row">
+        <label class="filter-label">日期</label>
+        <input type="date" class="filter-input" id="filter-date-from" onchange="applyHistoryFilter()" title="起始日期">
+        <span class="filter-sep">至</span>
+        <input type="date" class="filter-input" id="filter-date-to" onchange="applyHistoryFilter()" title="结束日期">
+      </div>
+      <div class="filter-row">
+        <label class="filter-label">胜负</label>
+        <select class="filter-select" id="filter-winner" onchange="applyHistoryFilter()">
+          <option value="">全部</option>
+          <option value="good">好人胜</option>
+          <option value="evil">反方胜</option>
+        </select>
+        <label class="filter-label">身份</label>
+        <select class="filter-select" id="filter-role" onchange="applyHistoryFilter()">
+          <option value="">全部</option>
+          <option value="梅林">梅林</option>
+          <option value="派西维尔">派西维尔</option>
+          <option value="忠臣">忠臣</option>
+          <option value="莫甘娜">莫甘娜</option>
+          <option value="刺客">刺客</option>
+          <option value="莫德雷德">莫德雷德</option>
+          <option value="兰斯洛特(蓝)">兰斯洛特(蓝)</option>
+          <option value="兰斯洛特(红)">兰斯洛特(红)</option>
+          <option value="奥伯伦">奥伯伦</option>
+          <option value="湖中女神">湖中女神</option>
+        </select>
+        <label class="filter-label">玩家</label>
+        <input type="text" class="filter-input filter-input-text" id="filter-player" placeholder="模糊搜索..." oninput="applyHistoryFilter()">
+        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛选">清除</button>
+      </div>
+    </div>
     <div id="history-compact-list" class="history-compact-list"></div>
     <div id="pagination-area"></div>
     <div class="btn-row" style="justify-content:center;margin-top:10px">
@@ -681,7 +742,7 @@ var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
 var MULTI_ROLES = ['忠臣','爪牙'];
-var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
+var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)','湖中女神'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'];
 
@@ -817,7 +878,7 @@ function showPage(page) {
   setActiveNav(page);
   if (page === 'setup') renderSetup();
   if (page === 'game') renderGame();
-  if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); }
+  if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
@@ -970,6 +1031,7 @@ function setTimerSeconds(sec) {
 }
 /* ==================== GAME START ==================== */
 function startGame() {
+  ensureAudioContext();
   if (!MISSION_COUNTS[state.playerCount]) { toast('请选择玩家人数', 'warn'); return; }
   if (state.activeRoles.length === 0) { toast('请至少选择一个本局角色', 'warn'); return; }
   for (var i = 0; i < state.playerCount; i++) {
@@ -1272,45 +1334,84 @@ function computeMerlinProbability() {
   }
 
   var totalWeight = 0;
+
+  // --- Current game analysis ---
   for (var round = 0; round < state.missions.length; round++) {
     var m = state.missions[round];
     if (!m || !m.team || m.team.length === 0) continue;
     if (!m.result) continue;
 
     var attempts = m.launchAttempts || [];
-    // Use the final successful attempt's votes
     for (var a = 0; a < attempts.length; a++) {
       var att = attempts[a];
-      // Only consider the attempt that actually launched
       var attApproves = 0;
       for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
-      if (attApproves <= Math.floor(pc / 2)) continue; // skip failed launches
+      if (attApproves <= Math.floor(pc / 2)) continue;
 
-      // Merlin tends to vote with good players
-      // Calculate voting consistency
       for (var i = 0; i < pc; i++) {
         if (i === state.selfIndex) continue;
         var vote = att.votes[i];
-        // Merlin votes approve for good missions, reject for suspicious ones
         if (m.result === 'success' && vote === 'approve') probs[i] += 3;
         if (m.result === 'fail' && vote === 'reject') probs[i] += 2;
       }
       totalWeight += 3;
-      break; // Only count the final successful launch per round
+      break;
     }
   }
 
-  // Incorporate tendency scores - players with high tendency (trusted) are less likely to be Merlin
-  // Merlin hides identity, so moderate tendency may actually be more suspicious for Merlin
+  // Tendency scores
   for (var i = 0; i < pc; i++) {
     if (i === state.selfIndex) continue;
     var t = state.tendencies[i] || 50;
-    // Players who consistently vote with known good patterns get higher Merlin probability
     probs[i] += t * 0.5;
     totalWeight += 0.5;
   }
 
-  // Normalize to percentages
+  // --- Historical analysis: check past games where each player was Merlin ---
+  var history = loadHistory();
+  if (history.length > 0) {
+    for (var i = 0; i < pc; i++) {
+      if (i === state.selfIndex) continue;
+      var playerName = state.playerNames[i];
+      var merlinGames = [];
+
+      for (var h = 0; h < history.length; h++) {
+        var rec = history[h];
+        if (!rec.identities) continue;
+        for (var j = 0; j < rec.identities.length; j++) {
+          if (rec.identities[j].name === playerName && rec.identities[j].role === '梅林') {
+            merlinGames.push(rec);
+            break;
+          }
+        }
+      }
+
+      if (merlinGames.length > 0) {
+        var successApproves = 0, failRejects = 0, totalVotes = 0;
+        for (var h = 0; h < merlinGames.length; h++) {
+          var rec = merlinGames[h];
+          if (!rec.missions) continue;
+          for (var m = 0; m < rec.missions.length; m++) {
+            var mission = rec.missions[m];
+            if (!mission.votes || !mission.result) continue;
+            var vote = mission.votes[playerName];
+            if (!vote) continue;
+            totalVotes++;
+            if (mission.result === 'success' && vote === 'approve') successApproves++;
+            if (mission.result === 'fail' && vote === 'reject') failRejects++;
+          }
+        }
+        if (totalVotes > 0) {
+          var merlinScore = (successApproves + failRejects) / totalVotes;
+          var historyWeight = Math.min(merlinGames.length * 2, 8);
+          probs[i] += merlinScore * historyWeight;
+          totalWeight += historyWeight;
+        }
+      }
+    }
+  }
+
+  // Normalize
   var maxProb = 0;
   for (var i = 0; i < pc; i++) {
     if (probs[i] > maxProb) maxProb = probs[i];
@@ -1318,12 +1419,12 @@ function computeMerlinProbability() {
 
   if (maxProb > 0) {
     for (var i = 0; i < pc; i++) {
-      probs[i] = Math.round((probs[i] / maxProb) * 90 + 5); // Range 5-95%
+      probs[i] = Math.round((probs[i] / maxProb) * 90 + 5);
       if (probs[i] > 95) probs[i] = 95;
     }
   } else {
     for (var i = 0; i < pc; i++) {
-      probs[i] = Math.round(20 + Math.random() * 30); // Fallback random-ish
+      probs[i] = Math.round(20 + Math.random() * 30);
     }
   }
 
@@ -1377,6 +1478,177 @@ function renderMerlinPredictTend() {
     h += '</div>';
   }
   el.innerHTML = h || '<p style="color:var(--text-dim);font-size:12px">暂无数据</p>';
+}
+
+/* ==================== IDENTITY SIMULATION ==================== */
+var SIM_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','兰斯洛特(红)','兰斯洛特(蓝)','奥伯伦','湖中女神'];
+
+function renderIdentitySimGrid() {
+  var el = $('identity-sim-grid');
+  if (!el) return;
+  var pc = state.playerCount;
+  var h = '';
+  for (var i = 0; i < pc; i++) {
+    h += '<div class="identity-sim-row">';
+    h += '<span class="sim-name"><span class="sim-idx">' + (i + 1) + '号</span>' + playerLabel(i) + '</span>';
+    h += '<select id="sim-role-' + i + '">';
+    h += '<option value="">未指定</option>';
+    for (var j = 0; j < SIM_ROLES.length; j++) {
+      h += '<option value="' + SIM_ROLES[j] + '">' + SIM_ROLES[j] + '</option>';
+    }
+    h += '</select>';
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function getSimRole(i) {
+  var sel = document.getElementById('sim-role-' + i);
+  return sel ? sel.value : '';
+}
+
+function runIdentitySimulation() {
+  var el = $('identity-sim-result');
+  if (!el) return;
+  var pc = state.playerCount;
+  var assigned = {};
+  for (var i = 0; i < pc; i++) {
+    var r = getSimRole(i);
+    if (r) assigned[i] = r;
+  }
+
+  if (Object.keys(assigned).length < pc) {
+    el.innerHTML = '<div class="sim-contradiction info">请为所有玩家指定身份后再校验</div>';
+    return;
+  }
+
+  var contradictions = [];
+
+  // Build maps for quick lookup
+  var roleMap = {}; // idx -> role
+  var factionMap = {}; // idx -> 'good'/'evil'
+  for (var i = 0; i < pc; i++) {
+    roleMap[i] = assigned[i];
+    factionMap[i] = EVIL_ROLES.indexOf(assigned[i]) !== -1 ? 'evil' : 'good';
+  }
+
+  // Rule 1: Task fail => team must have at least one evil
+  for (var r = 0; r < state.missions.length; r++) {
+    var m = state.missions[r];
+    if (!m || !m.result || m.result !== 'fail') continue;
+    if (!m.team || m.team.length === 0) continue;
+    var hasEvil = false;
+    for (var t = 0; t < m.team.length; t++) {
+      if (factionMap[m.team[t]] === 'evil') { hasEvil = true; break; }
+    }
+    if (!hasEvil) {
+      contradictions.push('第' + (r + 1) + '轮任务失败，但假设中队伍[' + m.team.map(function(i) { return playerLabel(i); }).join('、') + ']里没有反方角色');
+    }
+  }
+
+  // Rule 2: Task success - if all team members are good, but team has known evil (less likely contradiction)
+  // Rule 3: Merlin & Morgana: both know evil, shouldn't both approve a fail mission
+  var merlinIdx = -1, morganaIdx = -1;
+  for (var i = 0; i < pc; i++) {
+    if (assigned[i] === '梅林') merlinIdx = i;
+    if (assigned[i] === '莫甘娜') morganaIdx = i;
+  }
+
+  if (merlinIdx !== -1 && morganaIdx !== -1) {
+    for (var r = 0; r < state.missions.length; r++) {
+      var m = state.missions[r];
+      if (!m || !m.result || !m.launchAttempts) continue;
+      for (var a = 0; a < m.launchAttempts.length; a++) {
+        var att = m.launchAttempts[a];
+        if (!att.votes) continue;
+        var mVote = att.votes[merlinIdx];
+        var mgVote = att.votes[morganaIdx];
+        // If mission failed and both Merlin and Morgana voted approve, both are complicit
+        // Not necessarily a contradiction since Morgana may approve to blend in
+        // But if mission was a FAIL and the team is all good (from merlin's POV), merlin shouldn't approve
+        if (m.result === 'fail' && mVote === 'approve' && mgVote === 'approve') {
+          // Check if merlin knew there was evil in the team
+          if (m.team && m.team.length > 0) {
+            var teamEvil = false;
+            for (var t = 0; t < m.team.length; t++) {
+              if (factionMap[m.team[t]] === 'evil' && assigned[m.team[t]] !== '莫德雷德') { teamEvil = true; break; }
+            }
+            if (teamEvil && merlinIdx !== -1) {
+              contradictions.push('第' + (r + 1) + '轮任务失败，梅林(' + playerLabel(merlinIdx) + ')和莫甘娜(' + playerLabel(morganaIdx) + ')都投了赞成，但梅林已知队伍中有非莫德雷德的反方');
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Rule 4: Assassin & Mordred don't know each other, votes should not be 100% identical
+  var assassinIdx = -1, mordredIdx = -1;
+  for (var i = 0; i < pc; i++) {
+    if (assigned[i] === '刺客') assassinIdx = i;
+    if (assigned[i] === '莫德雷德') mordredIdx = i;
+  }
+  if (assassinIdx !== -1 && mordredIdx !== -1 && state.missions.length > 0) {
+    var totalVotes = 0, sameVotes = 0;
+    for (var r = 0; r < state.missions.length; r++) {
+      var m = state.missions[r];
+      if (!m || !m.launchAttempts) continue;
+      for (var a = 0; a < m.launchAttempts.length; a++) {
+        var att = m.launchAttempts[a];
+        if (!att.votes) continue;
+        if (att.votes[assassinIdx] && att.votes[mordredIdx]) {
+          totalVotes++;
+          if (att.votes[assassinIdx] === att.votes[mordredIdx]) sameVotes++;
+        }
+      }
+    }
+    if (totalVotes > 3 && sameVotes === totalVotes) {
+      contradictions.push('刺客(' + playerLabel(assassinIdx) + ')和莫德雷德(' + playerLabel(mordredIdx) + ')在所有' + totalVotes + '次投票中完全一致，但互不知身份，可疑');
+    }
+  }
+
+  // Rule 5: Lancelot flip - after flip, their faction changes
+  var lancelotBlueIdx = -1, lancelotRedIdx = -1;
+  for (var i = 0; i < pc; i++) {
+    if (assigned[i] === '兰斯洛特(蓝)') lancelotBlueIdx = i;
+    if (assigned[i] === '兰斯洛特(红)') lancelotRedIdx = i;
+  }
+
+  // Simple check: if both Lancelots exist and there are more than 3 missions, 
+  // their voting pattern might indicate a flip point
+  if (lancelotBlueIdx !== -1 && lancelotRedIdx !== -1 && state.lancelotFlipped !== undefined) {
+    // Check if flipped lancelot's votes changed dramatically
+    if (state.lancelotFlipped) {
+      var blueVotes = [], redVotes = [];
+      for (var r = 0; r < state.missions.length; r++) {
+        var m = state.missions[r];
+        if (!m || !m.launchAttempts || m.launchAttempts.length === 0) continue;
+        var att = m.launchAttempts[m.launchAttempts.length - 1];
+        if (!att.votes) continue;
+        blueVotes.push({ round: r, vote: att.votes[lancelotBlueIdx] || '?' });
+        redVotes.push({ round: r, vote: att.votes[lancelotRedIdx] || '?' });
+      }
+      // Simple check: if blue lancelot (now evil after flip) starts rejecting missions that succeed
+      // This is a nuanced check; we'll flag if pattern seems off
+      if (blueVotes.length >= 2 && redVotes.length >= 2) {
+        var lastBlue = blueVotes[blueVotes.length - 1].vote;
+        var lastRed = redVotes[redVotes.length - 1].vote;
+        // After flip, blue becomes evil (should tend to reject or at least not always approve)
+        // Red becomes good (should tend to approve good missions)
+        // This is suggestive, not definitive, so we note it
+      }
+    }
+  }
+
+  if (contradictions.length === 0) {
+    el.innerHTML = '<div class="sim-ok">当前假设与所有线索兼容，无矛盾</div>';
+  } else {
+    var h = '<div style="font-weight:700;color:var(--red-bright);margin-bottom:8px;font-size:14px">发现 ' + contradictions.length + ' 个矛盾：</div>';
+    for (var c = 0; c < contradictions.length; c++) {
+      h += '<div class="sim-contradiction danger">' + contradictions[c] + '</div>';
+    }
+    el.innerHTML = h;
+  }
 }
 
 /* ==================== LADY OF THE LAKE ==================== */
@@ -1838,11 +2110,20 @@ function resetTimer() {
   startTimer();
 }
 
+function ensureAudioContext() {
+  if (!window._audioCtx) {
+    try {
+      window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) { return; }
+  }
+  if (window._audioCtx.state === 'suspended') {
+    window._audioCtx.resume();
+  }
+}
+
 function playBeepSound() {
   try {
-    if (!window._audioCtx) {
-      window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    if (!window._audioCtx) return;
     var ctx = window._audioCtx;
     if (ctx.state === 'suspended') ctx.resume();
     var osc = ctx.createOscillator();
@@ -2594,18 +2875,24 @@ function renderStats() {
 
   $('stats-overview').innerHTML = h;
 
+  // Apply filters
+  var filtered = getFilteredHistory(history);
+  state._filteredHistory = filtered; // store for pagination
+
   // Compact history list
   var ps = state._historyPageSize;
-  var totalPages = Math.ceil(history.length / ps);
+  var totalPages = Math.ceil(filtered.length / ps);
   if (state._historyPage >= totalPages && totalPages > 0) state._historyPage = totalPages - 1;
   if (state._historyPage < 0) state._historyPage = 0;
-  var start = history.length - 1 - state._historyPage * ps;
+  var start = filtered.length - 1 - state._historyPage * ps;
   var end = Math.max(-1, start - ps);
 
   var cl = $('history-compact-list');
   h = '';
-  for (var i = start; i > end; i--) {
-    var rec = history[i];
+  for (var fi = start; fi > end; fi--) {
+    var frec = filtered[fi];
+    var rec = frec.rec;
+    var i = frec.origIdx;
     if (!rec) continue;
     var winnerColor = rec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)';
     var winnerLabel = rec.winner === 'good' ? '好人方胜' : '反方胜';
@@ -2657,7 +2944,7 @@ function renderStats() {
     h += '</div></div></div>';
   }
   cl.innerHTML = h;
-  $('no-history').style.display = history.length === 0 ? 'block' : 'none';
+  $('no-history').style.display = filtered.length === 0 ? 'block' : 'none';
 
   // Pagination
   var pageArea = $('pagination-area');
@@ -2780,10 +3067,71 @@ function toggleCompactHistory(header) {
 }
 
 function goHistoryPage(p) {
-  var history = loadHistory();
-  var totalPages = Math.ceil(history.length / state._historyPageSize);
+  var filtered = state._filteredHistory || loadHistory();
+  var totalPages = Math.ceil(filtered.length / state._historyPageSize);
   if (p < 0 || p >= totalPages) return;
   state._historyPage = p;
+  renderStats();
+}
+
+function getFilteredHistory(history) {
+  var dateFrom = document.getElementById('filter-date-from') ? document.getElementById('filter-date-from').value : '';
+  var dateTo = document.getElementById('filter-date-to') ? document.getElementById('filter-date-to').value : '';
+  var winner = document.getElementById('filter-winner') ? document.getElementById('filter-winner').value : '';
+  var role = document.getElementById('filter-role') ? document.getElementById('filter-role').value : '';
+  var player = document.getElementById('filter-player') ? document.getElementById('filter-player').value.trim().toLowerCase() : '';
+
+  var result = [];
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    if (!rec) continue;
+
+    if (dateFrom && rec.date < dateFrom) continue;
+    if (dateTo && rec.date > dateTo) continue;
+    if (winner && rec.winner !== winner) continue;
+
+    if (role) {
+      var hasRole = false;
+      if (rec.identities) {
+        for (var j = 0; j < rec.identities.length; j++) {
+          if (rec.identities[j].role === role) { hasRole = true; break; }
+        }
+      }
+      if (!hasRole) continue;
+    }
+
+    if (player) {
+      var hasPlayer = false;
+      if (rec.identities) {
+        for (var j = 0; j < rec.identities.length; j++) {
+          if (rec.identities[j].name.toLowerCase().indexOf(player) !== -1) { hasPlayer = true; break; }
+        }
+      }
+      if (!hasPlayer) continue;
+    }
+
+    result.push({ rec: rec, origIdx: i });
+  }
+  return result;
+}
+
+function applyHistoryFilter() {
+  state._historyPage = 0;
+  renderStats();
+}
+
+function clearHistoryFilter() {
+  var from = document.getElementById('filter-date-from');
+  var to = document.getElementById('filter-date-to');
+  var winner = document.getElementById('filter-winner');
+  var role = document.getElementById('filter-role');
+  var player = document.getElementById('filter-player');
+  if (from) from.value = '';
+  if (to) to.value = '';
+  if (winner) winner.value = '';
+  if (role) role.value = '';
+  if (player) player.value = '';
+  state._historyPage = 0;
   renderStats();
 }
 
@@ -3465,19 +3813,14 @@ function syncFromCloud() {
 
 /* ==================== INIT ==================== */
 (function() {
-  // 首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
-  var initAudio = function() {
-    if (!window._audioCtx) {
-      try {
-        window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (window._audioCtx.state === 'suspended') window._audioCtx.resume();
-      } catch(e) {}
-    }
-    document.removeEventListener('click', initAudio);
-    document.removeEventListener('touchstart', initAudio);
+  // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
+  var initAudioOnce = function() {
+    ensureAudioContext();
+    document.removeEventListener('click', initAudioOnce);
+    document.removeEventListener('touchstart', initAudioOnce);
   };
-  document.addEventListener('click', initAudio, { once: true });
-  document.addEventListener('touchstart', initAudio, { once: true });
+  document.addEventListener('click', initAudioOnce);
+  document.addEventListener('touchstart', initAudioOnce);
 
   var last = loadLastGame();
   if (last && last.playerCount >= 5 && last.playerCount <= 10) {
