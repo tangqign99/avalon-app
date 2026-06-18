@@ -33,6 +33,29 @@ def run_git(args):
         return -1, "", "git timeout"
 
 
+@app.route("/save", methods=["POST"])
+def save():
+    """只写文件，不 commit/push"""
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] /save: invalid JSON - {e}")
+        return jsonify({"error": "invalid JSON"}), 400
+
+    if not isinstance(data, dict):
+        print(f"[{datetime.now()}] /save: received non-object JSON")
+        return jsonify({"error": "body must be a JSON object"}), 400
+
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"[{datetime.now()}] /save: wrote {len(json.dumps(data))} bytes to data.json")
+        return jsonify({"status": "ok", "file": DATA_FILE})
+    except Exception as e:
+        print(f"[{datetime.now()}] /save: write failed - {e}")
+        return jsonify({"error": "write failed"}), 500
+
+
 @app.route("/sync", methods=["POST"])
 def sync():
     try:

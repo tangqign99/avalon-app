@@ -378,6 +378,17 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .predict-form .predict-level-select{min-width:64px}
 .predict-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;flex-wrap:wrap}
 .predict-player-row .predict-pname{font-size:13px;font-weight:600;color:var(--text-bright);min-width:70px}
+
+/* ===== 同步诊断 ===== */
+.sync-status-card{background:linear-gradient(135deg,rgba(74,144,217,0.08),rgba(74,144,217,0.03));border:1px solid rgba(74,144,217,0.3);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.sync-status-card h3{color:var(--blue);font-size:15px;margin-bottom:10px}
+.sync-stat-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.sync-stat-row .sync-key{color:var(--text-dim)}
+.sync-stat-row .sync-val{font-weight:600;color:var(--text-bright)}
+.sync-stat-row .sync-val.ok{color:var(--green-bright)}
+.sync-stat-row .sync-val.warn{color:var(--orange)}
+.sync-stat-row .sync-val.bad{color:var(--red-bright)}
+.sync-hint{font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -457,6 +468,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <div class="btn-row" style="justify-content:center;margin-top:6px" id="timer-btns" hidden>
       <button class="btn small success" onclick="speakEnd()">发言结束</button>
       <button class="btn small" onclick="resetTimer()">重置时间</button>
+      <button class="btn small danger" onclick="endAllSpeak()">结束所有发言</button>
     </div>
   </div>
   <div class="game-layout">
@@ -544,6 +556,19 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       <div class="ma-value" id="ma-rate">--</div>
       <div class="ma-label">梅林被刺率</div>
       <div class="ma-detail" id="ma-detail"></div>
+    </div>
+  </div>
+  <div class="stats-two-col">
+    <div class="card" style="flex:1">
+      <h2>同步状态</h2>
+      <div id="sync-status-content">
+        <p style="color:var(--text-dim);font-size:13px">正在检查...</p>
+      </div>
+      <div class="btn-row" style="margin-top:10px;justify-content:center">
+        <button class="btn small" onclick="syncFromCloud()">从云端同步</button>
+        <button class="btn small success" onclick="pushDataToFile()">保存数据到本地文件</button>
+      </div>
+      <p class="sync-hint" id="sync-hint-text"></p>
     </div>
   </div>
   <div class="stats-two-col">
@@ -1536,6 +1561,21 @@ function speakEnd() {
   }
 }
 
+function endAllSpeak() {
+  stopTimer();
+  state.speakerOrder = [];
+  state.currentSpeakerIdx = -1;
+  state.speakTimes = {};
+  var el = $('timer-display');
+  if (el) el.style.display = 'none';
+  var btnRow = document.getElementById('timer-btns');
+  if (btnRow) btnRow.hidden = true;
+  toast('已结束所有玩家发言');
+  if (state._teamConfirmedPending) {
+    setTimeout(function() { transitionToVotes(); }, 500);
+  }
+}
+
 function resetTimer() {
   stopTimer();
   state.timerRemaining = (state.timerMode === 'all') ? 5 * 60 : state.timerSeconds;
@@ -2161,6 +2201,14 @@ function saveGameRecord() {
   saveHistory(history);
   toast('对局记录已保存');
 
+  // 自动更新 data.json 以便云端同步
+  var syncData = {
+    avalon_name_pool: namePool,
+    avalon_history_v2: history,
+    avalon_last_game: JSON.parse(localStorage.getItem('avalon_last_game') || 'null')
+  };
+  updateLocalDataJson(syncData);
+
   var savedCount = state.playerCount;
   var savedNames = state.playerNames.slice();
   var savedSelf = state.selfIndex;
@@ -2367,6 +2415,7 @@ function renderStats() {
     lh = '<div style="text-align:center;padding:16px;color:var(--text-dim)">暂无数据</div>';
   }
   $('win-rate-leaderboard').innerHTML = lh;
+  renderSyncStatus();
 }
 
 function toggleCompactHistory(header) {
@@ -2743,6 +2792,9 @@ function exportData() {
     body: json
   }).catch(function() {});
 
+  // 更新本地 data.json 以便 git commit
+  updateLocalDataJson(data);
+
   var prettyJson = JSON.stringify(data, null, 2);
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2809,6 +2861,7 @@ function syncFromCloud() {
         if (res.status === 404) {
           closeModal();
           toast('暂无云端数据', 'info');
+          renderSyncStatus();
           return;
         }
         throw new Error('HTTP ' + res.status);
@@ -2816,17 +2869,30 @@ function syncFromCloud() {
       return res.json();
     })
     .then(function(data) {
-      if (!data || typeof data !== 'object') { toast('云端数据格式无效', 'warn'); closeModal(); return; }
+      if (!data || typeof data !== 'object') { toast('云端数据格式无效', 'warn'); closeModal(); renderSyncStatus(); return; }
       var validKeys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
       var synced = 0;
+      var skipped = 0;
+      var detail = [];
       for (var i = 0; i < validKeys.length; i++) {
         var k = validKeys[i];
         if (k in data) {
+          var oldVal = localStorage.getItem(k);
           localStorage.setItem(k, JSON.stringify(data[k]));
           synced++;
+          var localCount = 0, cloudCount = 0;
+          try {
+            if (k === 'avalon_history_v2') {
+              localCount = oldVal ? JSON.parse(oldVal).length : 0;
+              cloudCount = data[k].length || 0;
+            }
+          } catch(e) {}
+          detail.push({ key: k, localCount: localCount, cloudCount: cloudCount });
+        } else {
+          skipped++;
         }
       }
-      if (synced === 0) { toast('云端未找到有效数据', 'warn'); closeModal(); return; }
+      if (synced === 0) { toast('云端未找到有效数据', 'warn'); closeModal(); renderSyncStatus(); return; }
       closeModal();
       toast('已同步 ' + synced + ' 条数据，即将刷新页面');
       setTimeout(function() { location.reload(); }, 800);
@@ -2834,6 +2900,166 @@ function syncFromCloud() {
     .catch(function(err) {
       closeModal();
       toast('同步失败：' + err.message, 'warn');
+      renderSyncStatus();
+    });
+}
+
+function renderSyncStatus() {
+  var el = $('sync-status-content');
+  if (!el) return;
+  var history = loadHistory();
+  var cloudData = null;
+  var cloudError = '';
+  try {
+    var raw = localStorage.getItem('avalon_sync_meta');
+    if (raw) cloudData = JSON.parse(raw);
+  } catch(e) {}
+
+  var localGames = history.length;
+  var cloudGames = 0;
+  var lastSyncTime = '';
+  var syncOk = false;
+
+  if (cloudData && cloudData.cloudGames !== undefined) {
+    cloudGames = cloudData.cloudGames;
+    lastSyncTime = cloudData.lastCheck || '';
+    syncOk = cloudData.syncOk === true;
+  }
+
+  // Also check data.json's local copy
+  var dataJson = null;
+  fetch('./data.json?t=' + Date.now()).then(function(res) {
+    return res.json();
+  }).then(function(d) {
+    dataJson = d;
+    updateSyncStatusDisplay(localGames, cloudGames, lastSyncTime, syncOk, dataJson, cloudError);
+  }).catch(function() {
+    updateSyncStatusDisplay(localGames, cloudGames, lastSyncTime, syncOk, null, '无法读取本地 data.json');
+  });
+}
+
+function updateSyncStatusDisplay(localGames, cloudGames, lastSyncTime, syncOk, dataJson, cloudError) {
+  var el = $('sync-status-content');
+  if (!el) return;
+
+  var djGames = 0;
+  if (dataJson && dataJson.avalon_history_v2 && Array.isArray(dataJson.avalon_history_v2)) {
+    djGames = dataJson.avalon_history_v2.length;
+  }
+
+  var h = '<div class="sync-stat-row"><span class="sync-key">本地 localStorage 对局数</span><span class="sync-val ok">' + localGames + ' 局</span></div>';
+  h += '<div class="sync-stat-row"><span class="sync-key">本地 data.json 对局数</span><span class="sync-val ' + (djGames === localGames ? 'ok' : 'warn') + '">' + djGames + ' 局' + (djGames !== localGames ? ' (不同步！)' : '') + '</span></div>';
+  h += '<div class="sync-stat-row"><span class="sync-key">上次云端检查</span><span class="sync-val">' + (lastSyncTime || '未检查') + '</span></div>';
+  h += '<div class="sync-stat-row"><span class="sync-key">云端对局数</span><span class="sync-val ' + (cloudGames > 0 ? 'ok' : 'warn') + '">' + (lastSyncTime ? cloudGames + ' 局' : '未知') + '</span></div>';
+  if (cloudError) {
+    h += '<div class="sync-stat-row"><span class="sync-key">云端状态</span><span class="sync-val bad">读取失败</span></div>';
+  }
+  el.innerHTML = h;
+
+  var hintEl = $('sync-hint-text');
+  if (hintEl) {
+    if (djGames !== localGames && localGames > 0) {
+      hintEl.textContent = '⚠ data.json 与 localStorage 不同步！请点击"保存数据到本地文件"按钮同步，然后通过 git push 推送到 GitHub Pages。\n朋友访问地址：https://tangqign99.github.io/avalon-app/';
+    } else if (localGames > 0) {
+      hintEl.textContent = '数据文件已同步。推送到 GitHub 后，朋友刷新 https://tangqign99.github.io/avalon-app/ 点击"从云端同步"即可获取最新数据。';
+    } else {
+      hintEl.textContent = '暂无对局数据。开始游戏并保存记录后，将自动更新到本地数据文件。';
+    }
+  }
+}
+
+function pushDataToFile() {
+  var data = {};
+  var keys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
+  for (var i = 0; i < keys.length; i++) {
+    var val = localStorage.getItem(keys[i]);
+    if (val !== null) {
+      try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
+    }
+  }
+  var json = JSON.stringify(data);
+  updateLocalDataJson(data);
+  fetch('http://localhost:8090/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: json
+  }).then(function(res) {
+    if (res.ok) {
+      toast('数据已保存到 data.json！现在可以 git push 到 GitHub');
+    } else {
+      toast('保存失败（本地同步服务未运行？），可手动导出数据', 'warn');
+    }
+    renderSyncStatus();
+  }).catch(function() {
+    toast('本地同步服务未运行。已更新本地 data.json，请手动 git push', 'warn');
+    renderSyncStatus();
+  });
+}
+
+function updateLocalDataJson(data) {
+  var json = JSON.stringify(data, null, 2);
+  try {
+    // 尝试通过本地 sync server 写入文件
+    fetch('http://localhost:8090/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    }).catch(function() {});
+  } catch(e) {}
+}
+
+function syncFromCloud() {
+  var meta = {
+    lastCheck: new Date().toLocaleString('zh-CN'),
+    syncOk: false,
+    cloudGames: 0
+  };
+  showModal('<h2>从云端同步</h2><p style="font-size:14px;margin-bottom:10px">正在从 GitHub Pages 拉取最新数据...</p>');
+  fetch('https://tangqign99.github.io/avalon-app/data.json?t=' + Date.now())
+    .then(function(res) {
+      if (!res.ok) {
+        if (res.status === 404) {
+          closeModal();
+          localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
+          toast('云端暂无数据文件。请先在本地保存数据并推送到 GitHub。', 'info');
+          renderSyncStatus();
+          return;
+        }
+        throw new Error('HTTP ' + res.status);
+      }
+      return res.json();
+    })
+    .then(function(data) {
+      if (!data || typeof data !== 'object') {
+        toast('云端数据格式无效', 'warn'); closeModal(); renderSyncStatus(); return;
+      }
+      var validKeys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
+      var synced = 0;
+      var cloudGameCount = 0;
+      for (var i = 0; i < validKeys.length; i++) {
+        var k = validKeys[i];
+        if (k in data) {
+          localStorage.setItem(k, JSON.stringify(data[k]));
+          synced++;
+          if (k === 'avalon_history_v2' && Array.isArray(data[k])) {
+            cloudGameCount = data[k].length;
+          }
+        }
+      }
+      meta.syncOk = true;
+      meta.cloudGames = cloudGameCount;
+      localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
+      if (synced === 0) { toast('云端未找到有效数据', 'warn'); closeModal(); renderSyncStatus(); return; }
+      closeModal();
+      toast('已同步 ' + synced + ' 项数据（云端 ' + cloudGameCount + ' 局）');
+      renderSyncStatus();
+      setTimeout(function() { location.reload(); }, 800);
+    })
+    .catch(function(err) {
+      closeModal();
+      localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
+      toast('同步失败：' + err.message, 'warn');
+      renderSyncStatus();
     });
 }
 
