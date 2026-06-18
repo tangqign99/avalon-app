@@ -1,4 +1,4 @@
-const CACHE_NAME = 'avalon-assist-v1';
+const CACHE_NAME = 'avalon-assist-v2';
 const ASSETS = [
   './index.html',
   './manifest.json'
