@@ -1,4 +1,4 @@
-const CACHE_NAME = 'avalon-assist-v4';
+const CACHE_NAME = 'avalon-assist-v5';
 const ASSETS = [
   './index.html',
   './style.css',
