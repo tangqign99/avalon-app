@@ -458,6 +458,20 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   #page-stats::before,#page-stats::after,
   #page-end::before,#page-end::after{width:4vw}
 }
+/* ===== 手机端适配 ===== */
+@media(max-width:480px){
+  .role-checkbox-grid label{
+    font-size:20px;
+    padding:10px 14px;
+    min-height:44px;
+  }
+  .role-group{
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .role-horizontal{gap:18px}
+  .faction-label{font-size:13px;padding:3px 10px}
+}
 
 </style>
 </head>
