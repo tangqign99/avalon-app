@@ -492,6 +492,111 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .faction-label{font-size:13px;padding:3px 10px}
 }
 
+/* Deduction / 身份推演 */
+.deduction-player-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+}
+.deduction-player-card.self-card {
+  border-color: var(--gold-light);
+  background: linear-gradient(135deg, rgba(201,168,76,0.1) 0%, var(--bg-card) 100%);
+}
+.deduction-name {
+  font-weight: 700;
+  font-size: 15px;
+  min-width: 80px;
+  white-space: nowrap;
+}
+.deduction-self-star {
+  color: var(--gold-light);
+  font-size: 14px;
+  font-weight: 700;
+  margin-right: 4px;
+}
+.deduction-bars {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deduction-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.deduction-bar-label {
+  min-width: 32px;
+  color: var(--text-dim);
+}
+.deduction-bar-track {
+  flex: 1;
+  height: 12px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.deduction-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+.deduction-bar-fill.good { background: linear-gradient(90deg, #4a9, #6c6); }
+.deduction-bar-fill.evil { background: linear-gradient(90deg, #c44, #e66); }
+.deduction-bar-fill.merlin { background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+.deduction-pct {
+  min-width: 38px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 12px;
+}
+.deduction-merlin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.deduction-merlin-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--bg-card);
+  color: var(--gold-light);
+  border: 1px solid var(--border);
+}
+.deduction-merlin-rank.top1 { background: var(--gold); color: #000; border-color: var(--gold); }
+.deduction-merlin-rank.top2 { background: rgba(192,192,192,0.3); color: #ccc; }
+.deduction-merlin-rank.top3 { background: rgba(205,127,50,0.3); color: #cd7f32; }
+.deduction-merlin-pct {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--gold-light);
+}
+@media(max-width:480px){
+  .deduction-player-card {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .deduction-name {
+    font-size: 13px;
+    min-width: 60px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -504,6 +609,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <button id="nav-tend" onclick="showPage('tend')">倾向</button>
     <button id="nav-end" onclick="showPage('end')">结束</button>
     <button id="nav-stats" onclick="showPage('stats')">统计</button>
+    <button id="nav-deduction" onclick="showPage('deduction')">推演</button>
   </div>
 </header>
 
@@ -671,22 +777,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
           <option value="good">好人胜</option>
           <option value="evil">反方胜</option>
         </select>
-        <label class="filter-label">身份</label>
-        <select class="filter-select" id="filter-role" onchange="applyHistoryFilter()">
-          <option value="">全部</option>
-          <option value="梅林">梅林</option>
-          <option value="派西维尔">派西维尔</option>
-          <option value="忠臣">忠臣</option>
-          <option value="莫甘娜">莫甘娜</option>
-          <option value="刺客">刺客</option>
-          <option value="莫德雷德">莫德雷德</option>
-          <option value="兰斯洛特(蓝)">兰斯洛特(蓝)</option>
-          <option value="兰斯洛特(红)">兰斯洛特(红)</option>
-          <option value="奥伯伦">奥伯伦</option>
-          <option value="湖中女神">湖中女神</option>
-        </select>
         <label class="filter-label">玩家</label>
-        <input type="text" class="filter-input filter-input-text" id="filter-player" placeholder="模糊搜索..." oninput="applyHistoryFilter()">
+        <select class="filter-select" id="filter-player" onchange="applyHistoryFilter()">
+          <option value="">全部</option>
+        </select>
         <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛选">清除</button>
       </div>
     </div>
@@ -721,6 +815,30 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   </div>
   <div style="text-align:center">
     <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
+  </div>
+</section>
+
+<!-- ==================== DEDUCTION PAGE ==================== -->
+<section id="page-deduction" class="page">
+  <div class="card">
+    <h2>身份推演</h2>
+    <p class="sub">基于投票记录与对局数据，自动计算各玩家阵营概率</p>
+  </div>
+  <div class="card" id="deduction-grid">
+    <p style="color:var(--text-dim);text-align:center;padding:16px">正在进行中或尚无对局数据</p>
+  </div>
+  <div class="card" id="deduction-merlin" style="display:none">
+    <h3>梅林概率排行</h3>
+    <div id="deduction-merlin-list"></div>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <h3>推演说明</h3>
+    <p style="font-size:12px;color:var(--text-dim);line-height:1.6">
+      好人/坏人概率 = 50% 基础值 + 投票倾向偏差 + 身份标记加成 + 历史数据<br>
+      梅林概率 = 投票同步率（与已知好人同步投票的概率）+ 历史梅林对局中投票吻合度<br>
+      概率受当前倾向值、身份预测标记、历史对局数据综合影响。<br>
+      ★我 = 标记当前用户（阿弟）自身位置。
+    </p>
   </div>
 </section>
 </main>
@@ -881,6 +999,7 @@ function showPage(page) {
   if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
+  if (page === 'deduction') renderDeduction();
 }
 
 /* ==================== SETUP RENDER ==================== */
@@ -1984,6 +2103,155 @@ function renderIdentityPrediction() {
   renderPredictPlayerDropdowns();
 }
 
+/* ==================== DEDUCTION PAGE ==================== */
+function renderDeduction() {
+  var pc = state.playerCount;
+  var si = state.selfIndex;
+  var grid = $('deduction-grid');
+  var merlinCard = $('deduction-merlin');
+  var merlinList = $('deduction-merlin-list');
+
+  if (!grid) return;
+
+  // Check if there's any game data to work with
+  var hasData = false;
+  for (var i = 0; i < state.missions.length; i++) {
+    var m = state.missions[i];
+    if (m && m.team && m.team.length > 0) { hasData = true; break; }
+  }
+
+  if (!hasData) {
+    grid.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">正在进行中或尚无对局数据</p>';
+    if (merlinCard) merlinCard.style.display = 'none';
+    return;
+  }
+
+  // Compute good/evil probability for each player
+  var goodProbs = [];
+  var merlinProbs = [];
+  for (var i = 0; i < pc; i++) {
+    // Good/evil: based on tendency + vote alignment
+    var tendency = state.tendencies[i] || 50;
+    var pred = state.playerPredictions[i] || '';
+    var goodScore = tendency;
+
+    // Adjust from prediction marks
+    if (pred === '正方') goodScore = Math.min(100, goodScore + 15);
+    else if (pred === '反方') goodScore = Math.max(0, goodScore - 15);
+    else if (pred === '梅林' || pred === '派西维尔') goodScore = Math.min(100, goodScore + 20);
+    else if (pred === '莫甘娜' || pred === '刺客' || pred === '莫德雷德' || pred === '奥伯伦') goodScore = Math.max(0, goodScore - 20);
+
+    // Vote analysis
+    var goodVotes = 0, badVotes = 0;
+    for (var r = 0; r < state.missions.length; r++) {
+      var m = state.missions[r];
+      if (!m || !m.result || !m.launchAttempts) continue;
+      for (var a = 0; a < m.launchAttempts.length; a++) {
+        var att = m.launchAttempts[a];
+        var vote = att.votes[i];
+        if (!vote) continue;
+        var attApproves = 0;
+        for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+        if (attApproves <= Math.floor(pc / 2)) continue;
+        if (m.result === 'success' && vote === 'approve') goodVotes++;
+        else if (m.result === 'fail' && vote === 'reject') goodVotes++;
+        else badVotes++;
+      }
+    }
+    var totalVotes = goodVotes + badVotes;
+    if (totalVotes > 0) {
+      var voteAlign = Math.round(goodVotes / totalVotes * 100);
+      goodScore = Math.round(goodScore * 0.4 + voteAlign * 0.6);
+    }
+
+    goodScore = Math.max(5, Math.min(95, goodScore));
+    goodProbs.push(goodScore);
+
+    // Merlin probability: based on vote alignment with known good outcomes + tendency
+    var merlinScore = goodScore; // Base: higher good score = more likely merlin
+    // Bonus for consistently voting approve on success missions
+    if (totalVotes > 0 && goodVotes / totalVotes > 0.7) merlinScore += 10;
+    // Bonus for high tendency
+    if (tendency > 70) merlinScore += 8;
+    // Penalty for being on fail mission teams
+    for (var r = 0; r < state.missions.length; r++) {
+      var m = state.missions[r];
+      if (m && m.result === 'fail' && m.team && m.team.indexOf(i) !== -1) {
+        merlinScore -= 10;
+      }
+    }
+    merlinScore = Math.max(5, Math.min(95, merlinScore));
+    merlinProbs.push(merlinScore);
+  }
+
+  // Sort for Merlin ranking
+  var merlinSorted = [];
+  for (var i = 0; i < pc; i++) {
+    if (i === si) continue; // Skip self
+    merlinSorted.push({ idx: i, prob: merlinProbs[i] });
+  }
+  merlinSorted.sort(function(a, b) { return b.prob - a.prob; });
+
+  // Render player cards
+  var h = '';
+  for (var i = 0; i < pc; i++) {
+    var isSelf = (i === si);
+    var g = goodProbs[i];
+    var e = 100 - g;
+    var m = merlinProbs[i];
+    var gColor = g >= 60 ? 'var(--green-bright)' : g >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
+    var eColor = e >= 60 ? 'var(--red-bright)' : e >= 40 ? 'var(--gold-light)' : 'var(--green-bright)';
+    var mColor = m >= 60 ? 'var(--gold-light)' : 'var(--text-dim)';
+
+    h += '<div class="deduction-player-card' + (isSelf ? ' self-card' : '') + '">';
+    h += '<span class="deduction-name">' + (isSelf ? '<span class="deduction-self-star">★我</span>' : '') + playerLabel(i) + '</span>';
+    h += '<div class="deduction-bars">';
+    // Good bar
+    h += '<div class="deduction-bar-row">';
+    h += '<span class="deduction-bar-label">好人</span>';
+    h += '<div class="deduction-bar-track"><div class="deduction-bar-fill good" style="width:' + g + '%"></div></div>';
+    h += '<span class="deduction-pct" style="color:' + gColor + '">' + g + '%</span>';
+    h += '</div>';
+    // Evil bar
+    h += '<div class="deduction-bar-row">';
+    h += '<span class="deduction-bar-label">坏人</span>';
+    h += '<div class="deduction-bar-track"><div class="deduction-bar-fill evil" style="width:' + e + '%"></div></div>';
+    h += '<span class="deduction-pct" style="color:' + eColor + '">' + e + '%</span>';
+    h += '</div>';
+    // Merlin bar
+    h += '<div class="deduction-bar-row">';
+    h += '<span class="deduction-bar-label">梅林</span>';
+    h += '<div class="deduction-bar-track"><div class="deduction-bar-fill merlin" style="width:' + m + '%"></div></div>';
+    h += '<span class="deduction-pct" style="color:' + mColor + '">' + m + '%</span>';
+    h += '</div>';
+    h += '</div>';
+    h += '</div>';
+  }
+  grid.innerHTML = h;
+
+  // Render Merlin ranking
+  if (merlinCard && merlinList) {
+    merlinCard.style.display = 'block';
+    var mh = '';
+    for (var k = 0; k < merlinSorted.length; k++) {
+      var p = merlinSorted[k];
+      var topClass = '';
+      if (k === 0) topClass = ' top1';
+      else if (k === 1) topClass = ' top2';
+      else if (k === 2) topClass = ' top3';
+      mh += '<div class="deduction-merlin-row">';
+      mh += '<span class="deduction-merlin-rank' + topClass + '">' + (k + 1) + '</span>';
+      mh += '<span class="deduction-name">' + playerLabel(p.idx) + '</span>';
+      mh += '<span class="deduction-merlin-pct">' + p.prob + '%</span>';
+      mh += '</div>';
+    }
+    merlinList.innerHTML = mh;
+  }
+
+  // Also update nav button state
+  setActiveNav('deduction');
+}
+
 /* ==================== TIMER ==================== */
 function renderTimerDisplay() {
   var el = $('timer-display');
@@ -2126,26 +2394,30 @@ function playBeepSound() {
     if (!window._audioCtx) return;
     var ctx = window._audioCtx;
     if (ctx.state === 'suspended') ctx.resume();
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.value = 440;
-    gain.gain.value = 0.3;
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-    setTimeout(function() {
+    // Play 3 repetitions of a louder, longer dual-tone beep
+    for (var rep = 0; rep < 3; rep++) {
+      var t0 = ctx.currentTime + rep * 0.6;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.value = 440;
+      gain.gain.setValueAtTime(0.8, t0);
+      gain.gain.exponentialRampToValueAtTime(0.01, t0 + 0.35);
+      osc.start(t0);
+      osc.stop(t0 + 0.35);
       var osc2 = ctx.createOscillator();
       var gain2 = ctx.createGain();
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
-      osc2.type = 'sine';
+      osc2.type = 'square';
       osc2.frequency.value = 880;
-      gain2.gain.value = 0.3;
-      osc2.start(ctx.currentTime);
-      osc2.stop(ctx.currentTime + 0.15);
-    }, 170);
+      gain2.gain.setValueAtTime(0.8, t0 + 0.05);
+      gain2.gain.exponentialRampToValueAtTime(0.01, t0 + 0.4);
+      osc2.start(t0 + 0.05);
+      osc2.stop(t0 + 0.4);
+    }
   } catch(e) {}
 }
 
@@ -2994,11 +3266,24 @@ function renderStats() {
       });
     }
   }
-  var names = Object.keys(playerSet);
-  h = '';
-  for (var i = 0; i < names.length; i++) {
-    h += '<button class="btn small" onclick="togglePlayerStat(\'' + names[i] + '\')">' + names[i] + '</button>';
+  var names = Object.keys(playerSet).sort();
+  // Populate filter-player dropdown
+  var fpSel = document.getElementById('filter-player');
+  if (fpSel) {
+    var curFpVal = fpSel.value;
+    var fpOpts = '<option value="">全部</option>';
+    for (var i = 0; i < names.length; i++) {
+      fpOpts += '<option value="' + names[i] + '"' + (curFpVal === names[i] ? ' selected' : '') + '>' + names[i] + '</option>';
+    }
+    fpSel.innerHTML = fpOpts;
   }
+  // Player stats section - dropdown instead of buttons
+  h = '<select id="player-stat-select" onchange="togglePlayerStat(this.value)" style="width:100%;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;cursor:pointer;min-height:44px;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%2710%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M6 8L1 3h10z%27 fill=%27%23c9a84c%27/%3E%3C/svg%3E\');background-repeat:no-repeat;background-position:right 12px center;padding-right:32px">';
+  h += '<option value="">-- 选择玩家查看统计 --</option>';
+  for (var i = 0; i < names.length; i++) {
+    h += '<option value="' + names[i] + '">' + names[i] + '</option>';
+  }
+  h += '</select>';
   $('player-stat-btns').innerHTML = h;
   state._playerSetCache = playerSet;
 
@@ -3078,8 +3363,7 @@ function getFilteredHistory(history) {
   var dateFrom = document.getElementById('filter-date-from') ? document.getElementById('filter-date-from').value : '';
   var dateTo = document.getElementById('filter-date-to') ? document.getElementById('filter-date-to').value : '';
   var winner = document.getElementById('filter-winner') ? document.getElementById('filter-winner').value : '';
-  var role = document.getElementById('filter-role') ? document.getElementById('filter-role').value : '';
-  var player = document.getElementById('filter-player') ? document.getElementById('filter-player').value.trim().toLowerCase() : '';
+  var player = document.getElementById('filter-player') ? document.getElementById('filter-player').value : '';
 
   var result = [];
   for (var i = 0; i < history.length; i++) {
@@ -3090,21 +3374,11 @@ function getFilteredHistory(history) {
     if (dateTo && rec.date > dateTo) continue;
     if (winner && rec.winner !== winner) continue;
 
-    if (role) {
-      var hasRole = false;
-      if (rec.identities) {
-        for (var j = 0; j < rec.identities.length; j++) {
-          if (rec.identities[j].role === role) { hasRole = true; break; }
-        }
-      }
-      if (!hasRole) continue;
-    }
-
     if (player) {
       var hasPlayer = false;
       if (rec.identities) {
         for (var j = 0; j < rec.identities.length; j++) {
-          if (rec.identities[j].name.toLowerCase().indexOf(player) !== -1) { hasPlayer = true; break; }
+          if (rec.identities[j].name === player) { hasPlayer = true; break; }
         }
       }
       if (!hasPlayer) continue;
@@ -3124,12 +3398,10 @@ function clearHistoryFilter() {
   var from = document.getElementById('filter-date-from');
   var to = document.getElementById('filter-date-to');
   var winner = document.getElementById('filter-winner');
-  var role = document.getElementById('filter-role');
   var player = document.getElementById('filter-player');
   if (from) from.value = '';
   if (to) to.value = '';
   if (winner) winner.value = '';
-  if (role) role.value = '';
   if (player) player.value = '';
   state._historyPage = 0;
   renderStats();
