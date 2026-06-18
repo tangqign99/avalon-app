@@ -281,7 +281,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .merlin-bar-row .m-pct{font-size:13px;font-weight:700;color:var(--gold-light);min-width:38px;text-align:right}
 .merlin-pct-col{font-size:13px;font-weight:700;color:var(--gold-light);min-width:44px;text-align:right}
 
-/* 湖中仙女 */
+/* 湖中女神 */
 .lady-check-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);margin-top:10px;cursor:pointer;transition:all 0.15s}
 .lady-check-row:hover{border-color:var(--gold)}
 .lady-check-row.checked{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
@@ -376,15 +376,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .predict-form select,.predict-form button{padding:7px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:44px;-webkit-appearance:none;appearance:none}
 .predict-form select:focus{border-color:var(--gold);outline:none}
 .predict-form .predict-level-select{min-width:64px}
-.predict-mark-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:4px;line-height:1.5}
-.predict-mark-tag.high{background:rgba(217,74,74,0.25);color:#ff9999;border:1px solid rgba(217,74,74,0.4)}
-.predict-mark-tag.mid{background:rgba(217,138,32,0.2);color:var(--orange);border:1px solid rgba(217,138,32,0.35)}
-.predict-mark-tag.low{background:rgba(128,128,128,0.2);color:#999;border:1px solid rgba(128,128,128,0.3)}
-.predict-mark-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--radius-sm);background:var(--bg-card);margin-bottom:3px;font-size:13px}
-.predict-mark-item .pm-target{font-weight:600;color:var(--text-bright);flex:1}
-.predict-mark-item .pm-prob{font-size:11px;color:var(--text-dim);min-width:60px;text-align:right}
-.predict-mark-item .pm-delete{color:var(--text-dim);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;min-width:28px;min-height:28px;display:flex;align-items:center;justify-content:center}
-.predict-mark-item .pm-delete:hover{color:var(--red-bright);background:rgba(255,80,80,0.1)}
+.predict-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;flex-wrap:wrap}
+.predict-player-row .predict-pname{font-size:13px;font-weight:600;color:var(--text-bright);min-width:70px}
 </style>
 </head>
 <body>
@@ -423,7 +416,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <h2>可选规则</h2>
     <div id="lady-check-row" class="lady-check-row" onclick="toggleLadyOfLake()">
       <input type="checkbox" id="lady-checkbox" onclick="event.stopPropagation();toggleLadyOfLake()">
-      <span class="lady-label">湖中仙女</span>
+      <span class="lady-label">湖中女神</span>
       <span class="lady-hint">（头衔非身份，初始持有者为最后队长右侧玩家）</span>
     </div>
     <div class="timer-setup" id="timer-setup">
@@ -434,10 +427,11 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
         <button class="timer-mode-btn selected" id="timer-mode-per" onclick="setTimerMode('per')">每人发言 X 秒</button>
       </div>
       <div class="timer-options-row" id="timer-options">
-        <button class="timer-opt-btn" onclick="setTimerSeconds(45)">45s</button>
-        <button class="timer-opt-btn selected" onclick="setTimerSeconds(60)">60s</button>
-        <button class="timer-opt-btn" onclick="setTimerSeconds(75)">75s</button>
-        <button class="timer-opt-btn" onclick="setTimerSeconds(90)">90s</button>
+        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">每人</span>
+        <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
+          style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
+          onchange="setTimerSecondsInput()" onfocus="this.select()">
+        <span style="color:var(--text-dim);font-size:13px">秒</span>
       </div>
     </div>
   </div>
@@ -453,8 +447,13 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   <div class="round-tracker" id="round-tracker"></div>
   <div id="launch-fail-area"></div>
   <div class="timer-display" id="timer-display" style="display:none">
-    <div class="timer-value" id="timer-value">05:00</div>
+    <div class="timer-value" id="timer-value">01:00</div>
     <div class="timer-label" id="timer-label">发言计时</div>
+    <div id="timer-speaker-name" style="font-size:16px;color:var(--gold-light);margin-top:4px;font-weight:700"></div>
+    <div class="btn-row" style="justify-content:center;margin-top:6px" id="timer-btns" hidden>
+      <button class="btn small success" onclick="speakEnd()">发言结束</button>
+      <button class="btn small" onclick="resetTimer()">重置时间</button>
+    </div>
   </div>
   <div class="game-layout">
     <div class="game-main">
@@ -466,15 +465,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
         <div id="tendency-mini"></div>
         <div id="lady-lake-results" style="margin-top:6px"></div>
         <div class="identity-predict-section" id="identity-predict-section">
-          <h3>身份预测标记</h3>
-          <div class="predict-form">
-            <select id="predict-target" onchange="onPredictTargetChange()"><option value="">选玩家</option></select>
-            <select id="predict-level" class="predict-level-select" onchange="onPredictTargetChange()">
-              <option value="high">高</option><option value="mid" selected>中</option><option value="low">低</option>
-            </select>
-            <button class="btn small" onclick="addIdentityMark()" style="min-height:44px">标记</button>
-          </div>
-          <div id="predict-marks-list"></div>
+          <h3>身份预测</h3>
+          <div id="predict-player-dropdowns"></div>
         </div>
       </div>
       <div class="card" style="padding:10px">
@@ -483,7 +475,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       </div>
       <div id="lady-lake-entry" style="display:none">
         <div class="card lady-check-entry">
-          <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">湖中仙女验人</button>
+          <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">湖中女神验人</button>
         </div>
       </div>
       <div class="review-section" id="review-section" style="display:none">
@@ -499,20 +491,12 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <h2>倾向值面板</h2>
     <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
       从「我」的视角评估其他玩家。绿≥60 黄40-59 红&lt;40。初始50。
-      <span id="my-role-display" style="color:var(--gold-light)"></span>
     </p>
     <div id="tendency-full"></div>
   </div>
   <div class="card">
-    <h2>身份预测标记</h2>
-    <div class="predict-form">
-      <select id="predict-target-full" onchange="onPredictTargetChangeFull()"><option value="">选玩家</option></select>
-      <select id="predict-level-full" class="predict-level-select" onchange="onPredictTargetChangeFull()">
-        <option value="high">高</option><option value="mid" selected>中</option><option value="low">低</option>
-      </select>
-      <button class="btn small" onclick="addIdentityMarkFull()" style="min-height:44px">标记</button>
-    </div>
-    <div id="predict-marks-list-full"></div>
+    <h2>身份预测</h2>
+    <div id="predict-player-dropdowns-full"></div>
   </div>
 </section>
 
@@ -646,7 +630,7 @@ function initState(n) {
   for (var i = 0; i < n; i++) state.playerNames[i] = '玩家' + (i + 1);
   state.selfIndex = -1;
   state.myRole = null;
-  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'] : DEFAULT_ACTIVE_ROLES.slice();
   state.missions = [];
   state.currentRound = 0;
   state.tendencies = {};
@@ -668,6 +652,10 @@ function initState(n) {
   state.timerRemaining = 0;
   state.roundTendencies = [];
   state.identityMarks = [];
+  state.playerPredictions = {};
+  state.speakerOrder = [];
+  state.currentSpeakerIdx = -1;
+  state.speakTimes = {};
   for (var i = 0; i < n; i++) {
     state.tendencies[i] = 50;
     state.consecutiveRejects[i] = 0;
@@ -804,7 +792,7 @@ function setPlayerCount(n) {
   var oldNames = state.playerNames;
   var oldSelf = state.selfIndex;
   state.playerCount = n;
-  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'] : DEFAULT_ACTIVE_ROLES.slice();
   state.playerNames = [];
   for (var i = 0; i < n; i++) {
     state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
@@ -867,12 +855,19 @@ function setTimerMode(mode) {
   });
 }
 
+function setTimerSecondsInput() {
+  var input = document.getElementById('timer-seconds-input');
+  if (!input) return;
+  var val = parseInt(input.value);
+  if (isNaN(val) || val < 10) { val = 10; input.value = 10; }
+  if (val > 300) { val = 300; input.value = 300; }
+  state.timerSeconds = val;
+}
+
 function setTimerSeconds(sec) {
   state.timerSeconds = sec;
-  var btns = document.querySelectorAll('#timer-options .timer-opt-btn');
-  btns.forEach(function(b) {
-    b.className = 'timer-opt-btn' + (parseInt(b.textContent) === sec ? ' selected' : '');
-  });
+  var input = document.getElementById('timer-seconds-input');
+  if (input) input.value = sec;
 }
 /* ==================== GAME START ==================== */
 function startGame() {
@@ -927,6 +922,10 @@ function doStartGame() {
   state.ladyLakeHolder = -1;
   state.roundTendencies = [];
   state.identityMarks = [];
+  state.playerPredictions = {};
+  state.speakerOrder = [];
+  state.currentSpeakerIdx = -1;
+  state.speakTimes = {};
   stopTimer();
   for (var i = 0; i < state.playerCount; i++) {
     state.tendencies[i] = 50;
@@ -1087,9 +1086,8 @@ function renderTendencyItem(idx, score, merlinProb) {
   if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
   else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
   else { cls = 'suspect'; barCls = 'suspect'; }
-  var isSelf = idx === state.selfIndex;
   var h = '<div class="tendency-item">';
-  h += '<span class="tend-name">' + (isSelf ? '★ ' : '') + playerLabel(idx) + '</span>';
+  h += '<span class="tend-name">' + playerLabel(idx) + '</span>';
   h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
   h += '<span class="tend-score ' + cls + '">' + score + '</span>';
   if (merlinProb !== undefined) {
@@ -1115,20 +1113,9 @@ function renderTendencyFull() {
   var probs = computeMerlinProbability();
   var h = '';
   for (var i = 0; i < state.playerCount; i++) {
-    if (i === state.selfIndex) continue;
     h += renderTendencyItem(i, state.tendencies[i] || 50, probs[i]);
   }
-  if (state.selfIndex >= 0) {
-    h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">';
-    h += renderTendencyItem(state.selfIndex, state.tendencies[state.selfIndex] || 50, probs[state.selfIndex]);
-    h += '</div>';
-  }
   el.innerHTML = h || '<p style="color:var(--text-dim)">暂无数据，请先开始游戏</p>';
-  if (state.myRole) {
-    $('my-role-display').textContent = '我的身份：' + state.myRole + '（权重翻倍）';
-  } else {
-    $('my-role-display').textContent = '';
-  }
 }
 
 /* ==================== MERLIN PREDICTION ==================== */
@@ -1230,7 +1217,7 @@ function renderLadyLakeResults() {
     if (el) el.innerHTML = '';
     return;
   }
-  var h = '<div style="font-size:12px;color:var(--gold);margin-bottom:3px">湖中仙女验人记录</div>';
+  var h = '<div style="font-size:12px;color:var(--gold);margin-bottom:3px">湖中女神验人记录</div>';
   for (var i = 0; i < state.ladyLakeChecks.length; i++) {
     var c = state.ladyLakeChecks[i];
     h += '<div class="lady-check-result ' + (c.result === 'good' ? 'good' : 'evil') + '">';
@@ -1255,7 +1242,7 @@ function renderLadyLakeEntry() {
 function showLadyCheck() {
   if (!state.ladyOfLakeEnabled) return;
   var pc = state.playerCount;
-  var h = '<h2>湖中仙女验人</h2>';
+  var h = '<h2>湖中女神验人</h2>';
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
   for (var i = 0; i < pc; i++) {
@@ -1263,6 +1250,7 @@ function showLadyCheck() {
     h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + i + ')">' + playerLabel(i) + '</button>';
   }
   h += '</div>';
+  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
   showModal(h);
 }
 
@@ -1271,7 +1259,7 @@ function doLadyCheck(targetIdx) {
   var pc = state.playerCount;
   // Determine faction: we need to simulate - in the assistant context we don't know real roles
   // Show a modal to let the user input the real result
-  var h = '<h2>湖中仙女验人结果</h2>';
+  var h = '<h2>湖中女神验人结果</h2>';
   h += '<p style="font-size:15px;margin-bottom:10px">查验目标：<strong style="color:var(--gold-light)">' + playerLabel(targetIdx) + '</strong></p>';
   h += '<p style="font-size:14px;margin-bottom:14px">该玩家的阵营是？</p>';
   h += '<div class="winner-toggle">';
@@ -1299,153 +1287,134 @@ function recordLadyCheck(targetIdx, result) {
   toast('验人结果已记录：' + playerLabel(targetIdx) + ' 为' + (result === 'good' ? '好人方' : '反方'));
 }
 
-/* ==================== IDENTITY PREDICTION MARKS ==================== */
-function populatePredictDropdown(selId) {
-  var sel = document.getElementById(selId);
-  if (!sel) return;
-  var curVal = sel.value;
-  sel.innerHTML = '<option value="">选玩家</option>';
+/* ==================== IDENTITY PREDICTION ==================== */
+var PREDICT_ROLES = ['正方','反方','梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','忠臣'];
+
+function getTakenPredictions(excludeIdx) {
+  var taken = {};
+  var loyalCount = 0;
   for (var i = 0; i < state.playerCount; i++) {
-    if (i === state.selfIndex) continue;
-    sel.innerHTML += '<option value="' + i + '">' + playerLabel(i) + '</option>';
-  }
-  if (curVal) sel.value = curVal;
-}
-
-function onPredictTargetChange() {
-  populatePredictDropdown('predict-target');
-}
-
-function onPredictTargetChangeFull() {
-  populatePredictDropdown('predict-target-full');
-}
-
-function addIdentityMarkBase(targetIdx, level) {
-  if (targetIdx === null || targetIdx === undefined || targetIdx === '') {
-    toast('请选择玩家', 'warn'); return;
-  }
-  targetIdx = parseInt(targetIdx);
-  // Remove existing mark for same player
-  state.identityMarks = state.identityMarks.filter(function(m) { return m.target !== targetIdx; });
-  state.identityMarks.push({
-    target: targetIdx,
-    level: level,
-    timestamp: Date.now()
-  });
-  renderPredictMarks();
-  toast('已标记 ' + playerLabel(targetIdx));
-}
-
-function addIdentityMark() {
-  var sel = document.getElementById('predict-target');
-  var lvl = document.getElementById('predict-level');
-  if (!sel || !lvl) return;
-  addIdentityMarkBase(sel.value, lvl.value);
-  sel.value = '';
-}
-
-function addIdentityMarkFull() {
-  var sel = document.getElementById('predict-target-full');
-  var lvl = document.getElementById('predict-level-full');
-  if (!sel || !lvl) return;
-  addIdentityMarkBase(sel.value, lvl.value);
-  sel.value = '';
-}
-
-function removeIdentityMark(targetIdx) {
-  state.identityMarks = state.identityMarks.filter(function(m) { return m.target !== targetIdx; });
-  renderPredictMarks();
-}
-
-function getLevelLabel(level) {
-  if (level === 'high') return '高';
-  if (level === 'mid') return '中';
-  return '低';
-}
-
-function computeMarkProbabilities() {
-  // For each mark, compute ally/enemy probability based on tendency and vote history
-  var probs = {};
-  var pc = state.playerCount;
-  for (var i = 0; i < pc; i++) {
-    probs[i] = { ally: 50, enemy: 50 };
-  }
-
-  for (var mi = 0; mi < state.identityMarks.length; mi++) {
-    var mark = state.identityMarks[mi];
-    var t = mark.target;
-    var score = state.tendencies[t] || 50;
-
-    // Base probability from tendency
-    var allyBase = score;
-    var enemyBase = 100 - score;
-
-    // Adjust by mark level: high suspicion = more enemy, low = more ally
-    if (mark.level === 'high') { enemyBase = Math.min(100, enemyBase + 20); allyBase = Math.max(0, allyBase - 20); }
-    else if (mark.level === 'low') { allyBase = Math.min(100, allyBase + 15); enemyBase = Math.max(0, enemyBase - 15); }
-
-    // Factor in vote history - check mission votes
-    var goodVotes = 0, badVotes = 0;
-    for (var r = 0; r < state.missions.length; r++) {
-      var m = state.missions[r];
-      if (!m || !m.result) continue;
-      var attempts = m.launchAttempts || [];
-      for (var a = 0; a < attempts.length; a++) {
-        var att = attempts[a];
-        var vote = att.votes[t];
-        if (!vote) continue;
-        if (m.result === 'success' && vote === 'approve') goodVotes++;
-        else if (m.result === 'fail' && vote === 'reject') goodVotes++;
-        else badVotes++;
-      }
+    if (i === excludeIdx) continue;
+    var pred = state.playerPredictions[i] || '';
+    if (pred && pred !== '未标记' && pred !== '正方' && pred !== '反方') {
+      taken[pred] = (taken[pred] || 0) + 1;
     }
-    var totalVotes = goodVotes + badVotes;
-    if (totalVotes > 0) {
-      var voteAlly = Math.round(goodVotes / totalVotes * 100);
-      allyBase = Math.round(allyBase * 0.6 + voteAlly * 0.4);
-      enemyBase = 100 - allyBase;
-    }
-
-    probs[t] = { ally: allyBase, enemy: enemyBase };
+    if (pred === '忠臣') loyalCount++;
   }
-  return probs;
+  taken._loyalCount = loyalCount;
+  return taken;
 }
 
-function renderPredictMarks() {
-  var probs = computeMarkProbabilities();
-  renderPredictMarksTo('predict-marks-list', true);
-  renderPredictMarksTo('predict-marks-list-full', false);
-  renderPredictMarksTo('identity-predict-section', true);
+function setPlayerPrediction(idx, role) {
+  if (role === '未标记') {
+    delete state.playerPredictions[idx];
+  } else {
+    state.playerPredictions[idx] = role;
+  }
+  renderPredictPlayerDropdowns();
+  renderTendencyMini();
 }
 
-function renderPredictMarksTo(elId, isGame) {
+function renderPredictPlayerDropdowns() {
+  renderPredictDropdownsTo('predict-player-dropdowns');
+  renderPredictDropdownsTo('predict-player-dropdowns-full');
+}
+
+function renderPredictDropdownsTo(elId) {
   var el = document.getElementById(elId);
   if (!el) return;
-  if (state.identityMarks.length === 0) {
-    if (isGame) el.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:4px 0">暂无标记</div>';
-    else el.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:4px 0">暂无标记</div>';
-    return;
-  }
-  var probs = computeMarkProbabilities();
+  var pc = state.playerCount;
   var h = '';
-  for (var i = 0; i < state.identityMarks.length; i++) {
-    var mark = state.identityMarks[i];
-    var pb = probs[mark.target] || { ally: 50, enemy: 50 };
-    var allyColor = pb.ally >= 60 ? 'var(--green-bright)' : pb.ally >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
-    h += '<div class="predict-mark-item">';
-    h += '<span class="pm-target">' + playerLabel(mark.target) + '</span>';
-    h += '<span class="predict-mark-tag ' + mark.level + '">' + getLevelLabel(mark.level) + '</span>';
-    h += '<span class="pm-prob">好人：<span style="color:' + allyColor + '">' + pb.ally + '%</span> | 反方：' + pb.enemy + '%</span>';
-    h += '<span class="pm-delete" onclick="removeIdentityMark(' + mark.target + ')">&#10005;</span>';
+  for (var i = 0; i < pc; i++) {
+    var taken = getTakenPredictions(i);
+    var curPred = state.playerPredictions[i] || '未标记';
+    h += '<div class="predict-player-row">';
+    h += '<span class="predict-pname">' + playerLabel(i) + '</span>';
+    h += '<select onchange="setPlayerPrediction(' + i + ',this.value)" style="flex:1;min-width:100px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:38px;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%2710%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M6 8L1 3h10z%27 fill=%27%23c9a84c%27/%3E%3C/svg%3E\');background-repeat:no-repeat;background-position:right 8px center;padding-right:24px">';
+    h += '<option value="未标记"' + (curPred === '未标记' ? ' selected' : '') + '>未标记</option>';
+    for (var j = 0; j < PREDICT_ROLES.length; j++) {
+      var r = PREDICT_ROLES[j];
+      var disabled = false;
+      if (r !== '未标记' && r !== '正方' && r !== '反方' && r !== curPred) {
+        if (r === '忠臣') {
+          if (taken._loyalCount >= 3) disabled = true;
+        } else {
+          if ((taken[r] || 0) >= 1) disabled = true;
+        }
+      }
+      h += '<option value="' + r + '"' + (curPred === r ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + r + (disabled ? ' (已选)' : '') + '</option>';
+    }
+    h += '</select>';
+    // Show computed probability
+    var prob = computePredictProbability(i);
+    if (prob !== null) {
+      var pct = prob.good;
+      var pcolor = pct >= 60 ? 'var(--green-bright)' : pct >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
+      h += '<span style="font-size:12px;min-width:90px;text-align:right">好人<span style="color:' + pcolor + ';font-weight:700">' + pct + '%</span> / 反方' + prob.evil + '%</span>';
+    }
     h += '</div>';
   }
   el.innerHTML = h;
 }
 
+function computePredictProbability(idx) {
+  var pred = state.playerPredictions[idx];
+  if (!pred || pred === '未标记') {
+    // No prediction, show tendency-based
+    var t = state.tendencies[idx] || 50;
+    return { good: t, evil: 100 - t };
+  }
+
+  var goodScore = 50;
+  // Base on tendency
+  var t = state.tendencies[idx] || 50;
+  goodScore = t;
+
+  // Adjust based on prediction
+  if (pred === '正方') { goodScore = Math.min(100, goodScore + 20); }
+  else if (pred === '反方') { goodScore = Math.max(0, goodScore - 20); }
+  else if (pred === '梅林' || pred === '派西维尔') { goodScore = Math.min(100, goodScore + 25); }
+  else if (pred === '莫甘娜' || pred === '刺客' || pred === '莫德雷德' || pred === '奥伯伦') { goodScore = Math.max(0, goodScore - 25); }
+
+  // Adjust based on vote history
+  var pc = state.playerCount;
+  var goodVotes = 0, badVotes = 0;
+  for (var r = 0; r < state.missions.length; r++) {
+    var m = state.missions[r];
+    if (!m || !m.result) continue;
+    var attempts = m.launchAttempts || [];
+    for (var a = 0; a < attempts.length; a++) {
+      var att = attempts[a];
+      var vote = att.votes[idx];
+      if (!vote) continue;
+      var attApproves = 0;
+      for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+      if (attApproves <= Math.floor(pc / 2)) continue;
+      if (m.result === 'success' && vote === 'approve') goodVotes++;
+      else if (m.result === 'fail' && vote === 'reject') goodVotes++;
+      else badVotes++;
+    }
+  }
+  var totalVotes = goodVotes + badVotes;
+  if (totalVotes > 0) {
+    var voteAlly = Math.round(goodVotes / totalVotes * 100);
+    goodScore = Math.round(goodScore * 0.5 + voteAlly * 0.5);
+  }
+
+  // Constraint: if predicted as evil, cap goodScore lower
+  if (pred === '莫甘娜' || pred === '刺客' || pred === '莫德雷德' || pred === '奥伯伦' || pred === '反方') {
+    goodScore = Math.min(goodScore, 30);
+  }
+  if (pred === '梅林' || pred === '派西维尔' || pred === '正方') {
+    goodScore = Math.max(goodScore, 70);
+  }
+
+  goodScore = Math.max(0, Math.min(100, goodScore));
+  return { good: goodScore, evil: 100 - goodScore };
+}
+
 function renderIdentityPrediction() {
-  populatePredictDropdown('predict-target');
-  populatePredictDropdown('predict-target-full');
-  renderPredictMarks();
+  renderPredictPlayerDropdowns();
 }
 
 /* ==================== TIMER ==================== */
@@ -1465,6 +1434,17 @@ function renderTimerDisplay() {
   var lbl = (state.timerMode === 'all') ? '全体发言计时' : '当前发言计时';
   $('timer-label').textContent = lbl;
 
+  var spkEl = $('timer-speaker-name');
+  if (spkEl) {
+    if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0 && state.currentSpeakerIdx < state.speakerOrder.length) {
+      var spk = state.speakerOrder[state.currentSpeakerIdx];
+      spkEl.textContent = '当前发言：' + playerLabel(spk);
+      spkEl.style.display = 'block';
+    } else {
+      spkEl.style.display = 'none';
+    }
+  }
+
   if (state.timerRemaining > 0) {
     el.className = 'timer-display running';
   }
@@ -1477,9 +1457,15 @@ function startTimer() {
   stopTimer();
   if (state.timerMode === 'off') return;
   if (state.timerMode === 'all') {
-    state.timerRemaining = 5 * 60; // 5 minutes
+    state.timerRemaining = 5 * 60;
   } else {
     state.timerRemaining = state.timerSeconds;
+  }
+  var el = $('timer-display');
+  if (el) el.style.display = 'block';
+  if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
+    var btnRow = document.getElementById('timer-btns');
+    if (btnRow) btnRow.hidden = false;
   }
   renderTimerDisplay();
   state.timerInterval = setInterval(function() {
@@ -1489,6 +1475,10 @@ function startTimer() {
       stopTimer();
       playBeepSound();
       toast('计时结束！', 'warn');
+      // Auto advance speaker if in per mode
+      if (state.timerMode === 'per' && state.currentSpeakerIdx < state.speakerOrder.length - 1) {
+        setTimeout(function() { speakEnd(); }, 800);
+      }
     }
   }, 1000);
 }
@@ -1498,9 +1488,38 @@ function stopTimer() {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
-  state.timerRemaining = 0;
   var el = $('timer-display');
   if (el) el.style.display = 'none';
+  var btnRow = document.getElementById('timer-btns');
+  if (btnRow) btnRow.hidden = true;
+}
+
+function speakEnd() {
+  if (state.currentSpeakerIdx < 0) return;
+  var speaker = state.speakerOrder[state.currentSpeakerIdx];
+  var elapsed = (state.timerMode === 'all') ? 0 : (state.timerSeconds - state.timerRemaining);
+  state.speakTimes[speaker] = (state.speakTimes[speaker] || 0) + elapsed;
+  stopTimer();
+  if (state.currentSpeakerIdx < state.speakerOrder.length - 1) {
+    state.currentSpeakerIdx++;
+    state.timerRemaining = state.timerSeconds;
+    var el = $('timer-display');
+    if (el) el.style.display = 'block';
+    var btnRow = document.getElementById('timer-btns');
+    if (btnRow) btnRow.hidden = false;
+    renderTimerDisplay();
+    startTimer();
+  } else {
+    state.currentSpeakerIdx = -1;
+    state.speakerOrder = [];
+    toast('所有玩家发言结束');
+  }
+}
+
+function resetTimer() {
+  stopTimer();
+  state.timerRemaining = (state.timerMode === 'all') ? 5 * 60 : state.timerSeconds;
+  startTimer();
 }
 
 function playBeepSound() {
@@ -1704,6 +1723,16 @@ function confirmVotes() {
   applyLaunchTendencies();
 
   if (approves > rejects) {
+    // Set up speaker order starting from leader
+    if (state.timerMode === 'per') {
+      state.speakerOrder = [];
+      state.speakTimes = {};
+      var startIdx = m.leader;
+      for (var si = 0; si < state.playerCount; si++) {
+        state.speakerOrder.push((startIdx + si) % state.playerCount);
+      }
+      state.currentSpeakerIdx = 0;
+    }
     startTimer();
     renderStepPanelWithResult();
   } else {
@@ -1825,6 +1854,8 @@ function finalizeMission() {
   if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
 
   stopTimer();
+  state.speakerOrder = [];
+  state.currentSpeakerIdx = -1;
   updateFinalTendencies();
 
   // Capture tendency snapshot for this round
@@ -1837,7 +1868,7 @@ function finalizeMission() {
   checkGameEnd();
   renderGame();
 
-  if (state.ladyOfLakeEnabled && !state.winner) {
+  if (state.ladyOfLakeEnabled && !state.winner && state.currentRound >= 1) {
     setTimeout(function() { showLadyCheck(); }, 500);
   }
 }
@@ -2734,7 +2765,14 @@ function syncFromCloud() {
   showModal('<h2>从云端同步</h2><p style="font-size:14px;margin-bottom:10px">正在从仓库拉取最新数据...</p>');
   fetch('https://tangqign99.github.io/avalon-app/data.json?t=' + Date.now())
     .then(function(res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) {
+        if (res.status === 404) {
+          closeModal();
+          toast('暂无云端数据', 'info');
+          return;
+        }
+        throw new Error('HTTP ' + res.status);
+      }
       return res.json();
     })
     .then(function(data) {
@@ -2764,7 +2802,7 @@ function syncFromCloud() {
   var last = loadLastGame();
   if (last && last.playerCount >= 5 && last.playerCount <= 10) {
     state.playerCount = last.playerCount;
-    state.activeRoles = (last.playerCount === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
+    state.activeRoles = (last.playerCount === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'] : DEFAULT_ACTIVE_ROLES.slice();
     state.playerNames = last.playerNames.slice();
     state.selfIndex = last.selfIndex;
     state.tendencies = {};
