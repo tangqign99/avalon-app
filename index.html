@@ -79,9 +79,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   border-color:var(--gold) !important;
   box-shadow:0 0 12px rgba(201,168,76,0.5) !important;
 }
-.team-member-btn{min-width:56px;min-height:44px;padding:10px 14px;font-size:15px}
+.team-member-btn{min-width:56px;min-height:44px;padding:10px 14px;font-size:16px}
 .btn.active-page{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
-.count-grid{display:flex;gap:10px;flex-wrap:wrap}
+.count-grid{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .count-btn{
   width:58px;height:58px;border-radius:50%;font-size:24px;font-weight:700;
   border:2px solid var(--border);background:var(--bg-card);color:var(--text);
@@ -90,6 +90,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .count-btn:hover{transform:scale(1.08)}
 .count-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 16px rgba(201,168,76,0.5)}
 .player-setup-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+#player-names{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .player-setup-row .idx{color:var(--gold);font-weight:700;min-width:46px;font-size:14px}
 .player-setup-row select{
   flex:1;padding:10px;border-radius:var(--radius-sm);
@@ -376,11 +377,11 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* 计时 */
 .timer-setup{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
 .timer-setup h3{font-size:14px;color:var(--gold);margin-bottom:8px}
-.timer-mode-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.timer-mode-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;justify-content:center}
 .timer-mode-btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--bg-card);color:var(--text);transition:all 0.15s;min-height:44px}
 .timer-mode-btn:hover{border-color:var(--gold)}
 .timer-mode-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light)}
-.timer-options-row{display:flex;gap:6px;flex-wrap:wrap}
+.timer-options-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .timer-opt-btn{padding:6px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text);transition:all 0.15s;min-height:40px}
 .timer-opt-btn:hover{border-color:var(--gold)}
 .timer-opt-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light)}
@@ -621,7 +622,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <button id="nav-tend" onclick="showPage('tend')">倾向</button>
     <button id="nav-end" onclick="showPage('end')">结束</button>
     <button id="nav-stats" onclick="showPage('stats')">统计</button>
-    <button id="nav-deduction" onclick="showPage('deduction')">推演</button>
   </div>
 </header>
 
@@ -633,12 +633,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <div class="count-grid" id="count-grid"></div>
   </div>
   <div class="card">
-    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择，或添加新名字）</span></h2>
+    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择）</span></h2>
     <div id="player-names"></div>
-    <div class="add-name-row">
-      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
-      <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
-    </div>
   </div>
   <div class="card">
     <h2>本局角色 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（勾选的才会出现在结束面板身份选项中）</span></h2>
@@ -646,8 +642,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   </div>
   <div class="card">
     <h2>可选规则</h2>
-    <button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button>
-    <p class="lady-toggle-hint">头衔非身份，初始持有者为最后队长右侧玩家</p>
+    <div style="text-align:center"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button></div>
     <div class="timer-setup" id="timer-setup">
       <h3>计时模式</h3>
       <div class="timer-mode-row">
@@ -738,6 +733,24 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     </div>
     <div id="identity-sim-result" style="margin-top:10px"></div>
   </div>
+  <div class="card" id="deduction-grid">
+    <h2>身份推演</h2>
+    <p class="sub">基于投票记录与对局数据，自动计算各玩家阵营概率</p>
+    <p style="color:var(--text-dim);text-align:center;padding:16px">正在进行中或尚无对局数据</p>
+  </div>
+  <div class="card" id="deduction-merlin" style="display:none">
+    <h3>梅林概率排行</h3>
+    <div id="deduction-merlin-list"></div>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <h3>推演说明</h3>
+    <p style="font-size:12px;color:var(--text-dim);line-height:1.6">
+      好人/坏人概率 = 50% 基础值 + 投票倾向偏差 + 身份标记加成 + 历史数据<br>
+      梅林概率 = 投票同步率（与已知好人同步投票的概率）+ 历史梅林对局中投票吻合度<br>
+      概率受当前倾向值、身份预测标记、历史对局数据综合影响。<br>
+      ★我 = 标记当前用户（阿弟）自身位置。
+    </p>
+  </div>
 </section>
 
 <section class="page" id="page-end">
@@ -803,6 +816,13 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
   <div class="card">
+    <h2>添加新玩家</h2>
+    <div class="add-name-row">
+      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
+      <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
+    </div>
+  </div>
+  <div class="card">
     <h2>胜率排行榜</h2>
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
   </div>
@@ -827,29 +847,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   </div>
 </section>
 
-<!-- ==================== DEDUCTION PAGE ==================== -->
-<section id="page-deduction" class="page">
-  <div class="card">
-    <h2>身份推演</h2>
-    <p class="sub">基于投票记录与对局数据，自动计算各玩家阵营概率</p>
-  </div>
-  <div class="card" id="deduction-grid">
-    <p style="color:var(--text-dim);text-align:center;padding:16px">正在进行中或尚无对局数据</p>
-  </div>
-  <div class="card" id="deduction-merlin" style="display:none">
-    <h3>梅林概率排行</h3>
-    <div id="deduction-merlin-list"></div>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <h3>推演说明</h3>
-    <p style="font-size:12px;color:var(--text-dim);line-height:1.6">
-      好人/坏人概率 = 50% 基础值 + 投票倾向偏差 + 身份标记加成 + 历史数据<br>
-      梅林概率 = 投票同步率（与已知好人同步投票的概率）+ 历史梅林对局中投票吻合度<br>
-      概率受当前倾向值、身份预测标记、历史对局数据综合影响。<br>
-      ★我 = 标记当前用户（阿弟）自身位置。
-    </p>
-  </div>
-</section>
 </main>
 
 <div class="toast" id="toast"></div>
@@ -1005,10 +1002,9 @@ function showPage(page) {
   setActiveNav(page);
   if (page === 'setup') renderSetup();
   if (page === 'game') renderGame();
-  if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); }
+  if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); renderDeduction(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
-  if (page === 'deduction') renderDeduction();
 }
 
 /* ==================== SETUP RENDER ==================== */
@@ -1381,7 +1377,7 @@ function renderStepPanel() {
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div>';
     var splitAt = Math.ceil(pc / 2);
     for (var row = 0; row < 2; row++) {
-      h += '<div class="btn-row" style="margin-bottom:' + (row === 0 ? '12px' : '0') + '">';
+      h += '<div class="btn-row" style="margin-bottom:' + (row === 0 ? '12px' : '0') + ';gap:12px">';
       for (var i = row * splitAt; i < Math.min((row + 1) * splitAt, pc); i++) {
         var inTeam = m.team.indexOf(i) !== -1;
         var cls = 'btn team-member-btn';
@@ -1653,8 +1649,8 @@ function runIdentitySimulation() {
     if (r) assigned[i] = r;
   }
 
-  if (Object.keys(assigned).length < pc) {
-    el.innerHTML = '<div class="sim-contradiction info">请为所有玩家指定身份后再校验</div>';
+  if (Object.keys(assigned).length < 2) {
+    el.innerHTML = '<div class="sim-contradiction info">请至少为 2 名玩家指定身份后再校验</div>';
     return;
   }
 
@@ -2292,7 +2288,7 @@ function renderDeduction() {
   }
 
   // Also update nav button state
-  setActiveNav('deduction');
+  setActiveNav('tend');
 }
 
 /* ==================== TIMER ==================== */
@@ -3766,7 +3762,7 @@ function confirmDeleteGame(idx) {
 
   // 同步更新 data.json 以便云端同步
   var syncData = {
-    avalon_name_pool: JSON.parse(localStorage.getItem('avalon_name_pool') || '{}'),
+    avalon_name_pool: JSON.parse(localStorage.getItem('avalon_name_pool') || '[]'),
     avalon_history_v2: history,
     avalon_last_game: JSON.parse(localStorage.getItem('avalon_last_game') || 'null')
   };
