@@ -114,9 +114,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
 .round-tracker{display:flex;gap:10px;justify-content:center;padding:6px 0}
 .round-dot{
-  width:44px;height:44px;border-radius:50%;border:2px solid var(--border);
+  width:56px;height:56px;border-radius:50%;border:2px solid var(--border);
   background:var(--bg-card);display:flex;align-items:center;justify-content:center;
-  font-size:18px;font-weight:700;color:var(--text-dim);transition:all 0.2s;position:relative;
+  font-size:22px;font-weight:700;color:var(--text-dim);transition:all 0.2s;position:relative;
 }
 .round-dot.current{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 14px rgba(201,168,76,0.5)}
 .round-dot.success{background:#1a3a1a;border-color:#449944;color:#99ff99}
@@ -428,6 +428,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       </div>
       <div class="timer-options-row" id="timer-options">
         <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">每人</span>
+        <button class="timer-opt-btn" id="timer-opt-45" onclick="setTimerSeconds(45)">45s</button>
+        <button class="timer-opt-btn selected" id="timer-opt-60" onclick="setTimerSeconds(60)">60s</button>
+        <button class="timer-opt-btn" id="timer-opt-75" onclick="setTimerSeconds(75)">75s</button>
+        <button class="timer-opt-btn" id="timer-opt-90" onclick="setTimerSeconds(90)">90s</button>
         <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
           style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
           onchange="setTimerSecondsInput()" onfocus="this.select()">
@@ -458,6 +462,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   <div class="game-layout">
     <div class="game-main">
       <div class="card" id="step-container"></div>
+      <div class="review-section" id="review-section" style="display:none">
+        <button class="btn" onclick="toggleReview()">复盘</button>
+        <div id="review-panel" style="display:none;margin-top:8px"></div>
+      </div>
     </div>
     <div class="game-side">
       <div class="card" style="padding:10px">
@@ -477,10 +485,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
         <div class="card lady-check-entry">
           <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">湖中女神验人</button>
         </div>
-      </div>
-      <div class="review-section" id="review-section" style="display:none">
-        <button class="btn" onclick="toggleReview()">复盘</button>
-        <div id="review-panel" style="display:none;margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -630,7 +634,7 @@ function initState(n) {
   for (var i = 0; i < n; i++) state.playerNames[i] = '玩家' + (i + 1);
   state.selfIndex = -1;
   state.myRole = null;
-  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'] : DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
   state.missions = [];
   state.currentRound = 0;
   state.tendencies = {};
@@ -656,6 +660,7 @@ function initState(n) {
   state.speakerOrder = [];
   state.currentSpeakerIdx = -1;
   state.speakTimes = {};
+  state._teamConfirmedPending = false;
   for (var i = 0; i < n; i++) {
     state.tendencies[i] = 50;
     state.consecutiveRejects[i] = 0;
@@ -792,7 +797,7 @@ function setPlayerCount(n) {
   var oldNames = state.playerNames;
   var oldSelf = state.selfIndex;
   state.playerCount = n;
-  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙'] : DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
   state.playerNames = [];
   for (var i = 0; i < n; i++) {
     state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
@@ -862,12 +867,20 @@ function setTimerSecondsInput() {
   if (isNaN(val) || val < 10) { val = 10; input.value = 10; }
   if (val > 300) { val = 300; input.value = 300; }
   state.timerSeconds = val;
+  [45,60,75,90].forEach(function(s) {
+    var btn = document.getElementById('timer-opt-' + s);
+    if (btn) btn.className = 'timer-opt-btn';
+  });
 }
 
 function setTimerSeconds(sec) {
   state.timerSeconds = sec;
   var input = document.getElementById('timer-seconds-input');
   if (input) input.value = sec;
+  [45,60,75,90].forEach(function(s) {
+    var btn = document.getElementById('timer-opt-' + s);
+    if (btn) btn.className = 'timer-opt-btn' + (s === sec ? ' selected' : '');
+  });
 }
 /* ==================== GAME START ==================== */
 function startGame() {
@@ -969,12 +982,6 @@ function renderRoundTracker() {
 }
 
 function switchRound(i) {
-  if (state.missions[i] && state.missions[i].result) {
-    state.currentRound = i;
-    renderGame();
-    return;
-  }
-  if (i !== state.currentRound) return;
   state.currentRound = i;
   renderGame();
 }
@@ -1032,6 +1039,17 @@ function renderStepPanel() {
   }
 
   var leaderName = playerLabel(m.leader);
+
+  if (state._teamConfirmedPending) {
+    h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
+    h += '<span style="color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+    h += '<div style="text-align:center;padding:20px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+    h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
+    h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
+    h += '</div>';
+    c.innerHTML = h;
+    return;
+  }
 
   if (votesConfirmed) {
     h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
@@ -1230,12 +1248,10 @@ function renderLadyLakeResults() {
 function renderLadyLakeEntry() {
   var el = $('lady-lake-entry');
   if (!el) return;
-  var m = state.missions[state.currentRound];
-  if (!state.ladyOfLakeEnabled || !m || !m.result) {
+  if (!state.ladyOfLakeEnabled || state.currentRound < 2) {
     el.style.display = 'none';
     return;
   }
-  // Show entry after mission result is confirmed
   el.style.display = 'block';
 }
 
@@ -1475,9 +1491,10 @@ function startTimer() {
       stopTimer();
       playBeepSound();
       toast('计时结束！', 'warn');
-      // Auto advance speaker if in per mode
       if (state.timerMode === 'per' && state.currentSpeakerIdx < state.speakerOrder.length - 1) {
         setTimeout(function() { speakEnd(); }, 800);
+      } else if (state._teamConfirmedPending) {
+        setTimeout(function() { transitionToVotes(); }, 800);
       }
     }
   }, 1000);
@@ -1513,6 +1530,9 @@ function speakEnd() {
     state.currentSpeakerIdx = -1;
     state.speakerOrder = [];
     toast('所有玩家发言结束');
+    if (state._teamConfirmedPending) {
+      setTimeout(function() { transitionToVotes(); }, 800);
+    }
   }
 }
 
@@ -1682,10 +1702,41 @@ function toggleTeamMember(idx) {
 function confirmTeam() {
   var m = state.missions[state.currentRound];
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
+  // Start speech phase before voting
+  state._teamConfirmedPending = true;
+  if (state.timerMode === 'per') {
+    state.speakerOrder = [];
+    state.speakTimes = {};
+    var startIdx = m.leader;
+    for (var si = 0; si < state.playerCount; si++) {
+      state.speakerOrder.push((startIdx + si) % state.playerCount);
+    }
+    state.currentSpeakerIdx = 0;
+    state.timerRemaining = state.timerSeconds;
+    state.timerInterval = null;
+    renderTimerDisplay();
+    startTimer();
+  } else if (state.timerMode === 'all') {
+    state.timerRemaining = state.timerSeconds;
+    state.timerInterval = null;
+    state.speakerOrder = [];
+    state.currentSpeakerIdx = -1;
+    renderTimerDisplay();
+    startTimer();
+  }
+  renderStepPanel();
+}
+
+function transitionToVotes() {
+  state._teamConfirmedPending = false;
+  var m = state.missions[state.currentRound];
   m.votes = {};
   for (var i = 0; i < state.playerCount; i++) {
     m.votes[i] = 'reject';
   }
+  stopTimer();
+  var el = $('timer-display');
+  if (el) el.style.display = 'none';
   renderStepPanel();
 }
 
@@ -1723,17 +1774,6 @@ function confirmVotes() {
   applyLaunchTendencies();
 
   if (approves > rejects) {
-    // Set up speaker order starting from leader
-    if (state.timerMode === 'per') {
-      state.speakerOrder = [];
-      state.speakTimes = {};
-      var startIdx = m.leader;
-      for (var si = 0; si < state.playerCount; si++) {
-        state.speakerOrder.push((startIdx + si) % state.playerCount);
-      }
-      state.currentSpeakerIdx = 0;
-    }
-    startTimer();
     renderStepPanelWithResult();
   } else {
     m.launchFailures++;
@@ -1868,7 +1908,7 @@ function finalizeMission() {
   checkGameEnd();
   renderGame();
 
-  if (state.ladyOfLakeEnabled && !state.winner && state.currentRound >= 1) {
+  if (state.ladyOfLakeEnabled && !state.winner && state.currentRound >= 2) {
     setTimeout(function() { showLadyCheck(); }, 500);
   }
 }
