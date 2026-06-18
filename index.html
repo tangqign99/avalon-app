@@ -91,7 +91,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .count-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 16px rgba(201,168,76,0.5)}
 .player-setup-row{display:flex;align-items:center;gap:8px;padding:5px 0}
 #player-names{display:grid;grid-template-columns:1fr 1fr;gap:4px}
-.player-setup-row .idx{color:var(--gold);font-weight:700;min-width:46px;font-size:14px}
+.player-setup-row .idx{color:var(--gold);font-weight:800;flex:4;font-size:18px;text-align:center}
+.player-setup-row select{flex:6}
 .player-setup-row select{
   flex:1;padding:10px;border-radius:var(--radius-sm);
   border:1px solid var(--border);background:var(--bg-card);color:var(--text);
@@ -376,7 +377,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 /* 计时 */
 .timer-setup{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
-.timer-setup h3{font-size:14px;color:var(--gold);margin-bottom:8px}
+.timer-setup h3{font-size:14px;color:var(--gold);margin-bottom:8px;text-align:center}
 .timer-mode-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;justify-content:center}
 .timer-mode-btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--bg-card);color:var(--text);transition:all 0.15s;min-height:44px}
 .timer-mode-btn:hover{border-color:var(--gold)}
@@ -471,6 +472,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 /* ===== 统计/结束页面左右留白装饰 ===== */
 #page-stats,#page-end{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
+/* ===== 倾向页左右留白 ===== */
+#page-tend{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
 #page-stats::before,#page-stats::after,
 #page-end::before,#page-end::after{
   content:'';position:fixed;top:0;bottom:0;width:20vw;z-index:0;pointer-events:none;
