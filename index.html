@@ -375,7 +375,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .stats-top-row .stat-card{padding:10px 12px}
 .stats-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:820px){.stats-two-col{grid-template-columns:1fr}}
-.win-rate-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.win-rate-cards{display:grid;grid-template-columns:1fr;gap:6px}
 .win-rate-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;background:var(--bg-card);display:flex;align-items:center;gap:8px;min-height:44px;cursor:default;transition:border-color 0.15s}
 .win-rate-card:hover{border-color:var(--gold)}
 .win-rate-card .wc-rank{font-size:13px;color:var(--text-dim);min-width:22px;font-weight:700;text-align:center}
@@ -1459,6 +1459,8 @@ function undoLadyCheck(round) {
       } else if (c.result === 'evil' && (c.target in state.tendencies)) {
         state.tendencies[c.target] = Math.min(100, state.tendencies[c.target] + 15);
       }
+      // 恢复湖中女神头衔给原来的持有者
+      state.ladyLakeHolder = c.holder;
       state.ladyLakeChecks.splice(i, 1);
       break;
     }
@@ -2114,8 +2116,13 @@ function finalizeMission() {
   }
   state.roundTendencies.push(snap);
 
-  checkGameEnd();
-  renderGame();
+  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+  if (hasLancelot && state.currentRound >= 1) {
+    showLancelotFlipModal(state.currentRound);
+  } else {
+    checkGameEnd();
+    renderGame();
+  }
 }
 
 function updateFinalTendencies() {
@@ -2296,7 +2303,7 @@ function showLancelotFlipModal(roundNum) {
     '<p style="font-size:11px;text-align:center;color:var(--text-dim)">抽到2次恢复原阵营</p>' +
     '<div class="modal-actions">' +
     '<button class="btn primary" onclick="closeModal();applyLancelotFlip()">&#9989; 是，反转</button>' +
-    '<button class="btn" onclick="closeModal()">&#10060; 否，不反转</button>' +
+    '<button class="btn" onclick="closeModal();skipLancelotFlip()">&#10060; 否，不反转</button>' +
     '</div>'
   );
 }
@@ -2308,17 +2315,18 @@ function applyLancelotFlip() {
     state.lancelotRoundFlips[state.currentRound] = true;
   }
   toast(state.lancelotFlipped ? '兰斯洛特阵营已反转（第 ' + state.lancelotFlipCount + ' 次）' : '兰斯洛特阵营恢复原状（反转2次）');
-  renderRoundTracker();
+  checkGameEnd();
+  renderGame();
+}
+
+function skipLancelotFlip() {
+  checkGameEnd();
+  renderGame();
 }
 
 function setLancelotFlip(val) {
   state.lancelotFlipped = val;
   state._lancelotAsked = true;
-  $('end-lancelot-card').style.display = 'none';
-  var yBtn = $('end-lancelot-yes');
-  var nBtn = $('end-lancelot-no');
-  if (yBtn) yBtn.className = 'winner-btn good' + (val ? ' selected' : '');
-  if (nBtn) nBtn.className = 'winner-btn evil' + (!val ? ' selected' : '');
   renderEnd();
   toast(val ? '兰斯洛特已反转' : '兰斯洛特未反转');
 }
@@ -2327,7 +2335,7 @@ function resolveAssassin(isMerlin) {
   state.winner = isMerlin ? 'evil' : 'good';
   state.assassinFromMission = false;
   $('end-assassin-card').style.display = 'none';
-  $('end-lancelot-card').style.display = 'block';
+  renderEnd();
   toast(isMerlin ? '刺杀成功！反方获胜' : '刺杀失败！好人方获胜');
 }
 
@@ -2583,8 +2591,10 @@ function renderStats() {
     return b.total - a.total;
   });
 
+  var showAll = state._showAllLeaderboard || false;
+  var maxShow = showAll ? lb.length : Math.min(10, lb.length);
   var lh = '';
-  for (var r = 0; r < lb.length; r++) {
+  for (var r = 0; r < maxShow; r++) {
     var p = lb[r];
     var rateColor = p.rate >= 0.6 ? 'var(--green-bright)' : p.rate >= 0.4 ? 'var(--gold-light)' : 'var(--red-bright)';
     var topClass = '';
@@ -2598,11 +2608,21 @@ function renderStats() {
     lh += '<div class="wc-sub">' + p.wins + '/' + p.total + '场</div></div>';
     lh += '</div>';
   }
+  if (lb.length > 10) {
+    lh += '<div style="text-align:center;margin-top:8px">';
+    lh += '<button class="btn small" onclick="toggleLeaderboard()">' + (showAll ? '收起' : '展开全部（共' + lb.length + '名）') + '</button>';
+    lh += '</div>';
+  }
   if (lb.length === 0) {
     lh = '<div style="text-align:center;padding:16px;color:var(--text-dim)">暂无数据</div>';
   }
   $('win-rate-leaderboard').innerHTML = lh;
   renderSyncStatus();
+}
+
+function toggleLeaderboard() {
+  state._showAllLeaderboard = !state._showAllLeaderboard;
+  renderStats();
 }
 
 function toggleCompactHistory(header) {
