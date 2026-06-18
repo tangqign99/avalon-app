@@ -79,6 +79,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   border-color:var(--gold) !important;
   box-shadow:0 0 12px rgba(201,168,76,0.5) !important;
 }
+.team-member-btn{min-width:56px;min-height:44px;padding:10px 14px;font-size:15px}
 .btn.active-page{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
 .count-grid{display:flex;gap:10px;flex-wrap:wrap}
 .count-btn{
@@ -135,10 +136,11 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   color:#666;transition:all 0.2s;position:relative;
 }
 .lancelot-flip-dot svg{display:block}
-.lancelot-flip-dot.flipped{border-color:#e04040;background:rgba(224,64,64,0.18);color:#ff4444;box-shadow:0 0 16px rgba(224,64,64,0.55)}
+.lancelot-flip-dot.flipped{border-color:#ff3030;background:rgba(255,48,48,0.22);color:#ff4040;box-shadow:0 0 20px rgba(255,48,48,0.6);animation:flip-glow 1.5s ease-in-out infinite}
+@keyframes flip-glow{0%,100%{box-shadow:0 0 20px rgba(255,48,48,0.6)}50%{box-shadow:0 0 36px rgba(255,48,48,0.9)}}
 .lancelot-flip-dot.blank{opacity:0}
-.lancelot-flip-dot.no-flip{border-color:#555;background:rgba(100,100,100,0.08);color:#666}
-.lancelot-flip-dot.no-flip svg{opacity:0.5}
+.lancelot-flip-dot.no-flip{border-color:#777;background:rgba(150,150,150,0.12);color:#aaa}
+.lancelot-flip-dot.no-flip svg{opacity:0.7}
 .lancelot-flip-dot.future{opacity:0.25;border-style:dashed;border-color:#444;background:transparent;color:#444}
 .round-tracker{display:flex;gap:10px;justify-content:center;padding:6px 0}
 .round-dot{
@@ -436,23 +438,25 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .sync-stat-row .sync-val.bad{color:var(--red-bright)}
 .sync-hint{font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.5}
 
-/* ===== 统计页面左右留白装饰 ===== */
-#page-stats{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
-#page-stats::before,#page-stats::after{
+/* ===== 统计/结束页面左右留白装饰 ===== */
+#page-stats,#page-end{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
+#page-stats::before,#page-stats::after,
+#page-end::before,#page-end::after{
   content:'';position:fixed;top:0;bottom:0;width:20vw;z-index:0;pointer-events:none;
   background-position:center;background-repeat:repeat;opacity:0.06;
 }
-#page-stats::before{
+#page-stats::before,#page-end::before{
   left:0;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='36' fill='none' stroke='%23c9a84c' stroke-width='2' opacity='0.4'/%3E%3Ccircle cx='40' cy='40' r='26' fill='none' stroke='%23c9a84c' stroke-width='1' opacity='0.3'/%3E%3Cpath d='M30 40 Q40 25 50 40 Q40 55 30 40' fill='none' stroke='%23c9a84c' stroke-width='1.5' opacity='0.5'/%3E%3C/svg%3E");
 }
-#page-stats::after{
+#page-stats::after,#page-end::after{
   right:0;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='36' fill='none' stroke='%23c9a84c' stroke-width='2' opacity='0.4'/%3E%3Ccircle cx='40' cy='40' r='26' fill='none' stroke='%23c9a84c' stroke-width='1' opacity='0.3'/%3E%3Cpath d='M30 40 Q40 25 50 40 Q40 55 30 40' fill='none' stroke='%23c9a84c' stroke-width='1.5' opacity='0.5'/%3E%3C/svg%3E");
 }
 @media(max-width:900px){
-  #page-stats{padding-left:4vw;padding-right:4vw}
-  #page-stats::before,#page-stats::after{width:4vw}
+  #page-stats,#page-end{padding-left:4vw;padding-right:4vw}
+  #page-stats::before,#page-stats::after,
+  #page-end::before,#page-end::after{width:4vw}
 }
 
 </style>
@@ -1000,6 +1004,7 @@ function doStartGame() {
   state._lancelotAsked = false;
   state.lancelotFlipCount = 0;
   state.lancelotRoundFlips = [false, false, false, false, false];
+  state.autoRoles = null;
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
   state.ladyLakeHolder = -1;
@@ -1030,7 +1035,7 @@ function renderLancelotFlipTracker() {
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   if (!hasLancelot) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
-  var flipSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18A7 7 0 0 1 17 6"/><polyline points="16 2 18 6 14 6"/><path d="M17 6A7 7 0 0 1 7 18"/><polyline points="8 22 6 18 10 18"/></svg>';
+  var flipSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18A7 7 0 0 1 17 6"/><polyline points="16 2 18 6 14 6"/><path d="M17 6A7 7 0 0 1 7 18"/><polyline points="8 22 6 18 10 18"/></svg>';
   var h = '';
   for (var i = 0; i < 5; i++) {
     var cls = 'lancelot-flip-dot';
@@ -1161,16 +1166,21 @@ function renderStepPanel() {
     h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
 
-    h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div><div class="btn-row">';
-    for (var i = 0; i < pc; i++) {
-      var inTeam = m.team.indexOf(i) !== -1;
-      var cls = 'btn';
-      if (inTeam) cls += ' selected team-member-highlight';
-      h += '<button class="' + cls + '" onclick="toggleTeamMember(' + i + ')">';
-      h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
-      h += '</button>';
+    h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div>';
+    var splitAt = Math.ceil(pc / 2);
+    for (var row = 0; row < 2; row++) {
+      h += '<div class="btn-row" style="margin-bottom:' + (row === 0 ? '12px' : '0') + '">';
+      for (var i = row * splitAt; i < Math.min((row + 1) * splitAt, pc); i++) {
+        var inTeam = m.team.indexOf(i) !== -1;
+        var cls = 'btn team-member-btn';
+        if (inTeam) cls += ' selected team-member-highlight';
+        h += '<button class="' + cls + '" onclick="toggleTeamMember(' + i + ')">';
+        h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
+        h += '</button>';
+      }
+      h += '</div>';
     }
-    h += '</div></div>';
+    h += '</div>';
 
     h += '<div style="text-align:center;margin-bottom:12px">';
     h += '<button class="btn primary" onclick="confirmTeam()"';
@@ -1357,19 +1367,9 @@ function renderMerlinPredictTend() {
 
 /* ==================== LADY OF THE LAKE ==================== */
 function renderLadyLakeResults() {
+  // 湖中验人记录已合并至女神系谱栏，此处仅保留容器清理
   var el = $('lady-lake-results');
-  if (!el || !state.ladyOfLakeEnabled || state.ladyLakeChecks.length === 0) {
-    if (el) el.innerHTML = '';
-    return;
-  }
-  var h = '<div style="font-size:12px;color:var(--gold);margin-bottom:3px">湖中女神验人记录</div>';
-  for (var i = 0; i < state.ladyLakeChecks.length; i++) {
-    var c = state.ladyLakeChecks[i];
-    h += '<div class="lady-check-result ' + (c.result === 'good' ? 'good' : 'evil') + '">';
-    h += playerLabel(c.target) + '：' + (c.result === 'good' ? '好人方' : '反方');
-    h += '</div>';
-  }
-  el.innerHTML = h;
+  if (el) el.innerHTML = '';
 }
 
 function renderLadyLakeEntry() {
@@ -1394,9 +1394,9 @@ function renderLadyLakeHolderInfo() {
     var genNum = 1;
     for (var hi = 0; hi < history.length; hi++) {
       var rec = history[hi];
-      h += '<div style="font-size:11px;color:var(--text-dim);margin-bottom:2px">';
-      h += '第' + genNum + '任：' + (rec.holder + 1) + '号 ' + state.playerNames[rec.holder] + ' → 验 ' + (rec.target + 1) + '号 ' + state.playerNames[rec.target];
-      h += ' <span style="color:' + (rec.result === 'good' ? '#99bbff' : '#ff9999') + '">' + (rec.result === 'good' ? '好人' : '反方') + '</span>';
+      h += '<div style="font-size:14px;color:var(--text);margin-bottom:5px;line-height:1.5">';
+      h += '<strong>第' + genNum + '任女神：</strong>' + (rec.holder + 1) + '号 ' + state.playerNames[rec.holder] + ' <span style="color:var(--gold-light)">→</span> 验 ' + (rec.target + 1) + '号 ' + state.playerNames[rec.target];
+      h += ' <span style="font-weight:700;font-size:15px;color:' + (rec.result === 'good' ? '#99bbff' : '#ff9999') + '">' + (rec.result === 'good' ? '好人' : '反方') + '</span>';
       h += '</div>';
       genNum++;
     }
@@ -1826,7 +1826,11 @@ function resetTimer() {
 
 function playBeepSound() {
   try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!window._audioCtx) {
+      window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    var ctx = window._audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
     var osc = ctx.createOscillator();
     var gain = ctx.createGain();
     osc.connect(gain);
@@ -2216,7 +2220,15 @@ function finalizeMission() {
 
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   if (hasLancelot && state.currentRound >= 1) {
-    showLancelotFlipModal(state.currentRound);
+    var sc = state.missions.filter(function(mm) { return mm.result === 'success'; }).length;
+    var fc = state.missions.filter(function(mm) { return mm.result === 'fail'; }).length;
+    if (sc >= 3 || fc >= 3) {
+      // 已决定胜负，跳过反转确认直接推进游戏结束
+      checkGameEnd();
+      renderGame();
+    } else {
+      showLancelotFlipModal(state.currentRound);
+    }
   } else {
     checkGameEnd();
     renderGame();
@@ -2337,6 +2349,10 @@ function renderEndIdentityDropdowns() {
     var taken = getTakenUniqueRoles(i);
     var curSel = document.getElementById('end-role-' + i);
     var curVal = curSel ? curSel.value : '';
+    // 自动填入已知身份（如刺杀中确认的梅林）
+    if (!curVal && state.autoRoles && state.autoRoles[i]) {
+      curVal = state.autoRoles[i];
+    }
 
     h += '<div class="end-player-row">';
     h += '<span class="ep-name">' + playerLabel(i) + '</span>';
@@ -2432,6 +2448,10 @@ function setLancelotFlip(val) {
 function resolveAssassin(isMerlin) {
   state.winner = isMerlin ? 'evil' : 'good';
   state.assassinFromMission = false;
+  if (isMerlin && state.assassinTarget !== null) {
+    state.autoRoles = state.autoRoles || {};
+    state.autoRoles[state.assassinTarget] = '梅林';
+  }
   $('end-assassin-card').style.display = 'none';
   renderEnd();
   toast(isMerlin ? '刺杀成功！反方获胜' : '刺杀失败！好人方获胜');
@@ -2492,6 +2512,17 @@ function saveGameRecord() {
         }, {})
       };
     })
+  },
+  ladyCheckHistory: state.ladyCheckHistory.map(function(h) {
+    return {
+      round: h.round,
+      holder: h.holder,
+      holderName: playerLabel(h.holder),
+      target: h.target,
+      targetName: playerLabel(h.target),
+      result: h.result
+    };
+  })
   };
   history.push(record);
   saveHistory(history);
@@ -2854,6 +2885,18 @@ function showGameDetail(idx) {
     h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
     if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
     h += '</div>';
+  }
+
+  if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+    h += '<h3 style="margin-top:10px">湖中女神验人</h3>';
+    for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+      var lh = rec.ladyCheckHistory[li];
+      h += '<div style="margin-bottom:3px;font-size:13px">';
+      h += '<strong>第' + (li + 1) + '任女神：</strong>' + lh.holderName + ' → 验 ' + lh.targetName;
+      h += ' <span style="font-weight:700;color:' + (lh.result === 'good' ? 'var(--blue-light)' : 'var(--red-bright)') + '">女神说' + (lh.result === 'good' ? '好人' : '反方') + '</span>';
+      h += ' <span style="font-size:11px;color:var(--text-dim)">（女神说的不一定准）</span>';
+      h += '</div>';
+    }
   }
 
   if (rec.roundTendencies && rec.roundTendencies.length > 0) {
@@ -3400,6 +3443,20 @@ function syncFromCloud() {
 
 /* ==================== INIT ==================== */
 (function() {
+  // 首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
+  var initAudio = function() {
+    if (!window._audioCtx) {
+      try {
+        window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (window._audioCtx.state === 'suspended') window._audioCtx.resume();
+      } catch(e) {}
+    }
+    document.removeEventListener('click', initAudio);
+    document.removeEventListener('touchstart', initAudio);
+  };
+  document.addEventListener('click', initAudio, { once: true });
+  document.addEventListener('touchstart', initAudio, { once: true });
+
   var last = loadLastGame();
   if (last && last.playerCount >= 5 && last.playerCount <= 10) {
     state.playerCount = last.playerCount;
