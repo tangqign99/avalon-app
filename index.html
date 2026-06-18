@@ -59,10 +59,16 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .btn.primary{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold);font-size:18px;padding:13px 28px}
 .btn.danger{background:#3a1a1a;color:#ff9999;border-color:#994444}
 .btn.success{background:#1a3a1a;color:#99ff99;border-color:#449944}
-.btn.self{background:#1a3050;color:#99bbff;border-color:#446699}
 .btn.small{padding:7px 12px;font-size:13px;min-height:36px}
 .btn:disabled{opacity:0.4;cursor:default;pointer-events:none}
 .btn.warn{padding:6px 10px;font-size:12px;border-color:#994444;color:#ff9999;background:#2a1a1a}
+/* 队长标志 */
+.leader-badge{
+  display:inline-block;padding:6px 16px;border:3px solid var(--gold);border-radius:50px;
+  background:var(--gold-dark);color:var(--gold-light);font-size:18px;font-weight:800;
+  box-shadow:0 0 20px rgba(201,168,76,0.6),0 0 40px rgba(201,168,76,0.2);
+  letter-spacing:2px;text-shadow:0 0 8px rgba(232,212,139,0.5);
+}
 .btn.active-page{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
 .count-grid{display:flex;gap:10px;flex-wrap:wrap}
 .count-btn{
@@ -82,7 +88,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23c9a84c'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
 }
-.player-setup-row .self-tag{color:var(--blue);font-weight:700;font-size:13px;min-width:42px;text-align:center}
 .add-name-row{display:flex;gap:8px;align-items:center;margin-top:4px;padding:4px 0}
 .add-name-input{
   flex:1;padding:9px 12px;border-radius:var(--radius-sm);
@@ -112,6 +117,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .faction-label{font-weight:700;font-size:14px;padding:4px 12px;border-radius:var(--radius-sm);margin-right:4px}
 .faction-label.good{background:rgba(102,153,255,0.2);color:#99bbff}
 .faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
+/* 兰斯洛特反转圆圈 */
+.lancelot-flip-tracker{display:flex;gap:10px;justify-content:center;padding:2px 0 6px}
+.lancelot-flip-dot{
+  width:56px;height:56px;border-radius:50%;border:2px solid var(--border);
+  background:var(--bg-card);display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;color:var(--text-dim);transition:all 0.2s;position:relative;
+}
+.lancelot-flip-dot.flipped{border-color:#e04040;background:rgba(224,64,64,0.15);color:#ff6666;box-shadow:0 0 14px rgba(224,64,64,0.5)}
+.lancelot-flip-dot.locked{opacity:0.3}
 .round-tracker{display:flex;gap:10px;justify-content:center;padding:6px 0}
 .round-dot{
   width:56px;height:56px;border-radius:50%;border:2px solid var(--border);
@@ -478,6 +492,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 <section class="page" id="page-game">
   <div class="round-tracker" id="round-tracker"></div>
+  <div class="lancelot-flip-tracker" id="lancelot-flip-tracker" style="display:none"></div>
   <div id="launch-fail-area"></div>
   <div class="timer-display" id="timer-display" style="display:none">
     <div class="timer-value" id="timer-value">01:00</div>
@@ -498,7 +513,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       </div>
     </div>
     <div class="game-side">
-      <div id="lady-lake-holder-info" style="display:none;padding:8px 12px;background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(201,168,76,0.03));border:1px solid var(--gold);border-radius:var(--radius);margin-bottom:8px;text-align:center;font-size:14px;font-weight:700;color:var(--gold-light)"></div>
+      <div id="lady-lake-holder-info" style="display:none;padding:8px 12px;background:linear-gradient(135deg,rgba(74,144,217,0.12),rgba(74,144,217,0.03));border:2px solid var(--blue);border-radius:var(--radius);margin-bottom:8px;text-align:center;font-size:14px;font-weight:700;color:var(--blue-light, #99bbff)"></div>
       <div class="card" style="padding:10px">
         <div id="lady-lake-results" style="margin-top:6px"></div>
       </div>
@@ -772,11 +787,9 @@ function renderSetup() {
   }
   $('count-grid').innerHTML = h;
 
-  var autoSelf = -1;
   h = '';
   for (var i = 0; i < state.playerCount; i++) {
     var curName = state.playerNames[i];
-    if (curName === '阿弟') autoSelf = i;
 
     // Collect names already taken by other players
     var takenNames = {};
@@ -797,12 +810,9 @@ function renderSetup() {
       h += '<option value="' + curName + '" selected>' + curName + '</option>';
     }
     h += '</select>';
-    if (autoSelf === i) h += '<span class="self-tag">★ 我</span>';
-    else h += '<span style="min-width:42px"></span>';
     h += '</div>';
   }
   $('player-names').innerHTML = h;
-  if (autoSelf >= 0) state.selfIndex = autoSelf;
 
   h = '<div class="role-horizontal">';
   h += '<div class="role-group good-group">';
@@ -852,7 +862,6 @@ function setPlayerCount(n) {
 
 function setPlayerName(idx, name) {
   state.playerNames[idx] = name;
-  if (name === '阿弟') state.selfIndex = idx;
   renderSetup();
 }
 
@@ -923,7 +932,6 @@ function startGame() {
   for (var i = 0; i < state.playerCount; i++) {
     if (state.playerNames[i] === '阿弟') { state.selfIndex = i; break; }
   }
-  if (state.selfIndex < 0) { toast('请确保玩家列表中有「阿弟」作为「我」', 'warn'); return; }
   showIdentityModal();
 }
 
@@ -989,8 +997,29 @@ function doStartGame() {
 }
 
 /* ==================== GAME RENDER ==================== */
+
+function renderLancelotFlipTracker() {
+  var el = $('lancelot-flip-tracker');
+  if (!el) return;
+  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+  if (!hasLancelot) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  var mc = MISSION_COUNTS[state.playerCount];
+  var h = '';
+  for (var i = 0; i < 5; i++) {
+    var cls = 'lancelot-flip-dot';
+    var icon = '';
+    if (i === 0) { cls += ' locked'; icon = mc[i]; }
+    else if (state.lancelotRoundFlips[i]) { cls += ' flipped'; icon = '⑂'; }
+    else { icon = mc[i]; }
+    h += '<div class="' + cls + '">' + icon + '</div>';
+  }
+  el.innerHTML = h;
+}
+
 function renderGame() {
   renderRoundTracker();
+  renderLancelotFlipTracker();
   renderStepPanel();
   renderLadyLakeResults();
   renderLadyLakeHolderInfo();
@@ -1070,7 +1099,7 @@ function renderStepPanel() {
     }
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤A：选择队长</div><div class="btn-row">';
     for (var i = 0; i < pc; i++) {
-      h += '<button class="btn' + (i === state.selfIndex ? ' self' : '') + '" onclick="selectLeader(' + i + ')">' + playerLabel(i) + '</button>';
+      h += '<button class="btn" onclick="selectLeader(' + i + ')">' + playerLabel(i) + '</button>';
     }
     h += '<button class="btn random-leader-btn" onclick="randomFirstLeader()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-weight:700">&#127922; 随机</button>';
     h += '</div></div>';
@@ -1081,8 +1110,8 @@ function renderStepPanel() {
   var leaderName = playerLabel(m.leader);
 
   if (state._teamConfirmedPending) {
-    h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
-    h += '<span style="color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+    h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
+    h += '<span style="color:var(--text-dim);margin-left:10px;font-size:14px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
     h += '<div style="text-align:center;padding:20px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
     h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
@@ -1098,10 +1127,10 @@ function renderStepPanel() {
   }
 
   if (votesConfirmed) {
-    h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
-    h += '<span style="color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+    h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
+    h += '<span style="color:var(--text-dim);margin-left:10px;font-size:14px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
   } else {
-    h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + leaderName + '</span>';
+    h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
     h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
 
@@ -1109,7 +1138,7 @@ function renderStepPanel() {
     for (var i = 0; i < pc; i++) {
       var inTeam = m.team.indexOf(i) !== -1;
       var sel = inTeam ? ' selected' : '';
-      h += '<button class="btn' + sel + (i === state.selfIndex ? ' self' : '') + '" onclick="toggleTeamMember(' + i + ')">';
+      h += '<button class="btn' + sel + '" onclick="toggleTeamMember(' + i + ')">';
       h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
       h += '</button>';
     }
@@ -2017,7 +2046,7 @@ function renderStepPanelWithResult() {
   h += '<span class="step-label">第' + (state.currentRound + 1) + '轮 · 需要 ' + m.size + ' 人出任务</span>';
   h += '<span style="font-size:13px;color:var(--text-dim)">进行中</span></div>';
 
-  h += '<div style="margin-bottom:6px;font-size:14px"><span style="color:var(--gold)">队长：' + playerLabel(m.leader) + '</span>';
+  h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + playerLabel(m.leader) + '</span>';
   h += '<span style="font-size:13px;color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
 
   var approves = Object.values(m.votes).filter(function(v) { return v === 'approve'; }).length;
