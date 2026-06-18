@@ -869,7 +869,7 @@ var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
 var MULTI_ROLES = ['忠臣','爪牙'];
-var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
+var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)','湖中女神'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'];
 
@@ -2121,6 +2121,31 @@ function renderIdentityPrediction() {
 }
 
 /* ==================== DEDUCTION PAGE ==================== */
+function computePriorGoodProb(i, pc, si, myRole, activeRoles) {
+  // Known self
+  if (i === si) {
+    if (myRole && EVIL_ROLES.indexOf(myRole) !== -1) return 5;
+    if (myRole && GOOD_ROLES.indexOf(myRole) !== -1) return 95;
+    return 50;
+  }
+  // Count good/evil from active roles
+  var goodCount = 0, evilCount = 0;
+  for (var r = 0; r < activeRoles.length; r++) {
+    if (GOOD_ROLES.indexOf(activeRoles[r]) !== -1) goodCount++;
+    else if (EVIL_ROLES.indexOf(activeRoles[r]) !== -1) evilCount++;
+  }
+  // Exclude self from pool to compute prior for others
+  if (myRole && GOOD_ROLES.indexOf(myRole) !== -1) {
+    var remainingGood = goodCount - 1;
+    return Math.round(remainingGood / (pc - 1) * 100);
+  } else if (myRole && EVIL_ROLES.indexOf(myRole) !== -1) {
+    var remainingEvil = evilCount - 1;
+    return Math.round((pc - 1 - remainingEvil) / (pc - 1) * 100);
+  }
+  // Unknown self role: flat prior
+  return Math.round(goodCount / pc * 100);
+}
+
 function renderDeduction() {
   var pc = state.playerCount;
   var si = state.selfIndex;
@@ -2147,10 +2172,11 @@ function renderDeduction() {
   var goodProbs = [];
   var merlinProbs = [];
   for (var i = 0; i < pc; i++) {
-    // Good/evil: based on tendency + vote alignment
+    // Good/evil: blend tendency with Bayesian prior from role counts
     var tendency = state.tendencies[i] || 50;
+    var prior = computePriorGoodProb(i, pc, si, state.myRole, state.activeRoles);
     var pred = state.playerPredictions[i] || '';
-    var goodScore = tendency;
+    var goodScore = Math.round(tendency * 0.5 + prior * 0.5);
 
     // Adjust from prediction marks
     if (pred === '正方') goodScore = Math.min(100, goodScore + 15);
