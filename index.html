@@ -3085,7 +3085,7 @@ function pushDataToFile() {
       try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
     }
   }
-  var json = JSON.stringify(data);
+  var json = JSON.stringify(data, null, 2);
   updateLocalDataJson(data);
   fetch('http://localhost:8090/save', {
     method: 'POST',
@@ -3093,13 +3093,15 @@ function pushDataToFile() {
     body: json
   }).then(function(res) {
     if (res.ok) {
-      toast('数据已保存到 data.json！现在可以 git push 到 GitHub');
+      toast('data.json 已保存！运行 git push 或点击「同步」推送到云端');
     } else {
-      toast('保存失败（本地同步服务未运行？），可手动导出数据', 'warn');
+      downloadDataJsonFile(json);
+      toast('data.json 已下载，请放入项目目录后 git push', 'warn');
     }
     renderSyncStatus();
   }).catch(function() {
-    toast('本地同步服务未运行。已更新本地 data.json，请手动 git push', 'warn');
+    downloadDataJsonFile(json);
+    toast('同步服务未运行。data.json 已下载，请放入项目目录（avalon-app/）后手动 git push', 'warn');
     renderSyncStatus();
   });
 }
@@ -3107,13 +3109,41 @@ function pushDataToFile() {
 function updateLocalDataJson(data) {
   var json = JSON.stringify(data, null, 2);
   try {
-    // 尝试通过本地 sync server 写入文件
     fetch('http://localhost:8090/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: json
-    }).catch(function() {});
+    }).then(function(res) {
+      if (res.ok) {
+        window._dataJsonSynced = true;
+        window._lastDataJsonSave = Date.now();
+        console.log('[sync] data.json saved via sync_server');
+      }
+    }).catch(function() {
+      window._dataJsonSynced = false;
+      window._pendingDataJson = json;
+      // 只提示一次，避免每局都弹
+      if (!window._syncWarningShown) {
+        window._syncWarningShown = true;
+        setTimeout(function() {
+          toast('同步服务未运行。对局已保存到本地，点击统计页「保存数据到本地文件」可导出 data.json', 'warn');
+        }, 1500);
+      }
+    });
   } catch(e) {}
+}
+
+function downloadDataJsonFile(json) {
+  var blob = new Blob([json], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'data.json';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function syncFromCloud() {
@@ -3187,6 +3217,46 @@ function syncFromCloud() {
     }
   }
   showPage('setup');
+
+  // 初始化时检测 localStorage 与 data.json 是否同步
+  setTimeout(function() {
+    var localGames = loadHistory().length;
+    if (localGames === 0) return;
+    fetch('data.json?t=' + Date.now())
+      .then(function(r) { return r.json(); })
+      .then(function(dj) {
+        var djGames = (dj && dj.avalon_history_v2 && Array.isArray(dj.avalon_history_v2)) ? dj.avalon_history_v2.length : 0;
+        if (djGames < localGames) {
+          // 尝试通过 sync_server 自动修复
+          var autoData = {
+            avalon_name_pool: JSON.parse(localStorage.getItem('avalon_name_pool') || '[]'),
+            avalon_history_v2: loadHistory(),
+            avalon_last_game: JSON.parse(localStorage.getItem('avalon_last_game') || 'null')
+          };
+          fetch('http://localhost:8090/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(autoData, null, 2)
+          }).then(function(res) {
+            if (res.ok) {
+              toast('已自动修复 data.json（补充 ' + (localGames - djGames) + ' 条对局记录）', 'info');
+            } else {
+              showSyncMismatchWarning(localGames, djGames);
+            }
+          }).catch(function() {
+            showSyncMismatchWarning(localGames, djGames);
+          });
+        }
+      })
+      .catch(function() {});
+  }, 1500);
+
+  function showSyncMismatchWarning(localGames, djGames) {
+    window._syncWarningShown = true;
+    setTimeout(function() {
+      toast('⚠ data.json 缺少 ' + (localGames - djGames) + ' 条对局记录！请到统计页点击「保存数据到本地文件」同步，然后 git push 推送到云端', 'warn');
+    }, 500);
+  }
 })();
 </script>
 </body>
