@@ -294,6 +294,23 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .lady-check-result{padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;display:inline-block;margin:4px 2px}
 .lady-check-result.good{background:rgba(102,153,255,0.2);color:#99bbff}
 .lady-check-result.evil{background:rgba(255,102,102,0.15);color:#ff9999}
+.lady-check-result.uncertain{background:rgba(255,165,0,0.15);color:#ffaa44}
+/* 湖中女神发言内联 */
+.lady-speech-section{border:2px solid var(--gold);border-radius:var(--radius);padding:14px;margin:10px 0;background:linear-gradient(135deg,rgba(201,168,76,0.08),rgba(201,168,76,0.02))}
+.lady-speech-section h3{font-size:15px;color:var(--gold-light);margin-bottom:4px}
+.lady-speech-section .lady-speech-hint{font-size:12px;color:var(--text-dim);margin-bottom:10px}
+.lady-speech-target-btn{display:block;width:100%;padding:12px 14px;margin-bottom:6px;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;transition:all 0.15s;min-height:44px;border:2px solid var(--border);background:var(--bg-card);color:var(--text);text-align:center}
+.lady-speech-target-btn:hover{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light)}
+.lady-speech-target-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light);box-shadow:0 0 12px rgba(201,168,76,0.4)}
+.lady-speech-result-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.lady-speech-result-btn{flex:1;min-width:80px;padding:12px 10px;border-radius:var(--radius);font-size:15px;font-weight:700;cursor:pointer;transition:all 0.15s;min-height:52px;border:2px solid var(--border);background:var(--bg-card);color:var(--text);text-align:center}
+.lady-speech-result-btn.good-btn:hover,.lady-speech-result-btn.good-btn.selected{border-color:var(--green);background:#1a3a1a;color:var(--green-bright)}
+.lady-speech-result-btn.evil-btn:hover,.lady-speech-result-btn.evil-btn.selected{border-color:var(--red);background:#3a1a1a;color:var(--red-bright)}
+.lady-speech-result-btn.uncertain-btn:hover,.lady-speech-result-btn.uncertain-btn.selected{border-color:var(--orange);background:#3a2a1a;color:#ffaa44}
+.lady-speech-done{padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;text-align:center;margin-top:6px}
+.lady-speech-done.good-done{background:rgba(102,153,255,0.15);color:#99bbff}
+.lady-speech-done.evil-done{background:rgba(255,102,102,0.12);color:#ff9999}
+.lady-speech-done.uncertain-done{background:rgba(255,165,0,0.1);color:#ffaa44}
 
 /* 计时 */
 .timer-setup{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
@@ -1072,6 +1089,12 @@ function renderStepPanel() {
     h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
     h += '</div>';
+
+    // 湖中女神内联验人（第3轮起，发言环节中可用）
+    if (state.ladyOfLakeEnabled && state.currentRound >= 2) {
+      h += buildLadySpeechSection();
+    }
+
     c.innerHTML = h;
     return;
   }
@@ -1273,11 +1296,8 @@ function renderLadyLakeResults() {
 function renderLadyLakeEntry() {
   var el = $('lady-lake-entry');
   if (!el) return;
-  if (!state.ladyOfLakeEnabled || state.currentRound < 2) {
-    el.style.display = 'none';
-    return;
-  }
-  el.style.display = 'block';
+  // 湖中女神已改为发言环节内联验人，不再显示独立入口按钮
+  el.style.display = 'none';
 }
 
 function showLadyCheck() {
@@ -1321,11 +1341,103 @@ function recordLadyCheck(targetIdx, result) {
   if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
   if (result === 'good') {
     state.tendencies[targetIdx] = Math.min(100, state.tendencies[targetIdx] + 15);
-  } else {
+  } else if (result === 'evil') {
     state.tendencies[targetIdx] = Math.max(0, state.tendencies[targetIdx] - 15);
   }
+  // 'uncertain' 不改变倾向值
+  var resultLabel = result === 'good' ? '好人方' : result === 'evil' ? '反方' : '不确定';
   renderGame();
-  toast('验人结果已记录：' + playerLabel(targetIdx) + ' 为' + (result === 'good' ? '好人方' : '反方'));
+  toast('验人结果已记录：' + playerLabel(targetIdx) + ' 为' + resultLabel);
+}
+
+/* 湖中女神发言环节内联验人界面 */
+var _ladySpeechSelected = null; // 发言环节中选中的查验目标
+
+function buildLadySpeechSection() {
+  var pc = state.playerCount;
+  var round = state.currentRound;
+  
+  // 检查本轮是否已经验过人
+  var thisRoundCheck = null;
+  for (var i = state.ladyLakeChecks.length - 1; i >= 0; i--) {
+    if (state.ladyLakeChecks[i].round === round) {
+      thisRoundCheck = state.ladyLakeChecks[i];
+      break;
+    }
+  }
+
+  var h = '<div class="lady-speech-section">';
+  h += '<h3>湖中女神验人</h3>';
+
+  if (thisRoundCheck) {
+    // 已查验完毕，显示结果
+    var cls = thisRoundCheck.result === 'good' ? 'good-done' : thisRoundCheck.result === 'evil' ? 'evil-done' : 'uncertain-done';
+    var label = thisRoundCheck.result === 'good' ? '好人方' : thisRoundCheck.result === 'evil' ? '反方' : '不确定';
+    h += '<p class="lady-speech-hint">本轮查验已完成</p>';
+    h += '<div class="lady-speech-done ' + cls + '">';
+    h += playerLabel(thisRoundCheck.target) + ' → ' + label;
+    h += '</div>';
+    h += '<div class="btn-row" style="justify-content:center;margin-top:8px">';
+    h += '<button class="btn small warn" onclick="undoLadyCheck(' + round + ')">撤销重验</button>';
+    h += '</div>';
+  } else {
+    // 还未查验，显示选择界面
+    h += '<p class="lady-speech-hint">查验一名其他玩家的阵营（主持人操作，结果在发言环节公布）</p>';
+
+    if (_ladySpeechSelected === null) {
+      // 步骤1：选择查验目标
+      for (var i = 0; i < pc; i++) {
+        h += '<div class="lady-speech-target-btn" onclick="selectLadySpeechTarget(' + i + ')">' + playerLabel(i) + '</div>';
+      }
+    } else {
+      // 步骤2：选择查验结果
+      var target = _ladySpeechSelected;
+      h += '<p style="font-size:14px;color:var(--gold-light);margin-bottom:8px;text-align:center">查验目标：<strong>' + playerLabel(target) + '</strong></p>';
+      h += '<div class="lady-speech-result-row">';
+      h += '<button class="lady-speech-result-btn good-btn" onclick="doLadyCheckInline(\'good\')">好人方</button>';
+      h += '<button class="lady-speech-result-btn evil-btn" onclick="doLadyCheckInline(\'evil\')">反方</button>';
+      h += '<button class="lady-speech-result-btn uncertain-btn" onclick="doLadyCheckInline(\'uncertain\')">不确定</button>';
+      h += '</div>';
+      h += '<div style="text-align:center;margin-top:8px">';
+      h += '<button class="btn small" onclick="_ladySpeechSelected=null;renderStepPanel()">重新选择</button>';
+      h += '</div>';
+    }
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function selectLadySpeechTarget(idx) {
+  _ladySpeechSelected = idx;
+  renderStepPanel();
+}
+
+function doLadyCheckInline(result) {
+  if (_ladySpeechSelected === null) return;
+  var targetIdx = _ladySpeechSelected;
+  _ladySpeechSelected = null;
+  recordLadyCheck(targetIdx, result);
+}
+
+function undoLadyCheck(round) {
+  // 撤销本轮湖中女神查验
+  for (var i = state.ladyLakeChecks.length - 1; i >= 0; i--) {
+    if (state.ladyLakeChecks[i].round === round) {
+      var c = state.ladyLakeChecks[i];
+      // 恢复倾向值
+      if (c.result === 'good' && (c.target in state.tendencies)) {
+        state.tendencies[c.target] = Math.max(0, state.tendencies[c.target] - 15);
+      } else if (c.result === 'evil' && (c.target in state.tendencies)) {
+        state.tendencies[c.target] = Math.min(100, state.tendencies[c.target] + 15);
+      }
+      state.ladyLakeChecks.splice(i, 1);
+      break;
+    }
+  }
+  _ladySpeechSelected = null;
+  renderGame();
+  toast('已撤销本轮湖中女神查验');
 }
 
 /* ==================== IDENTITY PREDICTION ==================== */
@@ -1947,10 +2059,6 @@ function finalizeMission() {
 
   checkGameEnd();
   renderGame();
-
-  if (state.ladyOfLakeEnabled && !state.winner && state.currentRound >= 2) {
-    setTimeout(function() { showLadyCheck(); }, 500);
-  }
 }
 
 function updateFinalTendencies() {
