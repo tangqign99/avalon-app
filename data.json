@@ -805,11 +805,280 @@
           "votes": {}
         }
       ]
+    },
+    {
+      "date": "2026-06-18",
+      "playerCount": 10,
+      "winner": "good",
+      "identities": [
+        {
+          "name": "玩家1",
+          "index": 0,
+          "role": "梅林"
+        },
+        {
+          "name": "玩家2",
+          "index": 1,
+          "role": "忠臣"
+        },
+        {
+          "name": "玩家3",
+          "index": 2,
+          "role": "派西维尔"
+        },
+        {
+          "name": "玩家4",
+          "index": 3,
+          "role": "莫甘娜"
+        },
+        {
+          "name": "玩家5",
+          "index": 4,
+          "role": "兰斯洛特(红)"
+        },
+        {
+          "name": "阿弟",
+          "index": 5,
+          "role": "刺客"
+        },
+        {
+          "name": "玩家7",
+          "index": 6,
+          "role": "兰斯洛特(蓝)"
+        },
+        {
+          "name": "玩家8",
+          "index": 7,
+          "role": "莫德雷德"
+        },
+        {
+          "name": "玩家9",
+          "index": 8,
+          "role": "忠臣"
+        },
+        {
+          "name": "玩家10",
+          "index": 9,
+          "role": "忠臣"
+        }
+      ],
+      "lancelotFlips": {
+        "4": false,
+        "6": false
+      },
+      "activeRoles": [
+        "梅林",
+        "派西维尔",
+        "忠臣",
+        "莫甘娜",
+        "刺客",
+        "莫德雷德",
+        "兰斯洛特(蓝)",
+        "兰斯洛特(红)"
+      ],
+      "roundTendencies": [
+        {
+          "0": 46,
+          "1": 46,
+          "2": 46,
+          "3": 33,
+          "4": 33,
+          "5": 50,
+          "6": 46,
+          "7": 46,
+          "8": 46,
+          "9": 46
+        },
+        {
+          "0": 55,
+          "1": 55,
+          "2": 55,
+          "3": 42,
+          "4": 42,
+          "5": 50,
+          "6": 58,
+          "7": 58,
+          "8": 58,
+          "9": 55
+        },
+        {
+          "0": 51,
+          "1": 51,
+          "2": 51,
+          "3": 38,
+          "4": 38,
+          "5": 35,
+          "6": 41,
+          "7": 41,
+          "8": 41,
+          "9": 51
+        },
+        {
+          "0": 60,
+          "1": 60,
+          "2": 60,
+          "3": 50,
+          "4": 50,
+          "5": 35,
+          "6": 53,
+          "7": 53,
+          "8": 50,
+          "9": 60
+        },
+        {
+          "0": 69,
+          "1": 69,
+          "2": 84,
+          "3": 62,
+          "4": 62,
+          "5": 35,
+          "6": 65,
+          "7": 65,
+          "8": 59,
+          "9": 69
+        }
+      ],
+      "assassinTarget": "1号 玩家1",
+      "assassinSuccess": false,
+      "identityMarks": [],
+      "missions": [
+        {
+          "round": 0,
+          "size": 3,
+          "leader": "6号 阿弟",
+          "team": [
+            "6号 阿弟",
+            "5号 玩家5",
+            "4号 玩家4"
+          ],
+          "result": "fail",
+          "failCount": 1,
+          "launchFailures": 0,
+          "votes": {
+            "1号 玩家1": "approve",
+            "2号 玩家2": "approve",
+            "3号 玩家3": "approve",
+            "4号 玩家4": "approve",
+            "5号 玩家5": "approve",
+            "6号 阿弟": "approve",
+            "7号 玩家7": "approve",
+            "8号 玩家8": "approve",
+            "9号 玩家9": "approve",
+            "10号 玩家10": "approve"
+          }
+        },
+        {
+          "round": 1,
+          "size": 4,
+          "leader": "7号 玩家7",
+          "team": [
+            "7号 玩家7",
+            "8号 玩家8",
+            "9号 玩家9",
+            "6号 阿弟"
+          ],
+          "result": "success",
+          "failCount": 0,
+          "launchFailures": 0,
+          "votes": {
+            "1号 玩家1": "approve",
+            "2号 玩家2": "approve",
+            "3号 玩家3": "approve",
+            "4号 玩家4": "approve",
+            "5号 玩家5": "approve",
+            "6号 阿弟": "approve",
+            "7号 玩家7": "approve",
+            "8号 玩家8": "approve",
+            "9号 玩家9": "approve",
+            "10号 玩家10": "approve"
+          }
+        },
+        {
+          "round": 2,
+          "size": 4,
+          "leader": "8号 玩家8",
+          "team": [
+            "9号 玩家9",
+            "8号 玩家8",
+            "7号 玩家7",
+            "6号 阿弟"
+          ],
+          "result": "fail",
+          "failCount": 1,
+          "launchFailures": 0,
+          "votes": {
+            "1号 玩家1": "approve",
+            "2号 玩家2": "approve",
+            "3号 玩家3": "approve",
+            "4号 玩家4": "approve",
+            "5号 玩家5": "approve",
+            "6号 阿弟": "approve",
+            "7号 玩家7": "approve",
+            "8号 玩家8": "approve",
+            "9号 玩家9": "approve",
+            "10号 玩家10": "approve"
+          }
+        },
+        {
+          "round": 3,
+          "size": 5,
+          "leader": "9号 玩家9",
+          "team": [
+            "7号 玩家7",
+            "6号 阿弟",
+            "5号 玩家5",
+            "4号 玩家4",
+            "8号 玩家8"
+          ],
+          "result": "success",
+          "failCount": 1,
+          "launchFailures": 0,
+          "votes": {
+            "1号 玩家1": "approve",
+            "2号 玩家2": "approve",
+            "3号 玩家3": "approve",
+            "4号 玩家4": "approve",
+            "5号 玩家5": "approve",
+            "6号 阿弟": "approve",
+            "7号 玩家7": "approve",
+            "8号 玩家8": "approve",
+            "9号 玩家9": "approve",
+            "10号 玩家10": "approve"
+          }
+        },
+        {
+          "round": 4,
+          "size": 5,
+          "leader": "10号 玩家10",
+          "team": [
+            "8号 玩家8",
+            "7号 玩家7",
+            "6号 阿弟",
+            "5号 玩家5",
+            "4号 玩家4"
+          ],
+          "result": "success",
+          "failCount": 0,
+          "launchFailures": 0,
+          "votes": {
+            "1号 玩家1": "approve",
+            "2号 玩家2": "approve",
+            "3号 玩家3": "approve",
+            "4号 玩家4": "approve",
+            "5号 玩家5": "approve",
+            "6号 阿弟": "approve",
+            "7号 玩家7": "approve",
+            "8号 玩家8": "approve",
+            "9号 玩家9": "approve",
+            "10号 玩家10": "approve"
+          }
+        }
+      ]
     }
   ],
   "avalon_last_game": {
     "date": "2026-06-18",
-    "playerCount": 8,
+    "playerCount": 10,
     "playerNames": [
       "玩家1",
       "玩家2",
@@ -818,7 +1087,9 @@
       "玩家5",
       "阿弟",
       "玩家7",
-      "玩家8"
+      "玩家8",
+      "玩家9",
+      "玩家10"
     ],
     "selfIndex": 5
   }

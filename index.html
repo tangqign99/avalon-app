@@ -551,14 +551,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
     </div>
   </div>
-  <div class="card" id="end-lancelot-card" style="display:none">
-    <h2>兰斯洛特反转</h2>
-    <p id="end-lancelot-info" style="font-size:14px;margin-bottom:10px">游戏中抽到反转卡 <span id="end-lancelot-count" style="font-weight:700;color:var(--gold-light)">0</span> 次</p>
-    <div class="winner-toggle">
-      <button class="winner-btn good" id="end-lancelot-yes" onclick="setLancelotFlip(true)">&#9989; 是，反转</button>
-      <button class="winner-btn evil" id="end-lancelot-no" onclick="setLancelotFlip(false)">&#10060; 否，不反转</button>
-    </div>
-  </div>
+
   <div class="card">
     <h2>游戏结束</h2>
     <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果：<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
@@ -1682,6 +1675,10 @@ function stopTimer() {
 }
 
 function speakEnd() {
+  if (state.timerMode === 'all') {
+    endAllSpeak();
+    return;
+  }
   if (state.currentSpeakerIdx < 0) return;
   var speaker = state.speakerOrder[state.currentSpeakerIdx];
   var elapsed = (state.timerMode === 'all') ? 0 : (state.timerSeconds - state.timerRemaining);
@@ -2268,22 +2265,9 @@ function renderEnd() {
     $('winner-toggle').innerHTML = h;
   }
 
-  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
-  if (!state._lancelotAsked && hasLancelot && !(state.assassinFromMission && !state.winner)) {
-    $('end-lancelot-card').style.display = 'block';
-    if ($('end-lancelot-count')) $('end-lancelot-count').textContent = state.lancelotFlipCount;
-    // 自动应用游戏中累计的反转状态
-    if (state.lancelotFlipCount > 0) {
-      state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
-    }
-    // 高亮当前状态按钮
-    var yBtn = $('end-lancelot-yes');
-    var nBtn = $('end-lancelot-no');
-    if (yBtn) yBtn.className = 'winner-btn good' + (state.lancelotFlipped ? ' selected' : '');
-    if (nBtn) nBtn.className = 'winner-btn evil' + (!state.lancelotFlipped ? ' selected' : '');
-    state._lancelotAsked = true;
-  } else {
-    $('end-lancelot-card').style.display = 'none';
+  // 兰斯洛特反转状态由游戏中累计的反转记录自动判定
+  if (state.lancelotFlipCount > 0) {
+    state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
   }
 
   var sc = state.missions.filter(function(m) { return m.result === 'success'; }).length;
