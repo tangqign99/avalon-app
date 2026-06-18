@@ -69,6 +69,16 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   box-shadow:0 0 20px rgba(201,168,76,0.6),0 0 40px rgba(201,168,76,0.2);
   letter-spacing:2px;text-shadow:0 0 8px rgba(232,212,139,0.5);
 }
+/* 队伍成员高亮 */
+.team-member-highlight{
+  border-color:var(--gold) !important;
+  box-shadow:0 0 8px rgba(201,168,76,0.35) !important;
+  background:linear-gradient(135deg,rgba(201,168,76,0.08),var(--bg-card)) !important;
+}
+.team-member-highlight.selected{
+  border-color:var(--gold) !important;
+  box-shadow:0 0 12px rgba(201,168,76,0.5) !important;
+}
 .btn.active-page{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
 .count-grid{display:flex;gap:10px;flex-wrap:wrap}
 .count-btn{
@@ -120,13 +130,14 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* 兰斯洛特反转圆圈 */
 .lancelot-flip-tracker{display:flex;gap:10px;justify-content:center;padding:2px 0 6px}
 .lancelot-flip-dot{
-  width:56px;height:56px;border-radius:50%;border:2px solid var(--border);
-  background:var(--bg-card);display:flex;align-items:center;justify-content:center;
-  font-size:20px;font-weight:700;color:var(--text-dim);transition:all 0.2s;position:relative;
+  width:56px;height:56px;border-radius:50%;border:2px solid #555;
+  background:rgba(100,100,100,0.08);display:flex;align-items:center;justify-content:center;
+  font-size:30px;font-weight:700;color:#666;transition:all 0.2s;position:relative;
 }
-.lancelot-flip-dot.flipped{border-color:#e04040;background:rgba(224,64,64,0.15);color:#ff6666;box-shadow:0 0 14px rgba(224,64,64,0.5)}
+.lancelot-flip-dot.flipped{border-color:#e04040;background:rgba(224,64,64,0.18);color:#ff4444;box-shadow:0 0 16px rgba(224,64,64,0.55)}
 .lancelot-flip-dot.blank{opacity:0}
-.lancelot-flip-dot.no-flip{border-color:#555;background:rgba(100,100,100,0.12);color:transparent}
+.lancelot-flip-dot.no-flip{border-color:#555;background:rgba(100,100,100,0.08);color:#666}
+.lancelot-flip-dot.future{opacity:0.25;border-style:dashed;border-color:#444;background:transparent;color:#444}
 .round-tracker{display:flex;gap:10px;justify-content:center;padding:6px 0}
 .round-dot{
   width:56px;height:56px;border-radius:50%;border:2px solid var(--border);
@@ -422,6 +433,26 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .sync-stat-row .sync-val.warn{color:var(--orange)}
 .sync-stat-row .sync-val.bad{color:var(--red-bright)}
 .sync-hint{font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.5}
+
+/* ===== 统计页面左右留白装饰 ===== */
+#page-stats{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
+#page-stats::before,#page-stats::after{
+  content:'';position:fixed;top:0;bottom:0;width:20vw;z-index:0;pointer-events:none;
+  background-position:center;background-repeat:repeat;opacity:0.06;
+}
+#page-stats::before{
+  left:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='36' fill='none' stroke='%23c9a84c' stroke-width='2' opacity='0.4'/%3E%3Ccircle cx='40' cy='40' r='26' fill='none' stroke='%23c9a84c' stroke-width='1' opacity='0.3'/%3E%3Cpath d='M30 40 Q40 25 50 40 Q40 55 30 40' fill='none' stroke='%23c9a84c' stroke-width='1.5' opacity='0.5'/%3E%3C/svg%3E");
+}
+#page-stats::after{
+  right:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='36' fill='none' stroke='%23c9a84c' stroke-width='2' opacity='0.4'/%3E%3Ccircle cx='40' cy='40' r='26' fill='none' stroke='%23c9a84c' stroke-width='1' opacity='0.3'/%3E%3Cpath d='M30 40 Q40 25 50 40 Q40 55 30 40' fill='none' stroke='%23c9a84c' stroke-width='1.5' opacity='0.5'/%3E%3C/svg%3E");
+}
+@media(max-width:900px){
+  #page-stats{padding-left:4vw;padding-right:4vw}
+  #page-stats::before,#page-stats::after{width:4vw}
+}
+
 </style>
 </head>
 <body>
@@ -658,7 +689,8 @@ var state = {
   lancelotFlipped: false,
   _lancelotAsked: false,
   roundTendencies: [],
-  identityMarks: []
+  identityMarks: [],
+  ladyCheckHistory: []
 };
 
 function initState(n) {
@@ -684,6 +716,7 @@ function initState(n) {
   state.ladyOfLakeEnabled = false;
   state.ladyLakeHolder = -1;
   state.ladyLakeChecks = [];
+  state.ladyCheckHistory = [];
   state.timerMode = 'per';
   state.timerSeconds = 60;
   state.timerInterval = null;
@@ -961,6 +994,7 @@ function doStartGame() {
   state.lancelotFlipCount = 0;
   state.lancelotRoundFlips = [false, false, false, false, false];
   state.ladyLakeChecks = [];
+  state.ladyCheckHistory = [];
   state.ladyLakeHolder = -1;
   state.roundTendencies = [];
   state.identityMarks = [];
@@ -992,11 +1026,11 @@ function renderLancelotFlipTracker() {
   var h = '';
   for (var i = 0; i < 5; i++) {
     var cls = 'lancelot-flip-dot';
-    var icon = '';
-    if (i === 0) { icon = ''; cls += ' blank'; }
-    else if (i > state.currentRound) { icon = ''; cls += ' blank'; }
-    else if (state.lancelotRoundFlips[i]) { cls += ' flipped'; icon = '⑂'; }
-    else { cls += ' no-flip'; icon = ''; }
+    var icon = '\u21BB';
+    if (i === 0) { icon = '\u21BB'; cls += ' blank'; }
+    else if (i > state.currentRound) { cls += ' future'; }
+    else if (state.lancelotRoundFlips[i]) { cls += ' flipped'; }
+    else { cls += ' no-flip'; }
     h += '<div class="' + cls + '">' + icon + '</div>';
   }
   el.innerHTML = h;
@@ -1017,7 +1051,6 @@ function renderGame() {
 function renderRoundTracker() {
   var mc = MISSION_COUNTS[state.playerCount];
   var h = '';
-  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   for (var i = 0; i < 5; i++) {
     var m = state.missions[i];
     var cls = '';
@@ -1025,10 +1058,6 @@ function renderRoundTracker() {
     if (i === state.currentRound && !m.result) cls = 'current';
     else if (m && m.result === 'success') { cls = 'success'; extra = '<span class="badge win">&#10003;</span>'; }
     else if (m && m.result === 'fail') { cls = 'fail'; extra = '<span class="badge lose">&#10007;</span>'; }
-    // 反转标记（第2轮起，即i>=1）
-    if (hasLancelot && i >= 1 && state.lancelotRoundFlips[i]) {
-      extra += '<span class="badge flip" title="第' + (i + 1) + '轮抽到反转卡">&#128260;</span>';
-    }
     h += '<div class="round-dot ' + cls + '" onclick="switchRound(' + i + ')">' + mc[i] + extra + '</div>';
   }
   $('round-tracker').innerHTML = h;
@@ -1096,7 +1125,10 @@ function renderStepPanel() {
 
   if (state._teamConfirmedPending) {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
-    h += '<span style="color:var(--text-dim);margin-left:10px;font-size:14px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+    var pendingTeamHTML = m.team.map(function(i) {
+      return '<span style="display:inline-block;padding:3px 10px;margin:2px 3px;border:2px solid var(--gold);border-radius:20px;background:rgba(201,168,76,0.1);color:var(--gold-light);font-size:13px;font-weight:600;box-shadow:0 0 6px rgba(201,168,76,0.2)">' + playerLabel(i) + '</span>';
+    }).join('');
+    h += '<div style="margin-top:6px">' + pendingTeamHTML + '</div></div>';
     h += '<div style="text-align:center;padding:20px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
     h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
@@ -1113,7 +1145,10 @@ function renderStepPanel() {
 
   if (votesConfirmed) {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
-    h += '<span style="color:var(--text-dim);margin-left:10px;font-size:14px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
+    var teamMembersHTML = m.team.map(function(i) {
+      return '<span style="display:inline-block;padding:3px 10px;margin:2px 3px;border:2px solid var(--gold);border-radius:20px;background:rgba(201,168,76,0.1);color:var(--gold-light);font-size:13px;font-weight:600;box-shadow:0 0 6px rgba(201,168,76,0.2)">' + playerLabel(i) + '</span>';
+    }).join('');
+    h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px"><span style="color:var(--text-dim);font-size:13px">队伍：</span>' + teamMembersHTML + '</div></div>';
   } else {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
     h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
@@ -1122,8 +1157,9 @@ function renderStepPanel() {
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div><div class="btn-row">';
     for (var i = 0; i < pc; i++) {
       var inTeam = m.team.indexOf(i) !== -1;
-      var sel = inTeam ? ' selected' : '';
-      h += '<button class="btn' + sel + '" onclick="toggleTeamMember(' + i + ')">';
+      var cls = 'btn';
+      if (inTeam) cls += ' selected team-member-highlight';
+      h += '<button class="' + cls + '" onclick="toggleTeamMember(' + i + ')">';
       h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
       h += '</button>';
     }
@@ -1318,12 +1354,29 @@ function renderLadyLakeEntry() {
 function renderLadyLakeHolderInfo() {
   var el = $('lady-lake-holder-info');
   if (!el) return;
-  if (state.ladyOfLakeEnabled && state.ladyLakeHolder >= 0) {
-    el.style.display = 'block';
-    el.innerHTML = '湖中女神：' + (state.ladyLakeHolder + 1) + '号 ' + state.playerNames[state.ladyLakeHolder];
-  } else {
-    el.style.display = 'none';
+  if (!state.ladyOfLakeEnabled) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  var h = '';
+  // 显示验人历史
+  var history = state.ladyCheckHistory || [];
+  if (history.length > 0) {
+    var genNum = 1;
+    for (var hi = 0; hi < history.length; hi++) {
+      var rec = history[hi];
+      h += '<div style="font-size:11px;color:var(--text-dim);margin-bottom:2px">';
+      h += '第' + genNum + '任：' + (rec.holder + 1) + '号 ' + state.playerNames[rec.holder] + ' → 验 ' + (rec.target + 1) + '号 ' + state.playerNames[rec.target];
+      h += ' <span style="color:' + (rec.result === 'good' ? '#99bbff' : '#ff9999') + '">' + (rec.result === 'good' ? '好人' : '反方') + '</span>';
+      h += '</div>';
+      genNum++;
+    }
   }
+  // 当前持有者
+  if (state.ladyLakeHolder >= 0) {
+    h += '<div style="font-size:13px;font-weight:700;color:var(--gold-light);margin-top:4px;border-top:1px solid var(--border);padding-top:4px">';
+    h += '当前女神：' + (state.ladyLakeHolder + 1) + '号 ' + state.playerNames[state.ladyLakeHolder];
+    h += '</div>';
+  }
+  el.innerHTML = h || '<span style="color:var(--text-dim)">湖中女神未分配</span>';
 }
 
 function showLadyCheck() {
@@ -1358,14 +1411,21 @@ function doLadyCheck(targetIdx) {
 
 function recordLadyCheck(targetIdx, result) {
   closeModal();
-  var holderLabel = playerLabel(state.ladyLakeHolder);
+  var holderIdx = state.ladyLakeHolder;
+  var holderLabel = playerLabel(holderIdx);
   state.ladyLakeChecks.push({
     round: state.currentRound,
     target: targetIdx,
     result: result,
-    holder: state.ladyLakeHolder
+    holder: holderIdx
   });
   // 湖中女神头衔传递给被验者
+  state.ladyCheckHistory.push({
+    round: state.currentRound,
+    holder: holderIdx,
+    target: targetIdx,
+    result: result
+  });
   state.ladyLakeHolder = targetIdx;
   // Update tendencies based on lady check
   if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
@@ -1462,6 +1522,13 @@ function undoLadyCheck(round) {
       // 恢复湖中女神头衔给原来的持有者
       state.ladyLakeHolder = c.holder;
       state.ladyLakeChecks.splice(i, 1);
+      break;
+    }
+  }
+  // 也移除 ladyCheckHistory 中的对应记录
+  for (var i = state.ladyCheckHistory.length - 1; i >= 0; i--) {
+    if (state.ladyCheckHistory[i].round === round) {
+      state.ladyCheckHistory.splice(i, 1);
       break;
     }
   }
