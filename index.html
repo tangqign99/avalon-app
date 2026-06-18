@@ -2511,18 +2511,17 @@ function saveGameRecord() {
           return acc;
         }, {})
       };
+    }),
+    ladyCheckHistory: state.ladyCheckHistory.map(function(h) {
+      return {
+        round: h.round,
+        holder: h.holder,
+        holderName: playerLabel(h.holder),
+        target: h.target,
+        targetName: playerLabel(h.target),
+        result: h.result
+      };
     })
-  },
-  ladyCheckHistory: state.ladyCheckHistory.map(function(h) {
-    return {
-      round: h.round,
-      holder: h.holder,
-      holderName: playerLabel(h.holder),
-      target: h.target,
-      targetName: playerLabel(h.target),
-      result: h.result
-    };
-  })
   };
   history.push(record);
   saveHistory(history);
@@ -3469,6 +3468,8 @@ function syncFromCloud() {
       state.tendencies[i] = 50;
       state.consecutiveRejects[i] = 0;
     }
+  } else {
+    initState(7);
   }
   showPage('setup');
 
