@@ -90,15 +90,23 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   font-size:15px;min-height:44px;outline:none;
 }
 .add-name-input:focus{border-color:var(--gold)}
-.role-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.role-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
 .role-checkbox-grid label{
-  display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--radius-sm);
-  border:1px solid var(--border);background:var(--bg-card);font-size:18px;cursor:pointer;
-  transition:all 0.15s;white-space:nowrap;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  padding:16px 20px;border-radius:var(--radius);
+  border:2px solid var(--border);background:var(--bg-card);
+  font-size:32px;font-weight:700;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;min-height:68px;
 }
-.role-checkbox-grid label:hover{border-color:var(--gold)}
-.role-checkbox-grid label.checked{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
-.role-checkbox-grid input[type=checkbox]{accent-color:var(--gold);width:32px;height:32px}
+.role-checkbox-grid label:hover{border-color:var(--gold);transform:scale(1.03)}
+.role-checkbox-grid label:active{transform:scale(0.97)}
+.role-checkbox-grid label.checked{
+  background:linear-gradient(135deg,var(--gold-dark),rgba(180,140,40,0.7));
+  color:var(--gold-light);
+  border-color:var(--gold);
+  box-shadow:0 0 20px rgba(201,168,76,0.55);
+  text-shadow:0 0 8px rgba(232,212,139,0.5);
+}
 .role-horizontal{display:flex;flex-direction:column;gap:24px}
 .role-group{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:space-evenly}
 .faction-label{font-weight:700;font-size:14px;padding:4px 12px;border-radius:var(--radius-sm);margin-right:4px}
@@ -638,7 +646,7 @@ function initState(n) {
   for (var i = 0; i < n; i++) state.playerNames[i] = '玩家' + (i + 1);
   state.selfIndex = -1;
   state.myRole = null;
-  state.activeRoles = DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
   state.missions = [];
   state.currentRound = 0;
   state.tendencies = {};
@@ -775,9 +783,7 @@ function renderSetup() {
   for (var i = 0; i < GOOD_ROLES.length; i++) {
     var r = GOOD_ROLES[i];
     var checked = state.activeRoles.indexOf(r) !== -1;
-    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">';
-    h += '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onclick="event.stopPropagation();toggleRole(\'' + r + '\')">';
-    h += r + '</label>';
+    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
   }
   h += '</div>';
   h += '<div class="role-group evil-group">';
@@ -785,9 +791,7 @@ function renderSetup() {
   for (var i = 0; i < EVIL_ROLES.length; i++) {
     var r = EVIL_ROLES[i];
     var checked = state.activeRoles.indexOf(r) !== -1;
-    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">';
-    h += '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onclick="event.stopPropagation();toggleRole(\'' + r + '\')">';
-    h += r + '</label>';
+    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
   }
   h += '</div></div>';
   $('role-checkbox-grid').innerHTML = h;
@@ -800,6 +804,7 @@ function setPlayerCount(n) {
   var oldNames = state.playerNames;
   var oldSelf = state.selfIndex;
   state.playerCount = n;
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
   state.playerNames = [];
   for (var i = 0; i < n; i++) {
     state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
@@ -2759,6 +2764,7 @@ function syncFromCloud() {
   var last = loadLastGame();
   if (last && last.playerCount >= 5 && last.playerCount <= 10) {
     state.playerCount = last.playerCount;
+    state.activeRoles = (last.playerCount === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
     state.playerNames = last.playerNames.slice();
     state.selfIndex = last.selfIndex;
     state.tendencies = {};
