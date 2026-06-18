@@ -905,8 +905,6 @@ function initState(n) {
   state.selfIndex = -1;
   state.myRole = null;
   state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
-  // sync ladyOfLakeEnabled with activeRoles
-  if (state.activeRoles.indexOf('湖中女神') === -1) state.ladyOfLakeEnabled = false;
   state.missions = [];
   state.currentRound = 0;
   state.tendencies = {};
@@ -1060,15 +1058,10 @@ function renderSetup() {
 
   var mc = MISSION_COUNTS[state.playerCount];
   $('mission-info').textContent = mc ? mc.join('-') : '请先选择人数';
-  // Show/hide lady-check-row based on role presence
+  // Sync lady-check-row checkbox UI
   var ladyRow = document.getElementById('lady-check-row');
   if (ladyRow) {
-    var ladyInRoles = state.activeRoles.indexOf('湖中女神') !== -1;
-    ladyRow.style.display = ladyInRoles ? '' : 'none';
-    // Auto-sync checkbox when 湖中女神 is not in roles
-    if (!ladyInRoles && state.ladyOfLakeEnabled) {
-      state.ladyOfLakeEnabled = false;
-    }
+    ladyRow.style.display = '';
     var cb = document.getElementById('lady-checkbox');
     if (cb) cb.checked = state.ladyOfLakeEnabled;
     if (state.ladyOfLakeEnabled) { ladyRow.classList.add('checked'); }
@@ -1108,10 +1101,7 @@ function toggleRole(role) {
   var pos = state.activeRoles.indexOf(role);
   if (pos !== -1) {
     state.activeRoles.splice(pos, 1);
-    // auto-disable lady of lake if 湖中女神 role is removed
-    if (role === '湖中女神' && state.ladyOfLakeEnabled) {
-      state.ladyOfLakeEnabled = false;
-    }
+
   } else {
     state.activeRoles.push(role);
   }
@@ -1128,10 +1118,6 @@ function addNameToPool() {
   input.value = '';
   renderSetup();
   toast('已添加「' + name + '」');
-}
-
-function isLadyRoleActive() {
-  return state.activeRoles.indexOf('湖中女神') !== -1;
 }
 
 function toggleLadyOfLake() {
@@ -1369,7 +1355,7 @@ function renderStepPanel() {
     h += '</div>';
 
     // 湖中女神内联验人（第3轮起，发言环节中可用）
-    if (state.ladyOfLakeEnabled && isLadyRoleActive() && state.currentRound >= 2) {
+    if (state.ladyOfLakeEnabled && state.currentRound >= 2) {
       h += buildLadySpeechSection();
     }
 
@@ -1800,11 +1786,6 @@ function runIdentitySimulation() {
 /* ==================== LADY OF THE LAKE ==================== */
 function renderLadyLakeResults() {
   // 湖中验人记录已合并至女神系谱栏，此处仅保留容器清理
-  if (!state.ladyOfLakeEnabled || !isLadyRoleActive()) {
-    var elHide = $('lady-lake-results');
-    if (elHide) elHide.innerHTML = '';
-    return;
-  }
   var el = $('lady-lake-results');
   if (el) el.innerHTML = '';
 }
@@ -1812,7 +1793,7 @@ function renderLadyLakeResults() {
 function renderLadyLakeEntry() {
   var el = $('lady-lake-entry');
   if (!el) return;
-  if (state.ladyOfLakeEnabled && isLadyRoleActive() && state.currentRound >= 2) {
+  if (state.ladyOfLakeEnabled && state.currentRound >= 2) {
     el.style.display = 'block';
   } else {
     el.style.display = 'none';
@@ -1822,7 +1803,7 @@ function renderLadyLakeEntry() {
 function renderLadyLakeHolderInfo() {
   var el = $('lady-lake-holder-info');
   if (!el) return;
-  if (!state.ladyOfLakeEnabled || !isLadyRoleActive()) { el.style.display = 'none'; return; }
+  if (!state.ladyOfLakeEnabled) { el.style.display = 'none'; return; }
   el.style.display = 'block';
   var h = '';
   // 显示验人历史
@@ -1848,7 +1829,7 @@ function renderLadyLakeHolderInfo() {
 }
 
 function showLadyCheck() {
-  if (!state.ladyOfLakeEnabled || !isLadyRoleActive()) return;
+  if (!state.ladyOfLakeEnabled) return;
   var pc = state.playerCount;
   var h = '<h2>湖中女神验人</h2>';
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
@@ -2602,7 +2583,7 @@ function confirmTeam() {
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
 
   // 湖中女神：第一轮队长确认后自动设定持有者
-  if (state.currentRound === 0 && state.ladyOfLakeEnabled && isLadyRoleActive() && state.ladyLakeHolder === -1) {
+  if (state.currentRound === 0 && state.ladyOfLakeEnabled && state.ladyLakeHolder === -1) {
     var pc = state.playerCount;
     state.ladyLakeHolder = (m.leader - 1 + pc) % pc;
   }
