@@ -22,7 +22,7 @@ body{
 }
 /* Dark forest background image (very subtle overlay) */
 body::before{
-  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.06;
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity: 0.12;
   background:
     url('./images/dark-forest-bg.png') center/cover no-repeat,
     url('./images/stone-wall-tile.png') repeat;
@@ -441,7 +441,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 }
 .import-textarea:focus{border-color:var(--gold)}
 
-/* 梅林概率栏 */
+/* 梅林概率�?*/
 .merlin-predict-section{margin-top:12px;padding-top:10px;border-top:1px solid rgba(201,168,76,0.15)}
 .merlin-predict-section h3{font-size:14px;color:var(--gold);margin-bottom:6px;font-family:var(--font-display)}
 .merlin-bar-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:var(--radius-sm);background:var(--parchment);margin-bottom:3px}
@@ -533,7 +533,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .rc-launch-attempts{margin-top:8px;font-size:12px;color:var(--text-dim)}
 .rc-launch-attempts .launch-item{padding:4px 8px;border-left:2px solid rgba(201,168,76,0.2);margin-bottom:4px;background:rgba(0,0,0,0.1);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
 
-/* ===== 五、统计显示优化 ===== */
+/* ===== 五、统计显示优�?===== */
 .merlin-assassin-card{
   background:linear-gradient(135deg,rgba(180,50,50,0.15),rgba(80,30,30,0.3));
   border:1px solid rgba(200,80,80,0.35);border-radius:var(--radius);
@@ -578,7 +578,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .history-compact-item .hci-actions{display:flex;gap:6px;margin-top:8px}
 .hci-right{display:flex;align-items:center;gap:6px;margin-left:auto}
 
-/* ===== 六、身份预测标记 ===== */
+/* ===== 六、身份预测标�?===== */
 .identity-predict-section{margin-top:10px;padding-top:10px;border-top:1px solid rgba(201,168,76,0.15)}
 .identity-predict-section h3{font-size:13px;color:var(--gold);margin-bottom:6px;font-family:var(--font-display)}
 .predict-form{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
@@ -603,18 +603,18 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .sync-stat-row .sync-val.bad{color:var(--red-bright)}
 .sync-hint{font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.5}
 
-/* ===== 倾向/统计/结束页背景骑士装饰 ===== */
+/* ===== 倾向/统计/结束页背景骑士装�?===== */
 #page-stats,#page-end{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
 #page-end{
   background:
     url('./images/knight-character.png') right 3vw bottom 20px/160px 240px no-repeat;
   background-attachment:fixed;
 }
-#page-end::before{opacity:0.04}
+#page-end::before{opacity: 0.10}
 @media(max-width:900px){
   #page-end{background:url('./images/knight-character.png') right 0 bottom 10px/100px 150px no-repeat;background-attachment:fixed}
 }
-/* ===== 倾向页左右留白 ===== */
+/* ===== 倾向页左右留�?===== */
 #page-tend{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
 #page-stats::before,#page-stats::after,
 #page-end::before,#page-end::after{
