@@ -757,13 +757,21 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 <section class="page" id="page-end">
   <div class="card" id="end-assassin-card" style="display:none">
-    <h2>刺杀结果</h2>
-    <p style="font-size:14px;margin-bottom:8px">刺杀目标：<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
-    <p style="font-size:14px;margin-bottom:10px">刺杀目标是不是梅林？</p>
-    <div class="winner-toggle">
-      <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅林 → 反方胜</button>
-      <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
+    <h2>刺客刺杀环节</h2>
+    <div id="end-assassin-pick-area"></div>
+    <div id="end-assassin-resolve-area" style="display:none">
+      <p style="font-size:14px;margin-bottom:8px">刺杀目标：<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
+      <p style="font-size:14px;margin-bottom:10px">刺杀目标是不是梅林？</p>
+      <div class="winner-toggle">
+        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅林 → 反方胜</button>
+        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
+      </div>
     </div>
+  </div>
+
+  <div class="card" id="end-review-card">
+    <h2>对局复盘</h2>
+    <div id="end-review-content"></div>
   </div>
 
   <div class="card">
@@ -818,13 +826,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
   <div class="card">
-    <h2>添加新玩家</h2>
-    <div class="add-name-row">
-      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
-      <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
-    </div>
-  </div>
-  <div class="card">
     <h2>胜率排行榜</h2>
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
   </div>
@@ -844,6 +845,13 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     </div>
     <p class="sync-hint" id="sync-hint-text"></p>
   </div>
+  <div class="card">
+    <h2>添加新玩家</h2>
+    <div class="add-name-row">
+      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
+      <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
+    </div>
+  </div>
   <div style="text-align:center">
     <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
   </div>
@@ -857,10 +865,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   <div class="identity-card" id="identity-card"></div>
 </div>
 
-<div class="identity-overlay" id="assassin-overlay">
-  <div class="identity-card" id="assassin-card"></div>
-</div>
-
 <script>
 /* ==================== DATA ==================== */
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
@@ -868,7 +872,7 @@ var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
 var MULTI_ROLES = ['忠臣','爪牙'];
-var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)','湖中女神'];
+var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'];
 
@@ -1795,7 +1799,7 @@ function renderLadyLakeResults() {
 function renderLadyLakeEntry() {
   var el = $('lady-lake-entry');
   if (!el) return;
-  if (state.ladyOfLakeEnabled && state.currentRound >= 2) {
+  if (state.ladyOfLakeEnabled) {
     el.style.display = 'block';
   } else {
     el.style.display = 'none';
@@ -2891,7 +2895,10 @@ function checkGameEnd() {
     return;
   }
   if (successCount >= 3) {
-    showAssassinPhase();
+    state.assassinTarget = null;
+    state.assassinFromMission = true;
+    stopTimer();
+    showPage('end');
     return;
   }
 
@@ -2899,39 +2906,36 @@ function checkGameEnd() {
   if (state.currentRound >= 5) state.currentRound = 4;
 }
 
-/* ==================== ASSASSIN PHASE ==================== */
-function showAssassinPhase() {
-  var h = '<h2>&#128481; 刺客刺杀环节</h2>';
-  h += '<p class="sub">好人方已完成 3 轮任务，请刺客选择刺杀目标</p>';
+/* ==================== ASSASSIN PHASE (inline on end page) ==================== */
+function renderEndAssassinPick() {
+  var h = '<p class="sub">好人方已完成 3 轮任务，请刺客选择刺杀目标（可参考下方复盘信息）</p>';
   h += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
   for (var i = 0; i < state.playerCount; i++) {
-    h += '<button class="assassin-target-btn' + (state.assassinTarget === i ? ' selected' : '') + '" onclick="pickAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
+    h += '<button class="assassin-target-btn' + (state.assassinTarget === i ? ' selected' : '') + '" onclick="pickEndAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
   }
   h += '</div>';
   h += '<div style="text-align:center;margin-top:14px">';
-  h += '<button class="btn primary" onclick="confirmAssassinTarget()"';
+  h += '<button class="btn primary" onclick="confirmEndAssassin()"';
   if (state.assassinTarget === null) h += ' disabled';
   h += '>确认刺杀目标</button></div>';
-
-  $('assassin-card').innerHTML = h;
-  $('assassin-overlay').classList.add('active');
+  $('end-assassin-pick-area').innerHTML = h;
 }
 
-function pickAssassinTarget(idx) {
+function pickEndAssassinTarget(idx) {
   state.assassinTarget = idx;
-  var btns = document.querySelectorAll('#assassin-card .assassin-target-btn');
+  var btns = document.querySelectorAll('#end-assassin-pick-area .assassin-target-btn');
   btns.forEach(function(b, i) {
     b.className = 'assassin-target-btn' + (i === idx ? ' selected' : '');
   });
-  var confirmBtn = document.querySelector('#assassin-card .btn.primary');
+  var confirmBtn = document.querySelector('#end-assassin-pick-area .btn.primary');
   if (confirmBtn) confirmBtn.disabled = false;
 }
 
-function confirmAssassinTarget() {
+function confirmEndAssassin() {
   if (state.assassinTarget === null) return;
-  $('assassin-overlay').classList.remove('active');
-  state.assassinFromMission = true;
-  showPage('end');
+  $('end-assassin-pick-area').style.display = 'none';
+  $('end-assassin-resolve-area').style.display = 'block';
+  $('end-target-name').textContent = playerLabel(state.assassinTarget);
 }
 
 /* ==================== END PANEL ==================== */
@@ -2979,12 +2983,26 @@ function renderEndIdentityDropdowns() {
 }
 
 function renderEnd() {
-  if (state.assassinFromMission && state.assassinTarget !== null && !state.winner) {
+  // Assassin phase
+  if (state.assassinFromMission && !state.winner) {
     $('end-assassin-card').style.display = 'block';
-    $('end-target-name').textContent = playerLabel(state.assassinTarget);
+    if (state.assassinTarget === null) {
+      // Phase 1: pick assassin target
+      $('end-assassin-pick-area').style.display = 'block';
+      $('end-assassin-resolve-area').style.display = 'none';
+      renderEndAssassinPick();
+    } else {
+      // Phase 2: resolve result
+      $('end-assassin-pick-area').style.display = 'none';
+      $('end-assassin-resolve-area').style.display = 'block';
+      $('end-target-name').textContent = playerLabel(state.assassinTarget);
+    }
   } else {
     $('end-assassin-card').style.display = 'none';
   }
+
+  // Show review on end page
+  $('end-review-content').innerHTML = buildReviewHTML();
 
   if (state.assassinFromMission && !state.winner) {
     $('winner-toggle').innerHTML = '';
