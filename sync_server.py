@@ -14,11 +14,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
 
 
+GIT_EXE = r"C:\Program Files\Git\bin\git.exe"
+
 def run_git(args):
     """Run git command from BASE_DIR, return (returncode, stdout, stderr)."""
     try:
         result = subprocess.run(
-            ["git"] + args,
+            [GIT_EXE] + args,
             cwd=BASE_DIR,
             capture_output=True,
             text=True,

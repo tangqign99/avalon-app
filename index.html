@@ -262,6 +262,121 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   box-sizing:border-box;
 }
 .import-textarea:focus{border-color:var(--gold)}
+
+/* 梅林概率栏 */
+.merlin-predict-section{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.merlin-predict-section h3{font-size:14px;color:var(--gold);margin-bottom:6px}
+.merlin-bar-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:var(--radius-sm);background:var(--bg-card);margin-bottom:3px}
+.merlin-bar-row .m-name{flex:1;font-size:13px;font-weight:600;color:var(--text-bright);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.merlin-bar-row .m-bar-wrap{width:80px;height:6px;border-radius:3px;background:#333;overflow:hidden;flex-shrink:0}
+.merlin-bar-row .m-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold-dark),var(--gold-light));transition:width 0.4s}
+.merlin-bar-row .m-pct{font-size:13px;font-weight:700;color:var(--gold-light);min-width:38px;text-align:right}
+.merlin-pct-col{font-size:13px;font-weight:700;color:var(--gold-light);min-width:44px;text-align:right}
+
+/* 湖中仙女 */
+.lady-check-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);margin-top:10px;cursor:pointer;transition:all 0.15s}
+.lady-check-row:hover{border-color:var(--gold)}
+.lady-check-row.checked{background:var(--gold-dark);color:var(--gold-light);border-color:var(--gold)}
+.lady-check-row input[type=checkbox]{accent-color:var(--gold);width:28px;height:28px}
+.lady-check-row .lady-label{font-size:15px;font-weight:600}
+.lady-check-row .lady-hint{font-size:12px;color:var(--text-dim);margin-left:4px}
+.lady-check-row.checked .lady-hint{color:var(--gold-light);opacity:0.7}
+.lady-check-entry{margin-top:8px;text-align:center}
+.lady-check-entry button{min-height:44px}
+.lady-check-result{padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;display:inline-block;margin:4px 2px}
+.lady-check-result.good{background:rgba(102,153,255,0.2);color:#99bbff}
+.lady-check-result.evil{background:rgba(255,102,102,0.15);color:#ff9999}
+
+/* 计时 */
+.timer-setup{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.timer-setup h3{font-size:14px;color:var(--gold);margin-bottom:8px}
+.timer-mode-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.timer-mode-btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--bg-card);color:var(--text);transition:all 0.15s;min-height:44px}
+.timer-mode-btn:hover{border-color:var(--gold)}
+.timer-mode-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light)}
+.timer-options-row{display:flex;gap:6px;flex-wrap:wrap}
+.timer-opt-btn{padding:6px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text);transition:all 0.15s;min-height:40px}
+.timer-opt-btn:hover{border-color:var(--gold)}
+.timer-opt-btn.selected{border-color:var(--gold);background:var(--gold-dark);color:var(--gold-light)}
+.timer-display{text-align:center;padding:8px 16px;border-radius:var(--radius);background:var(--bg-card);border:2px solid var(--border);margin-bottom:10px;transition:border-color 0.3s,background 0.3s}
+.timer-display.running{border-color:var(--gold)}
+.timer-display.warning{border-color:var(--red-bright);background:#2a1a1a;animation:timer-flash 0.6s infinite}
+.timer-display .timer-value{font-size:36px;font-weight:700;color:var(--gold-light);font-variant-numeric:tabular-nums}
+.timer-display.warning .timer-value{color:var(--red-bright)}
+.timer-display .timer-label{font-size:12px;color:var(--text-dim)}
+@keyframes timer-flash{0%,100%{opacity:1}50%{opacity:0.5}}
+
+/* 复盘 */
+.review-section{margin-top:8px;text-align:center}
+.review-section button{min-height:44px;font-size:15px}
+.review-card{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.review-card .rc-header{background:var(--bg-card);padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:44px;transition:background 0.15s}
+.review-card .rc-header:hover{background:rgba(201,168,76,0.08)}
+.review-card .rc-header .rc-title{font-size:15px;font-weight:700;color:var(--gold-light)}
+.review-card .rc-header .rc-toggle{font-size:18px;color:var(--gold);transition:transform 0.2s}
+.review-card .rc-header .rc-toggle.open{transform:rotate(90deg)}
+.review-card .rc-body{display:none;padding:12px 14px;background:rgba(0,0,0,0.15);font-size:13px}
+.review-card .rc-body.open{display:block}
+.rc-vote-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.rc-vote-table th,.rc-vote-table td{padding:4px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06)}
+.rc-vote-table th{color:var(--gold);font-size:11px}
+.rc-vote-table .vote-ap{color:var(--green-bright)}
+.rc-vote-table .vote-rj{color:var(--red-bright)}
+.rc-launch-attempts{margin-top:8px;font-size:12px;color:var(--text-dim)}
+.rc-launch-attempts .launch-item{padding:4px 8px;border-left:2px solid var(--border);margin-bottom:4px;background:rgba(0,0,0,0.1);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+
+/* ===== 五、统计显示优化 ===== */
+.merlin-assassin-card{background:linear-gradient(135deg,rgba(180,50,50,0.15),rgba(80,30,30,0.3));border:1px solid rgba(200,80,80,0.35);border-radius:var(--radius);padding:14px 18px;text-align:center;margin-bottom:10px}
+.merlin-assassin-card .ma-value{font-size:32px;font-weight:700;color:var(--red-bright)}
+.merlin-assassin-card .ma-label{font-size:12px;color:var(--text-dim);margin-top:2px}
+.merlin-assassin-card .ma-detail{font-size:11px;color:var(--text-dim);margin-top:4px}
+.stats-top-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px}
+.stats-top-row .stat-card{padding:10px 12px}
+.stats-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:820px){.stats-two-col{grid-template-columns:1fr}}
+.win-rate-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.win-rate-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;background:var(--bg-card);display:flex;align-items:center;gap:8px;min-height:44px;cursor:default;transition:border-color 0.15s}
+.win-rate-card:hover{border-color:var(--gold)}
+.win-rate-card .wc-rank{font-size:13px;color:var(--text-dim);min-width:22px;font-weight:700;text-align:center}
+.win-rate-card .wc-name{flex:1;font-size:14px;font-weight:600;color:var(--text-bright);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.win-rate-card .wc-rate{font-size:15px;font-weight:700;text-align:right;min-width:40px}
+.win-rate-card .wc-sub{font-size:10px;color:var(--text-dim);text-align:right;min-width:40px}
+.win-rate-card.top1{border-color:var(--gold);background:linear-gradient(135deg,rgba(201,168,76,0.12),var(--bg-card))}
+.win-rate-card.top2{border-color:rgba(180,180,180,0.35);background:rgba(180,180,180,0.04)}
+.win-rate-card.top3{border-color:rgba(180,120,50,0.3);background:rgba(180,120,50,0.04)}
+.history-compact-list{display:flex;flex-direction:column;gap:4px}
+.history-compact-item{border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;transition:border-color 0.15s}
+.history-compact-item:hover{border-color:var(--gold)}
+.history-compact-item .hci-header{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;background:var(--bg-card);min-height:44px;transition:background 0.15s}
+.history-compact-item .hci-header:hover{background:rgba(201,168,76,0.06)}
+.history-compact-item .hci-date{font-size:12px;color:var(--text-dim);min-width:70px}
+.history-compact-item .hci-players{font-size:13px;font-weight:600;color:var(--text-bright)}
+.history-compact-item .hci-result{font-size:13px;font-weight:700;margin-left:auto;min-width:48px;text-align:right}
+.history-compact-item .hci-toggle{font-size:14px;color:var(--gold);transition:transform 0.2s;margin-left:4px}
+.history-compact-item .hci-toggle.open{transform:rotate(90deg)}
+.history-compact-item .hci-body{display:none;padding:10px 14px;background:rgba(0,0,0,0.12);font-size:12px;border-top:1px solid var(--border)}
+.history-compact-item .hci-body.open{display:block}
+.history-compact-item .hci-body .hci-roles{display:flex;flex-wrap:wrap;gap:4px 10px;margin-bottom:6px}
+.history-compact-item .hci-body .hci-missions{color:var(--text-dim);margin-top:4px}
+.history-compact-item .hci-actions{display:flex;gap:6px;margin-top:8px}
+.hci-right{display:flex;align-items:center;gap:6px;margin-left:auto}
+
+/* ===== 六、身份预测标记 ===== */
+.identity-predict-section{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.identity-predict-section h3{font-size:13px;color:var(--gold);margin-bottom:6px}
+.predict-form{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.predict-form select,.predict-form button{padding:7px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:44px;-webkit-appearance:none;appearance:none}
+.predict-form select:focus{border-color:var(--gold);outline:none}
+.predict-form .predict-level-select{min-width:64px}
+.predict-mark-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:4px;line-height:1.5}
+.predict-mark-tag.high{background:rgba(217,74,74,0.25);color:#ff9999;border:1px solid rgba(217,74,74,0.4)}
+.predict-mark-tag.mid{background:rgba(217,138,32,0.2);color:var(--orange);border:1px solid rgba(217,138,32,0.35)}
+.predict-mark-tag.low{background:rgba(128,128,128,0.2);color:#999;border:1px solid rgba(128,128,128,0.3)}
+.predict-mark-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--radius-sm);background:var(--bg-card);margin-bottom:3px;font-size:13px}
+.predict-mark-item .pm-target{font-weight:600;color:var(--text-bright);flex:1}
+.predict-mark-item .pm-prob{font-size:11px;color:var(--text-dim);min-width:60px;text-align:right}
+.predict-mark-item .pm-delete{color:var(--text-dim);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;min-width:28px;min-height:28px;display:flex;align-items:center;justify-content:center}
+.predict-mark-item .pm-delete:hover{color:var(--red-bright);background:rgba(255,80,80,0.1)}
 </style>
 </head>
 <body>
@@ -296,6 +411,28 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     <h2>本局角色 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（勾选的才会出现在结束面板身份选项中）</span></h2>
     <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
   </div>
+  <div class="card">
+    <h2>可选规则</h2>
+    <div id="lady-check-row" class="lady-check-row" onclick="toggleLadyOfLake()">
+      <input type="checkbox" id="lady-checkbox" onclick="event.stopPropagation();toggleLadyOfLake()">
+      <span class="lady-label">湖中仙女</span>
+      <span class="lady-hint">（头衔非身份，初始持有者为最后队长右侧玩家）</span>
+    </div>
+    <div class="timer-setup" id="timer-setup">
+      <h3>计时模式</h3>
+      <div class="timer-mode-row">
+        <button class="timer-mode-btn" id="timer-mode-off" onclick="setTimerMode('off')">关闭计时</button>
+        <button class="timer-mode-btn" id="timer-mode-all" onclick="setTimerMode('all')">全体发言 5 分钟</button>
+        <button class="timer-mode-btn selected" id="timer-mode-per" onclick="setTimerMode('per')">每人发言 X 秒</button>
+      </div>
+      <div class="timer-options-row" id="timer-options">
+        <button class="timer-opt-btn" onclick="setTimerSeconds(45)">45s</button>
+        <button class="timer-opt-btn selected" onclick="setTimerSeconds(60)">60s</button>
+        <button class="timer-opt-btn" onclick="setTimerSeconds(75)">75s</button>
+        <button class="timer-opt-btn" onclick="setTimerSeconds(90)">90s</button>
+      </div>
+    </div>
+  </div>
   <div class="card" style="text-align:center">
     <p style="color:var(--text-dim);font-size:14px;margin-bottom:8px">
       任务轮次：<span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
@@ -307,6 +444,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 <section class="page" id="page-game">
   <div class="round-tracker" id="round-tracker"></div>
   <div id="launch-fail-area"></div>
+  <div class="timer-display" id="timer-display" style="display:none">
+    <div class="timer-value" id="timer-value">05:00</div>
+    <div class="timer-label" id="timer-label">发言计时</div>
+  </div>
   <div class="game-layout">
     <div class="game-main">
       <div class="card" id="step-container"></div>
@@ -315,6 +456,31 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       <div class="card" style="padding:10px">
         <h3 style="margin-bottom:6px">倾向值 <span style="font-size:11px;color:var(--text-dim)">(0-100)</span></h3>
         <div id="tendency-mini"></div>
+        <div id="lady-lake-results" style="margin-top:6px"></div>
+        <div class="identity-predict-section" id="identity-predict-section">
+          <h3>身份预测标记</h3>
+          <div class="predict-form">
+            <select id="predict-target" onchange="onPredictTargetChange()"><option value="">选玩家</option></select>
+            <select id="predict-level" class="predict-level-select" onchange="onPredictTargetChange()">
+              <option value="high">高</option><option value="mid" selected>中</option><option value="low">低</option>
+            </select>
+            <button class="btn small" onclick="addIdentityMark()" style="min-height:44px">标记</button>
+          </div>
+          <div id="predict-marks-list"></div>
+        </div>
+      </div>
+      <div class="card" style="padding:10px">
+        <h3 style="margin-bottom:6px">梅林预测 <span style="font-size:11px;color:var(--text-dim)">（概率降序）</span></h3>
+        <div id="merlin-predict-mini"></div>
+      </div>
+      <div id="lady-lake-entry" style="display:none">
+        <div class="card lady-check-entry">
+          <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">湖中仙女验人</button>
+        </div>
+      </div>
+      <div class="review-section" id="review-section" style="display:none">
+        <button class="btn" onclick="toggleReview()">复盘</button>
+        <div id="review-panel" style="display:none;margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -328,6 +494,17 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       <span id="my-role-display" style="color:var(--gold-light)"></span>
     </p>
     <div id="tendency-full"></div>
+  </div>
+  <div class="card">
+    <h2>身份预测标记</h2>
+    <div class="predict-form">
+      <select id="predict-target-full" onchange="onPredictTargetChangeFull()"><option value="">选玩家</option></select>
+      <select id="predict-level-full" class="predict-level-select" onchange="onPredictTargetChangeFull()">
+        <option value="high">高</option><option value="mid" selected>中</option><option value="low">低</option>
+      </select>
+      <button class="btn small" onclick="addIdentityMarkFull()" style="min-height:44px">标记</button>
+    </div>
+    <div id="predict-marks-list-full"></div>
   </div>
 </section>
 
@@ -367,15 +544,26 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   <div class="card">
     <h2>战绩概览</h2>
     <div class="stat-grid" id="stats-overview"></div>
+    <div class="merlin-assassin-card" id="merlin-assassin-card" style="display:none">
+      <div class="ma-value" id="ma-rate">--</div>
+      <div class="ma-label">梅林被刺率</div>
+      <div class="ma-detail" id="ma-detail"></div>
+    </div>
+  </div>
+  <div class="stats-two-col">
+    <div class="card">
+      <h2>胜率排行榜</h2>
+      <div id="win-rate-leaderboard" class="win-rate-cards"></div>
+    </div>
+    <div class="card">
+      <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开）</span></h2>
+      <div class="btn-row" id="player-stat-btns"></div>
+      <div id="player-stat-detail"></div>
+    </div>
   </div>
   <div class="card">
-    <h2>历史对局</h2>
-    <div style="overflow-x:auto">
-      <table class="history-table" id="history-table">
-        <thead><tr><th>日期</th><th>人数</th><th>胜方</th><th>详情</th><th>操作</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情）</span></h2>
+    <div id="history-compact-list" class="history-compact-list"></div>
     <div id="pagination-area"></div>
     <div class="btn-row" style="justify-content:center;margin-top:10px">
       <button class="btn small" onclick="exportData()">导出数据</button>
@@ -383,15 +571,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
       <button class="btn small" onclick="syncFromCloud()">从云端同步</button>
     </div>
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
-  </div>
-  <div class="card">
-    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开，胜率按最终阵营判定）</span></h2>
-    <div class="btn-row" id="player-stat-btns"></div>
-    <div id="player-stat-detail"></div>
-  </div>
-  <div class="card">
-    <h2>胜率排行榜</h2>
-    <div id="win-rate-leaderboard" style="overflow-x:auto"></div>
   </div>
   <div style="text-align:center">
     <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
@@ -438,7 +617,18 @@ var state = {
   assassinTarget: null,
   assassinFromMission: false,
   _historyPage: 0,
-  _historyPageSize: 5
+  _historyPageSize: 5,
+  ladyOfLakeEnabled: false,
+  ladyLakeHolder: -1,
+  ladyLakeChecks: [],
+  timerMode: 'per',
+  timerSeconds: 60,
+  timerInterval: null,
+  timerRemaining: 0,
+  lancelotFlipped: false,
+  _lancelotAsked: false,
+  roundTendencies: [],
+  identityMarks: []
 };
 
 function initState(n) {
@@ -461,6 +651,15 @@ function initState(n) {
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
   state._historyPage = 0;
+  state.ladyOfLakeEnabled = false;
+  state.ladyLakeHolder = -1;
+  state.ladyLakeChecks = [];
+  state.timerMode = 'per';
+  state.timerSeconds = 60;
+  state.timerInterval = null;
+  state.timerRemaining = 0;
+  state.roundTendencies = [];
+  state.identityMarks = [];
   for (var i = 0; i < n; i++) {
     state.tendencies[i] = 50;
     state.consecutiveRejects[i] = 0;
@@ -525,7 +724,7 @@ function showPage(page) {
   setActiveNav(page);
   if (page === 'setup') renderSetup();
   if (page === 'game') renderGame();
-  if (page === 'tend') renderTendencyFull();
+  if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
@@ -643,6 +842,33 @@ function addNameToPool() {
   renderSetup();
   toast('已添加「' + name + '」');
 }
+
+function toggleLadyOfLake() {
+  state.ladyOfLakeEnabled = !state.ladyOfLakeEnabled;
+  var row = document.getElementById('lady-check-row');
+  var cb = document.getElementById('lady-checkbox');
+  cb.checked = state.ladyOfLakeEnabled;
+  if (state.ladyOfLakeEnabled) { row.classList.add('checked'); }
+  else { row.classList.remove('checked'); }
+}
+
+function setTimerMode(mode) {
+  state.timerMode = mode;
+  var optRow = document.getElementById('timer-options');
+  optRow.style.display = (mode === 'per') ? 'flex' : 'none';
+  ['off','all','per'].forEach(function(m) {
+    var btn = document.getElementById('timer-mode-' + m);
+    if (btn) btn.className = 'timer-mode-btn' + (m === mode ? ' selected' : '');
+  });
+}
+
+function setTimerSeconds(sec) {
+  state.timerSeconds = sec;
+  var btns = document.querySelectorAll('#timer-options .timer-opt-btn');
+  btns.forEach(function(b) {
+    b.className = 'timer-opt-btn' + (parseInt(b.textContent) === sec ? ' selected' : '');
+  });
+}
 /* ==================== GAME START ==================== */
 function startGame() {
   if (!MISSION_COUNTS[state.playerCount]) { toast('请选择玩家人数', 'warn'); return; }
@@ -690,6 +916,13 @@ function doStartGame() {
   state._lastLeaderIdx = -1;
   state.assassinTarget = null;
   state.assassinFromMission = false;
+  state.lancelotFlipped = false;
+  state._lancelotAsked = false;
+  state.ladyLakeChecks = [];
+  state.ladyLakeHolder = -1;
+  state.roundTendencies = [];
+  state.identityMarks = [];
+  stopTimer();
   for (var i = 0; i < state.playerCount; i++) {
     state.tendencies[i] = 50;
     state.consecutiveRejects[i] = 0;
@@ -707,6 +940,12 @@ function renderGame() {
   renderRoundTracker();
   renderStepPanel();
   renderTendencyMini();
+  renderMerlinPredictMini();
+  renderLadyLakeResults();
+  renderLadyLakeEntry();
+  renderTimerDisplay();
+  renderReviewEntry();
+  renderIdentityPrediction();
   $('launch-fail-area').innerHTML = '';
 }
 
@@ -838,7 +1077,7 @@ function renderStepPanel() {
 }
 
 /* ==================== TENDENCY RENDER ==================== */
-function renderTendencyItem(idx, score) {
+function renderTendencyItem(idx, score, merlinProb) {
   var cls, barCls;
   if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
   else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
@@ -848,6 +1087,9 @@ function renderTendencyItem(idx, score) {
   h += '<span class="tend-name">' + (isSelf ? '★ ' : '') + playerLabel(idx) + '</span>';
   h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
   h += '<span class="tend-score ' + cls + '">' + score + '</span>';
+  if (merlinProb !== undefined) {
+    h += '<span class="merlin-pct-col">' + merlinProb + '%</span>';
+  }
   h += '</div>';
   return h;
 }
@@ -855,23 +1097,25 @@ function renderTendencyItem(idx, score) {
 function renderTendencyMini() {
   var el = $('tendency-mini');
   if (!el) return;
+  var probs = computeMerlinProbability();
   var h = '';
   for (var i = 0; i < state.playerCount; i++) {
-    h += renderTendencyItem(i, state.tendencies[i] || 50);
+    h += renderTendencyItem(i, state.tendencies[i] || 50, probs[i]);
   }
   el.innerHTML = h;
 }
 
 function renderTendencyFull() {
   var el = $('tendency-full');
+  var probs = computeMerlinProbability();
   var h = '';
   for (var i = 0; i < state.playerCount; i++) {
     if (i === state.selfIndex) continue;
-    h += renderTendencyItem(i, state.tendencies[i] || 50);
+    h += renderTendencyItem(i, state.tendencies[i] || 50, probs[i]);
   }
   if (state.selfIndex >= 0) {
     h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">';
-    h += renderTendencyItem(state.selfIndex, state.tendencies[state.selfIndex] || 50);
+    h += renderTendencyItem(state.selfIndex, state.tendencies[state.selfIndex] || 50, probs[state.selfIndex]);
     h += '</div>';
   }
   el.innerHTML = h || '<p style="color:var(--text-dim)">暂无数据，请先开始游戏</p>';
@@ -879,6 +1123,503 @@ function renderTendencyFull() {
     $('my-role-display').textContent = '我的身份：' + state.myRole + '（权重翻倍）';
   } else {
     $('my-role-display').textContent = '';
+  }
+}
+
+/* ==================== MERLIN PREDICTION ==================== */
+function computeMerlinProbability() {
+  var pc = state.playerCount;
+  var probs = {};
+  for (var i = 0; i < pc; i++) {
+    probs[i] = 0;
+  }
+
+  var totalWeight = 0;
+  for (var round = 0; round < state.missions.length; round++) {
+    var m = state.missions[round];
+    if (!m || !m.team || m.team.length === 0) continue;
+    if (!m.result) continue;
+
+    var attempts = m.launchAttempts || [];
+    // Use the final successful attempt's votes
+    for (var a = 0; a < attempts.length; a++) {
+      var att = attempts[a];
+      // Only consider the attempt that actually launched
+      var attApproves = 0;
+      for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+      if (attApproves <= Math.floor(pc / 2)) continue; // skip failed launches
+
+      // Merlin tends to vote with good players
+      // Calculate voting consistency
+      for (var i = 0; i < pc; i++) {
+        if (i === state.selfIndex) continue;
+        var vote = att.votes[i];
+        // Merlin votes approve for good missions, reject for suspicious ones
+        if (m.result === 'success' && vote === 'approve') probs[i] += 3;
+        if (m.result === 'fail' && vote === 'reject') probs[i] += 2;
+      }
+      totalWeight += 3;
+      break; // Only count the final successful launch per round
+    }
+  }
+
+  // Incorporate tendency scores - players with high tendency (trusted) are less likely to be Merlin
+  // Merlin hides identity, so moderate tendency may actually be more suspicious for Merlin
+  for (var i = 0; i < pc; i++) {
+    if (i === state.selfIndex) continue;
+    var t = state.tendencies[i] || 50;
+    // Players who consistently vote with known good patterns get higher Merlin probability
+    probs[i] += t * 0.5;
+    totalWeight += 0.5;
+  }
+
+  // Normalize to percentages
+  var maxProb = 0;
+  for (var i = 0; i < pc; i++) {
+    if (probs[i] > maxProb) maxProb = probs[i];
+  }
+
+  if (maxProb > 0) {
+    for (var i = 0; i < pc; i++) {
+      probs[i] = Math.round((probs[i] / maxProb) * 90 + 5); // Range 5-95%
+      if (probs[i] > 95) probs[i] = 95;
+    }
+  } else {
+    for (var i = 0; i < pc; i++) {
+      probs[i] = Math.round(20 + Math.random() * 30); // Fallback random-ish
+    }
+  }
+
+  return probs;
+}
+
+function renderMerlinPredictMini() {
+  var el = $('merlin-predict-mini');
+  if (!el) return;
+  var probs = computeMerlinProbability();
+  var pc = state.playerCount;
+
+  // Sort by probability descending
+  var sorted = [];
+  for (var i = 0; i < pc; i++) {
+    sorted.push({ idx: i, prob: probs[i] });
+  }
+  sorted.sort(function(a, b) { return b.prob - a.prob; });
+
+  var h = '';
+  for (var k = 0; k < sorted.length; k++) {
+    var p = sorted[k];
+    h += '<div class="merlin-bar-row">';
+    h += '<span class="m-name">' + playerLabel(p.idx) + '</span>';
+    h += '<div class="m-bar-wrap"><div class="m-bar-fill" style="width:' + p.prob + '%"></div></div>';
+    h += '<span class="m-pct">' + p.prob + '%</span>';
+    h += '</div>';
+  }
+  el.innerHTML = h || '<p style="color:var(--text-dim);font-size:12px">暂无数据</p>';
+}
+
+/* ==================== LADY OF THE LAKE ==================== */
+function renderLadyLakeResults() {
+  var el = $('lady-lake-results');
+  if (!el || !state.ladyOfLakeEnabled || state.ladyLakeChecks.length === 0) {
+    if (el) el.innerHTML = '';
+    return;
+  }
+  var h = '<div style="font-size:12px;color:var(--gold);margin-bottom:3px">湖中仙女验人记录</div>';
+  for (var i = 0; i < state.ladyLakeChecks.length; i++) {
+    var c = state.ladyLakeChecks[i];
+    h += '<div class="lady-check-result ' + (c.result === 'good' ? 'good' : 'evil') + '">';
+    h += playerLabel(c.target) + '：' + (c.result === 'good' ? '好人方' : '反方');
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function renderLadyLakeEntry() {
+  var el = $('lady-lake-entry');
+  if (!el) return;
+  var m = state.missions[state.currentRound];
+  if (!state.ladyOfLakeEnabled || !m || !m.result) {
+    el.style.display = 'none';
+    return;
+  }
+  // Show entry after mission result is confirmed
+  el.style.display = 'block';
+}
+
+function showLadyCheck() {
+  if (!state.ladyOfLakeEnabled) return;
+  var pc = state.playerCount;
+  var h = '<h2>湖中仙女验人</h2>';
+  h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  for (var i = 0; i < pc; i++) {
+    if (i === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+    h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + i + ')">' + playerLabel(i) + '</button>';
+  }
+  h += '</div>';
+  showModal(h);
+}
+
+function doLadyCheck(targetIdx) {
+  closeModal();
+  var pc = state.playerCount;
+  // Determine faction: we need to simulate - in the assistant context we don't know real roles
+  // Show a modal to let the user input the real result
+  var h = '<h2>湖中仙女验人结果</h2>';
+  h += '<p style="font-size:15px;margin-bottom:10px">查验目标：<strong style="color:var(--gold-light)">' + playerLabel(targetIdx) + '</strong></p>';
+  h += '<p style="font-size:14px;margin-bottom:14px">该玩家的阵营是？</p>';
+  h += '<div class="winner-toggle">';
+  h += '<button class="winner-btn good" onclick="recordLadyCheck(' + targetIdx + ',\'good\')">&#128737; 好人方</button>';
+  h += '<button class="winner-btn evil" onclick="recordLadyCheck(' + targetIdx + ',\'evil\')">&#128481; 反方</button>';
+  h += '</div>';
+  showModal(h);
+}
+
+function recordLadyCheck(targetIdx, result) {
+  closeModal();
+  state.ladyLakeChecks.push({
+    round: state.currentRound,
+    target: targetIdx,
+    result: result
+  });
+  // Update tendencies based on lady check
+  if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
+  if (result === 'good') {
+    state.tendencies[targetIdx] = Math.min(100, state.tendencies[targetIdx] + 15);
+  } else {
+    state.tendencies[targetIdx] = Math.max(0, state.tendencies[targetIdx] - 15);
+  }
+  renderGame();
+  toast('验人结果已记录：' + playerLabel(targetIdx) + ' 为' + (result === 'good' ? '好人方' : '反方'));
+}
+
+/* ==================== IDENTITY PREDICTION MARKS ==================== */
+function populatePredictDropdown(selId) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var curVal = sel.value;
+  sel.innerHTML = '<option value="">选玩家</option>';
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === state.selfIndex) continue;
+    sel.innerHTML += '<option value="' + i + '">' + playerLabel(i) + '</option>';
+  }
+  if (curVal) sel.value = curVal;
+}
+
+function onPredictTargetChange() {
+  populatePredictDropdown('predict-target');
+}
+
+function onPredictTargetChangeFull() {
+  populatePredictDropdown('predict-target-full');
+}
+
+function addIdentityMarkBase(targetIdx, level) {
+  if (targetIdx === null || targetIdx === undefined || targetIdx === '') {
+    toast('请选择玩家', 'warn'); return;
+  }
+  targetIdx = parseInt(targetIdx);
+  // Remove existing mark for same player
+  state.identityMarks = state.identityMarks.filter(function(m) { return m.target !== targetIdx; });
+  state.identityMarks.push({
+    target: targetIdx,
+    level: level,
+    timestamp: Date.now()
+  });
+  renderPredictMarks();
+  toast('已标记 ' + playerLabel(targetIdx));
+}
+
+function addIdentityMark() {
+  var sel = document.getElementById('predict-target');
+  var lvl = document.getElementById('predict-level');
+  if (!sel || !lvl) return;
+  addIdentityMarkBase(sel.value, lvl.value);
+  sel.value = '';
+}
+
+function addIdentityMarkFull() {
+  var sel = document.getElementById('predict-target-full');
+  var lvl = document.getElementById('predict-level-full');
+  if (!sel || !lvl) return;
+  addIdentityMarkBase(sel.value, lvl.value);
+  sel.value = '';
+}
+
+function removeIdentityMark(targetIdx) {
+  state.identityMarks = state.identityMarks.filter(function(m) { return m.target !== targetIdx; });
+  renderPredictMarks();
+}
+
+function getLevelLabel(level) {
+  if (level === 'high') return '高';
+  if (level === 'mid') return '中';
+  return '低';
+}
+
+function computeMarkProbabilities() {
+  // For each mark, compute ally/enemy probability based on tendency and vote history
+  var probs = {};
+  var pc = state.playerCount;
+  for (var i = 0; i < pc; i++) {
+    probs[i] = { ally: 50, enemy: 50 };
+  }
+
+  for (var mi = 0; mi < state.identityMarks.length; mi++) {
+    var mark = state.identityMarks[mi];
+    var t = mark.target;
+    var score = state.tendencies[t] || 50;
+
+    // Base probability from tendency
+    var allyBase = score;
+    var enemyBase = 100 - score;
+
+    // Adjust by mark level: high suspicion = more enemy, low = more ally
+    if (mark.level === 'high') { enemyBase = Math.min(100, enemyBase + 20); allyBase = Math.max(0, allyBase - 20); }
+    else if (mark.level === 'low') { allyBase = Math.min(100, allyBase + 15); enemyBase = Math.max(0, enemyBase - 15); }
+
+    // Factor in vote history - check mission votes
+    var goodVotes = 0, badVotes = 0;
+    for (var r = 0; r < state.missions.length; r++) {
+      var m = state.missions[r];
+      if (!m || !m.result) continue;
+      var attempts = m.launchAttempts || [];
+      for (var a = 0; a < attempts.length; a++) {
+        var att = attempts[a];
+        var vote = att.votes[t];
+        if (!vote) continue;
+        if (m.result === 'success' && vote === 'approve') goodVotes++;
+        else if (m.result === 'fail' && vote === 'reject') goodVotes++;
+        else badVotes++;
+      }
+    }
+    var totalVotes = goodVotes + badVotes;
+    if (totalVotes > 0) {
+      var voteAlly = Math.round(goodVotes / totalVotes * 100);
+      allyBase = Math.round(allyBase * 0.6 + voteAlly * 0.4);
+      enemyBase = 100 - allyBase;
+    }
+
+    probs[t] = { ally: allyBase, enemy: enemyBase };
+  }
+  return probs;
+}
+
+function renderPredictMarks() {
+  var probs = computeMarkProbabilities();
+  renderPredictMarksTo('predict-marks-list', true);
+  renderPredictMarksTo('predict-marks-list-full', false);
+  renderPredictMarksTo('identity-predict-section', true);
+}
+
+function renderPredictMarksTo(elId, isGame) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  if (state.identityMarks.length === 0) {
+    if (isGame) el.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:4px 0">暂无标记</div>';
+    else el.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:4px 0">暂无标记</div>';
+    return;
+  }
+  var probs = computeMarkProbabilities();
+  var h = '';
+  for (var i = 0; i < state.identityMarks.length; i++) {
+    var mark = state.identityMarks[i];
+    var pb = probs[mark.target] || { ally: 50, enemy: 50 };
+    var allyColor = pb.ally >= 60 ? 'var(--green-bright)' : pb.ally >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
+    h += '<div class="predict-mark-item">';
+    h += '<span class="pm-target">' + playerLabel(mark.target) + '</span>';
+    h += '<span class="predict-mark-tag ' + mark.level + '">' + getLevelLabel(mark.level) + '</span>';
+    h += '<span class="pm-prob">好人：<span style="color:' + allyColor + '">' + pb.ally + '%</span> | 反方：' + pb.enemy + '%</span>';
+    h += '<span class="pm-delete" onclick="removeIdentityMark(' + mark.target + ')">&#10005;</span>';
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function renderIdentityPrediction() {
+  populatePredictDropdown('predict-target');
+  populatePredictDropdown('predict-target-full');
+  renderPredictMarks();
+}
+
+/* ==================== TIMER ==================== */
+function renderTimerDisplay() {
+  var el = $('timer-display');
+  if (!el) return;
+  if (state.timerMode === 'off' || state.timerInterval === null) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  var mins = Math.floor(state.timerRemaining / 60);
+  var secs = state.timerRemaining % 60;
+  var displayStr = (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+  $('timer-value').textContent = displayStr;
+
+  var lbl = (state.timerMode === 'all') ? '全体发言计时' : '当前发言计时';
+  $('timer-label').textContent = lbl;
+
+  if (state.timerRemaining > 0) {
+    el.className = 'timer-display running';
+  }
+  if (state.timerRemaining <= 10 && state.timerRemaining > 0) {
+    el.className = 'timer-display warning';
+  }
+}
+
+function startTimer() {
+  stopTimer();
+  if (state.timerMode === 'off') return;
+  if (state.timerMode === 'all') {
+    state.timerRemaining = 5 * 60; // 5 minutes
+  } else {
+    state.timerRemaining = state.timerSeconds;
+  }
+  renderTimerDisplay();
+  state.timerInterval = setInterval(function() {
+    state.timerRemaining--;
+    renderTimerDisplay();
+    if (state.timerRemaining <= 0) {
+      stopTimer();
+      playBeepSound();
+      toast('计时结束！', 'warn');
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+  state.timerRemaining = 0;
+  var el = $('timer-display');
+  if (el) el.style.display = 'none';
+}
+
+function playBeepSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.value = 0.3;
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+    setTimeout(function() {
+      var osc2 = ctx.createOscillator();
+      var gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.value = 1100;
+      gain2.gain.value = 0.3;
+      osc2.start(ctx.currentTime);
+      osc2.stop(ctx.currentTime + 0.2);
+    }, 180);
+  } catch(e) {}
+}
+
+/* ==================== REVIEW / 复盘 ==================== */
+function renderReviewEntry() {
+  var el = $('review-section');
+  if (!el) return;
+  el.style.display = 'block';
+}
+
+function toggleReview() {
+  var panel = $('review-panel');
+  if (panel.style.display === 'block') {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = buildReviewHTML();
+}
+
+function buildReviewHTML() {
+  var h = '';
+  var pc = state.playerCount;
+
+  for (var r = 0; r <= state.currentRound; r++) {
+    var m = state.missions[r];
+    if (!m) continue;
+
+    h += '<div class="review-card">';
+    h += '<div class="rc-header" onclick="toggleReviewCard(this)">';
+    h += '<span class="rc-title">第' + (r + 1) + '轮 · ' + (m.result ? (m.result === 'success' ? '任务成功' : '任务失败') : '进行中') + '</span>';
+    h += '<span class="rc-toggle">&#9654;</span>';
+    h += '</div>';
+    h += '<div class="rc-body">';
+
+    if (m.leader !== null) {
+      h += '<div style="margin-bottom:4px"><strong>队长：</strong>' + playerLabel(m.leader) + '</div>';
+    }
+
+    if (m.team.length > 0) {
+      h += '<div style="margin-bottom:4px"><strong>队伍：</strong>' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</div>';
+    }
+
+    // Show all launch attempts
+    var attempts = m.launchAttempts || [];
+    if (attempts.length > 0) {
+      for (var a = 0; a < attempts.length; a++) {
+        var att = attempts[a];
+        var attApproves = 0;
+        for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+        var launched = attApproves > Math.floor(pc / 2);
+
+        h += '<div class="launch-item' + (launched ? '' : '') + '" style="' + (launched ? 'border-left-color:var(--green);' : '') + '">';
+        h += '<strong>第' + (a + 1) + '次组队</strong> ';
+        h += '(队长 ' + playerLabel(att.leader) + ', 队伍 ' + att.team.map(function(i) { return playerLabel(i); }).join('、') + ')';
+        h += ' | 赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves);
+        h += launched ? ' <span style="color:var(--green-bright)">发车</span>' : ' <span style="color:var(--red-bright)">否决</span>';
+
+        // Vote detail table
+        h += '<table class="rc-vote-table"><tr><th>玩家</th><th>投票</th></tr>';
+        for (var k = 0; k < pc; k++) {
+          var v = att.votes[k];
+          h += '<tr><td>' + playerLabel(k) + '</td>';
+          h += '<td class="' + (v === 'approve' ? 'vote-ap' : 'vote-rj') + '">';
+          h += (v === 'approve' ? '赞成' : '反对') + '</td></tr>';
+        }
+        h += '</table>';
+        h += '</div>';
+      }
+    }
+
+    if (m.result) {
+      h += '<div style="margin-top:6px"><strong>任务结果：</strong>';
+      h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
+      h += (m.result === 'success' ? '成功' : '失败');
+      if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
+      h += '</span></div>';
+    }
+
+    if (m.launchFailures > 0) {
+      h += '<div style="margin-top:4px;color:var(--orange)">发车失败 ' + m.launchFailures + ' 次</div>';
+    }
+
+    h += '</div></div>';
+  }
+
+  h += '<div style="text-align:center;margin-top:8px"><button class="btn small" onclick="document.getElementById(\'review-panel\').style.display=\'none\'">收起</button></div>';
+  return h;
+}
+
+function toggleReviewCard(header) {
+  var body = header.nextElementSibling;
+  var toggle = header.querySelector('.rc-toggle');
+  if (body.classList.contains('open')) {
+    body.classList.remove('open');
+    toggle.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    toggle.classList.add('open');
   }
 }
 
@@ -958,6 +1699,7 @@ function confirmVotes() {
   applyLaunchTendencies();
 
   if (approves > rejects) {
+    startTimer();
     renderStepPanelWithResult();
   } else {
     m.launchFailures++;
@@ -1077,6 +1819,7 @@ function finalizeMission() {
   if (!m.result) { toast('请选择任务结果', 'warn'); return; }
   if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
 
+  stopTimer();
   updateFinalTendencies();
 
   // Capture tendency snapshot for this round
@@ -1088,6 +1831,10 @@ function finalizeMission() {
 
   checkGameEnd();
   renderGame();
+
+  if (state.ladyOfLakeEnabled && !state.winner) {
+    setTimeout(function() { showLadyCheck(); }, 500);
+  }
 }
 
 function updateFinalTendencies() {
@@ -1133,6 +1880,7 @@ function checkGameEnd() {
 
   if (failCount >= 3) {
     state.winner = 'evil';
+    stopTimer();
     toast('坏人方成功破坏 3 轮任务！游戏结束');
     return;
   }
@@ -1314,6 +2062,9 @@ function saveGameRecord() {
     roundTendencies: state.roundTendencies || [],
     assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
     assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
+    identityMarks: state.identityMarks.map(function(m) {
+      return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
+    }),
     missions: state.missions.map(function(m) {
       return {
         round: m.round,
@@ -1361,30 +2112,91 @@ function renderStats() {
   h += '<div class="stat-sub">' + (total > 0 ? Math.round(evilWins / total * 100) : 0) + '%</div></div>';
   $('stats-overview').innerHTML = h;
 
+  // Merlin assassination rate: count games where good won 3 missions and assassin guessed correctly
+  var merlinGames = 0, merlinKilled = 0;
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    if (!rec.missions) continue;
+    var sc = rec.missions.filter(function(m) { return m.result === 'success'; }).length;
+    if (sc >= 3) {
+      merlinGames++;
+      if (rec.assassinSuccess === true) merlinKilled++;
+    }
+  }
+  var maCard = $('merlin-assassin-card');
+  if (merlinGames > 0) {
+    maCard.style.display = 'block';
+    var maRate = Math.round(merlinKilled / merlinGames * 100);
+    $('ma-rate').textContent = maRate + '%';
+    $('ma-detail').textContent = merlinKilled + '次被刺 / ' + merlinGames + '局进入刺杀环节';
+  } else {
+    maCard.style.display = 'none';
+  }
+
+  // Compact history list
   var ps = state._historyPageSize;
   var totalPages = Math.ceil(history.length / ps);
   if (state._historyPage >= totalPages && totalPages > 0) state._historyPage = totalPages - 1;
   if (state._historyPage < 0) state._historyPage = 0;
-
   var start = history.length - 1 - state._historyPage * ps;
   var end = Math.max(-1, start - ps);
 
-  var tbody = document.querySelector('#history-table tbody');
+  var cl = $('history-compact-list');
   h = '';
   for (var i = start; i > end; i--) {
     var rec = history[i];
     if (!rec) continue;
-    var winnerLabel = rec.winner === 'good' ? '<span style="color:#99ff99">好人方</span>' : '<span style="color:#ff9999">反方</span>';
-    h += '<tr>';
-    h += '<td>' + rec.date + '</td>';
-    h += '<td>' + rec.playerCount + '人</td>';
-    h += '<td>' + winnerLabel + '</td>';
-    h += '<td><button class="btn small" onclick="showGameDetail(' + i + ')">详情</button></td>';
-    h += '<td><button class="btn small danger" onclick="deleteGameRecord(' + i + ')">删除</button></td>';
-    h += '</tr>';
+    var winnerColor = rec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)';
+    var winnerLabel = rec.winner === 'good' ? '好人方胜' : '反方胜';
+
+    h += '<div class="history-compact-item">';
+    h += '<div class="hci-header" onclick="toggleCompactHistory(this)">';
+    h += '<span class="hci-date">' + rec.date + '</span>';
+    h += '<span class="hci-players">' + rec.playerCount + '人</span>';
+    h += '<div class="hci-right">';
+    h += '<span class="hci-result" style="color:' + winnerColor + '">' + winnerLabel + '</span>';
+    h += '<span class="hci-toggle">&#9654;</span>';
+    h += '</div></div>';
+    h += '<div class="hci-body">';
+    // Roles
+    if (rec.identities) {
+      h += '<div class="hci-roles">';
+      for (var j = 0; j < rec.identities.length; j++) {
+        var id = rec.identities[j];
+        h += '<span>' + id.name + '：' + (id.role || '--') + '</span>';
+      }
+      h += '</div>';
+    }
+    // Missions summary
+    if (rec.missions) {
+      h += '<div class="hci-missions">任务：';
+      for (var j = 0; j < rec.missions.length; j++) {
+        var m = rec.missions[j];
+        h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
+        h += 'R' + (j + 1) + (m.result === 'success' ? '✓' : '✕') + '</span> ';
+      }
+      h += '</div>';
+    }
+    // Identity marks
+    if (rec.identityMarks && rec.identityMarks.length > 0) {
+      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">标记：';
+      for (var j = 0; j < rec.identityMarks.length; j++) {
+        var mk = rec.identityMarks[j];
+        var lvlLabel = mk.level === 'high' ? '高' : mk.level === 'mid' ? '中' : '低';
+        h += '<span>' + mk.targetName + '[' + lvlLabel + '] </span>';
+      }
+      h += '</div>';
+    }
+    if (rec.assassinTarget) {
+      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">刺杀：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '成功' : '失败') + '</div>';
+    }
+    h += '<div class="hci-actions">';
+    h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
+    h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')">删除</button>';
+    h += '</div></div></div>';
   }
-  tbody.innerHTML = h;
-  document.getElementById('no-history').style.display = history.length === 0 ? 'block' : 'none';
+  cl.innerHTML = h;
+  $('no-history').style.display = history.length === 0 ? 'block' : 'none';
 
   // Pagination
   var pageArea = $('pagination-area');
@@ -1393,7 +2205,6 @@ function renderStats() {
   } else {
     var ph = '<div class="pagination">';
     ph += '<button class="page-btn" onclick="goHistoryPage(' + (state._historyPage - 1) + ')"' + (state._historyPage === 0 ? ' disabled' : '') + '>‹</button>';
-
     var pageButtons = [];
     if (totalPages <= 7) {
       for (var p = 0; p < totalPages; p++) pageButtons.push(p);
@@ -1406,7 +2217,6 @@ function renderStats() {
       if (state._historyPage < totalPages - 4) pageButtons.push('...');
       pageButtons.push(totalPages - 1);
     }
-
     for (var k = 0; k < pageButtons.length; k++) {
       var bp = pageButtons[k];
       if (bp === '...') {
@@ -1415,12 +2225,12 @@ function renderStats() {
         ph += '<button class="page-btn' + (bp === state._historyPage ? ' active' : '') + '" onclick="goHistoryPage(' + bp + ')">' + (bp + 1) + '</button>';
       }
     }
-
     ph += '<button class="page-btn" onclick="goHistoryPage(' + (state._historyPage + 1) + ')"' + (state._historyPage >= totalPages - 1 ? ' disabled' : '') + '>›</button>';
     ph += '</div>';
     pageArea.innerHTML = ph;
   }
 
+  // Player stats
   var playerSet = {};
   for (var i = 0; i < history.length; i++) {
     var rec = history[i];
@@ -1444,7 +2254,7 @@ function renderStats() {
   $('player-stat-btns').innerHTML = h;
   state._playerSetCache = playerSet;
 
-  // Win rate leaderboard
+  // Win rate leaderboard - compact dual-column cards
   var lb = [];
   for (var nm in playerSet) {
     var items = playerSet[nm];
@@ -1462,31 +2272,37 @@ function renderStats() {
     return b.total - a.total;
   });
 
-  var lh = '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr>';
-  lh += '<th style="text-align:center;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim);width:60px">排名</th>';
-  lh += '<th style="text-align:left;padding:8px;border-bottom:1px solid var(--border)">玩家名</th>';
-  lh += '<th style="text-align:center;padding:8px;border-bottom:1px solid var(--border);width:70px">总场次</th>';
-  lh += '<th style="text-align:center;padding:8px;border-bottom:1px solid var(--border);width:70px">胜场</th>';
-  lh += '<th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);width:80px">胜率</th>';
-  lh += '</tr></thead><tbody>';
-
+  var lh = '';
   for (var r = 0; r < lb.length; r++) {
     var p = lb[r];
     var rateColor = p.rate >= 0.6 ? 'var(--green-bright)' : p.rate >= 0.4 ? 'var(--gold-light)' : 'var(--red-bright)';
-    lh += '<tr>';
-    lh += '<td style="text-align:center;padding:8px;border-bottom:1px solid var(--border);color:var(--text-dim)">' + (r + 1) + '</td>';
-    lh += '<td style="text-align:left;padding:8px;border-bottom:1px solid var(--border);font-weight:600">' + p.name + '</td>';
-    lh += '<td style="text-align:center;padding:8px;border-bottom:1px solid var(--border)">' + p.total + '</td>';
-    lh += '<td style="text-align:center;padding:8px;border-bottom:1px solid var(--border)">' + p.wins + '</td>';
-    lh += '<td style="text-align:right;padding:8px;border-bottom:1px solid var(--border);font-weight:700;color:' + rateColor + '">' + Math.round(p.rate * 100) + '%</td>';
-    lh += '</tr>';
+    var topClass = '';
+    if (r === 0) topClass = ' top1';
+    else if (r === 1) topClass = ' top2';
+    else if (r === 2) topClass = ' top3';
+    lh += '<div class="win-rate-card' + topClass + '">';
+    lh += '<span class="wc-rank">' + (r + 1) + '</span>';
+    lh += '<span class="wc-name">' + p.name + '</span>';
+    lh += '<div><div class="wc-rate" style="color:' + rateColor + '">' + Math.round(p.rate * 100) + '%</div>';
+    lh += '<div class="wc-sub">' + p.wins + '/' + p.total + '场</div></div>';
+    lh += '</div>';
   }
-
   if (lb.length === 0) {
-    lh += '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-dim)">暂无数据</td></tr>';
+    lh = '<div style="text-align:center;padding:16px;color:var(--text-dim)">暂无数据</div>';
   }
-  lh += '</tbody></table>';
   $('win-rate-leaderboard').innerHTML = lh;
+}
+
+function toggleCompactHistory(header) {
+  var body = header.nextElementSibling;
+  var toggle = header.querySelector('.hci-toggle');
+  if (body.classList.contains('open')) {
+    body.classList.remove('open');
+    toggle.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    toggle.classList.add('open');
+  }
 }
 
 function goHistoryPage(p) {
