@@ -8,6 +8,17 @@ var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'];
 
+/* ==================== SUPABASE ==================== */
+var SUPABASE_URL = 'https://nzbpopxrxniixnhnqktw.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56YnBvcHhyeG5paXhuaG5xa3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODQ2MzQsImV4cCI6MjA5NzQ2MDYzNH0.wLk-FdQlKha8YObTvgINW2M_9QVSpJk8c91bKJeQO7Q';
+var _supabase = null;
+function getSupabase() {
+  if (!_supabase && typeof supabase !== 'undefined') {
+    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  return _supabase;
+}
+
 var namePool = DEFAULT_NAME_POOL.slice();
 
 var state = {
@@ -163,15 +174,51 @@ function recordVisitor() {
   var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
   var timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' '
     + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-  visitors.push({ time: timeStr, device: getDeviceType() });
+  var device = getDeviceType();
+  visitors.push({ time: timeStr, device: device });
   if (visitors.length > 500) visitors = visitors.slice(-500);
   saveVisitors(visitors);
+
+  // 同步推送到 Supabase
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('visitors').insert([{ visit_time: timeStr, device: device }]).then(function(r) {
+      if (r.error) console.warn('Supabase visitor insert:', r.error.message);
+    });
+  }
 }
 
 function renderVisitorLog() {
-  var visitors = loadVisitors();
-  // reverse chronological
-  visitors = visitors.slice().reverse();
+  // 先从 localStorage 快速渲染，然后合并 Supabase 数据
+  var localVisitors = loadVisitors().slice().reverse();
+  renderVisitorList(localVisitors);
+
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('visitors').select('*').order('created_at', { ascending: false }).limit(200).then(function(r) {
+      if (r.error) return;
+      // 合并去重
+      var merged = {};
+      for (var i = 0; i < localVisitors.length; i++) {
+        var key = localVisitors[i].time + '|' + localVisitors[i].device;
+        merged[key] = true;
+      }
+      var remoteVisitors = [];
+      for (var j = 0; j < r.data.length; j++) {
+        var v = r.data[j];
+        var vkey = v.visit_time + '|' + v.device;
+        if (!merged[vkey]) {
+          remoteVisitors.push({ time: v.visit_time, device: v.device });
+        }
+      }
+      var all = remoteVisitors.concat(localVisitors);
+      all.sort(function(a, b) { return b.time.localeCompare(a.time); });
+      renderVisitorList(all);
+    });
+  }
+}
+
+function renderVisitorList(visitors) {
   var ps = state._visitorPageSize;
   var totalPages = Math.ceil(visitors.length / ps);
   if (state._visitorPage >= totalPages && totalPages > 0) state._visitorPage = totalPages - 1;

@@ -8,6 +8,7 @@
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script defer src="./app.js"></script>
 </head>
 <body>
@@ -267,9 +268,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=33',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=34',{scope:'./'});
   }).then(function(r){
-    console.log('SW v33 registered:',r.scope);
+    console.log('SW v34 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
