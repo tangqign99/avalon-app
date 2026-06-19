@@ -1,5 +1,5 @@
-/* ==================== Service Worker v37 ==================== */
-var CACHE_NAME = 'avalon-pwa-v37';
+/* ==================== Service Worker v38 ==================== */
+var CACHE_NAME = 'avalon-pwa-v38';
 var ASSETS = [
   './',
   './index.html',
@@ -31,8 +31,17 @@ self.addEventListener('activate', function(e) {
 
 self.addEventListener('fetch', function(e) {
   e.respondWith(
-    fetch(e.request).catch(function() {
-      return caches.match(e.request);
+    caches.match(e.request).then(function(cached) {
+      var fetchPromise = fetch(e.request).then(function(networkResponse) {
+        if (networkResponse && networkResponse.status === 200) {
+          var responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      });
+      return cached || fetchPromise;
     })
   );
 });
