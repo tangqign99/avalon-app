@@ -966,3 +966,84 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* ==================== MULTIPLAYER ==================== */
+#multiplayer-status-bar {
+  background: rgba(201,168,76,0.08);
+  border: 1px solid rgba(201,168,76,0.2);
+  min-height: 36px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mp-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.mp-badge.host {
+  background: rgba(74,222,128,0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74,222,128,0.35);
+}
+.mp-badge.viewer {
+  background: rgba(74,144,217,0.12);
+  color: var(--blue-light, #99bbff);
+  border: 1px solid rgba(74,144,217,0.3);
+}
+
+/* Viewer disabled styles */
+.viewer-disabled {
+  opacity: 0.4 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+
+/* Viewer mode overlay hint */
+.viewer-hint {
+  text-align: center;
+  padding: 10px;
+  color: var(--text-dim);
+  font-size: 13px;
+  border: 1px dashed rgba(201,168,76,0.25);
+  border-radius: var(--radius-sm);
+  margin: 8px 0;
+  animation: hint-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Name pool action buttons */
+.name-pool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.name-pool-delete:hover {
+  background: rgba(255,80,80,0.15);
+  color: var(--red-bright);
+  border-color: rgba(255,80,80,0.4);
+}
+.name-pool-edit:hover {
+  background: rgba(201,168,76,0.15);
+  color: var(--gold-light);
+  border-color: rgba(201,168,76,0.4);
+}

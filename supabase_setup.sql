@@ -44,6 +44,23 @@ CREATE POLICY "allow_anon_all" ON key_value FOR ALL USING (true);
 ALTER TABLE game_records REPLICA IDENTITY FULL;
 ALTER TABLE key_value REPLICA IDENTITY FULL;
 
+-- ===== 多人游戏房间表 =====
+CREATE TABLE IF NOT EXISTS game_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  host_id TEXT NOT NULL,
+  game_state JSONB DEFAULT '{}'::jsonb,
+  status TEXT DEFAULT 'waiting',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_anon_all_gamesessions" ON game_sessions FOR ALL USING (true);
+
+ALTER TABLE game_sessions REPLICA IDENTITY FULL;
+
 -- 将表加入 realtime publication（Supabase Realtime v2）
 ALTER PUBLICATION supabase_realtime ADD TABLE game_records;
 ALTER PUBLICATION supabase_realtime ADD TABLE key_value;
+ALTER PUBLICATION supabase_realtime ADD TABLE game_sessions;

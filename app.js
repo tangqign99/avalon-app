@@ -111,6 +111,13 @@ function initState(n) {
   }
 }
 
+/* ==================== MULTIPLAYER STATE ==================== */
+var _isHost = false;
+var _isViewer = false;
+var _deviceId = null;
+var _gameSessionId = null;
+var _gameSessionChannel = null;
+
 /* ==================== PLAYER LABEL ==================== */
 function playerLabel(idx) {
   return (idx + 1) + '号 ' + state.playerNames[idx];
@@ -160,6 +167,19 @@ function getDeviceType() {
   if (/Windows/.test(ua)) return 'Windows';
   if (/Linux/.test(ua)) return 'Linux';
   return 'Unknown';
+}
+
+function generateDeviceId() {
+  if (_deviceId) return _deviceId;
+  var stored = localStorage.getItem('avalon_device_id');
+  if (stored) { _deviceId = stored; return stored; }
+  _deviceId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('avalon_device_id', _deviceId);
+  return _deviceId;
+}
+
+function isIPad() {
+  return /iPad/.test(navigator.userAgent);
 }
 
 function loadVisitors() {
@@ -345,8 +365,13 @@ function showPage(page) {
   var pg = document.getElementById('page-' + page);
   if (pg) pg.classList.add('active');
   setActiveNav(page);
+  // 多人模式：游戏页根据host/viewer状态处理
+  if (page === 'game') {
+    updateMultiplayerStatusBar();
+    renderGame();
+    if (_isViewer) applyViewerMode();
+  }
   if (page === 'setup') renderSetup();
-  if (page === 'game') renderGame();
   if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); renderDeduction(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
@@ -383,6 +408,9 @@ function renderSetup() {
       h += '<option value="' + curName + '" selected>' + curName + '</option>';
     }
     h += '</select>';
+    // Delete and edit buttons for the currently selected name
+    h += '<button class="name-pool-btn name-pool-delete" onclick="event.stopPropagation();deleteNameFromPool(\'' + curName.replace(/'/g, "\\'") + '\')" title="从名字池删除">&times;</button>';
+    h += '<button class="name-pool-btn name-pool-edit" onclick="event.stopPropagation();editNameInPool(\'' + curName.replace(/'/g, "\\'") + '\')" title="修改名字">&#9998;</button>';
     h += '</div>';
   }
   $('player-names').innerHTML = h;
@@ -462,9 +490,68 @@ function addNameToPool() {
   if (namePool.indexOf(name) !== -1) { toast('名字已存在', 'warn'); return; }
   namePool.push(name);
   saveNamePool();
+  // Sync to Supabase
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+      if (res.error) console.warn('[Supabase] add name_pool failed:', res.error);
+    });
+  }
   input.value = '';
   renderSetup();
   toast('已添加「' + name + '」');
+}
+
+function deleteNameFromPool(name) {
+  var idx = namePool.indexOf(name);
+  if (idx === -1) return;
+  namePool.splice(idx, 1);
+  saveNamePool();
+  // Sync to Supabase
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+      if (res.error) console.warn('[Supabase] delete name_pool failed:', res.error);
+    });
+  }
+  // Update player names that reference the deleted name
+  for (var i = 0; i < state.playerCount; i++) {
+    if (state.playerNames[i] === name) {
+      state.playerNames[i] = '玩家' + (i + 1);
+    }
+  }
+  renderSetup();
+  toast('已删除「' + name + '」');
+}
+
+function editNameInPool(oldName) {
+  var newName = prompt('修改玩家姓名「' + oldName + '」：', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  newName = newName.trim();
+  if (newName.length > 10) { toast('名字不能超过10个字符', 'warn'); return; }
+  if (namePool.indexOf(newName) !== -1) { toast('名字已存在', 'warn'); return; }
+  var idx = namePool.indexOf(oldName);
+  if (idx !== -1) {
+    namePool[idx] = newName;
+  } else {
+    namePool.push(newName);
+  }
+  saveNamePool();
+  // Sync to Supabase
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+      if (res.error) console.warn('[Supabase] edit name_pool failed:', res.error);
+    });
+  }
+  // Update player names that reference the old name
+  for (var i = 0; i < state.playerCount; i++) {
+    if (state.playerNames[i] === oldName) {
+      state.playerNames[i] = newName;
+    }
+  }
+  renderSetup();
+  toast('已修改「' + oldName + '」→「' + newName + '」');
 }
 
 function toggleLadyOfLake() {
@@ -514,7 +601,19 @@ function startGame() {
   for (var i = 0; i < state.playerCount; i++) {
     if (state.playerNames[i] === '阿弟') { state.selfIndex = i; break; }
   }
-  showIdentityModal();
+  // 多人模式：先检查Supabase是否有活跃房间
+  var sb = getSupabase();
+  if (sb) {
+    initGameSession(sb, function(role) {
+      if (role === 'host') {
+        showIdentityModal();
+      }
+      // viewer: initGameSession 内部已设置_isViewer=true并订阅，直接切到游戏页
+    });
+  } else {
+    // Supabase不可用，回退单机模式
+    showIdentityModal();
+  }
 }
 
 function showIdentityModal() {
@@ -581,6 +680,7 @@ function doStartGame() {
   state.roundTendencies = [];
   saveLastGame();
   showPage('game');
+  syncGameState();
   var msg = '游戏开始！共 ' + state.playerCount + ' 名玩家，5 轮任务';
   if (state.myRole) msg += '（你的身份：' + state.myRole + '）';
   toast(msg);
@@ -759,6 +859,7 @@ function resolveInGameAssassin(isMerlin, targetIdx) {
   if (btn) btn.remove();
   toast(isMerlin ? '拍刀成功！反方获胜' : '拍刀失败！好人方获胜');
   renderGame();
+  syncGameState();
 }
 
 function renderRoundTracker() {
@@ -2193,6 +2294,7 @@ function confirmVotes() {
 
   if (approves > rejects) {
     renderStepPanelWithResult();
+    syncGameState();
   } else {
     m.launchFailures++;
 
@@ -2202,6 +2304,7 @@ function confirmVotes() {
       updateFinalTendencies();
       checkGameEnd();
       renderGame();
+      syncGameState();
       var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮连续 <span class="count">5</span> 次发车失败，任务自动失败！</div>';
       $('launch-fail-area').innerHTML = banner;
       return;
@@ -2345,6 +2448,7 @@ function finalizeMission() {
     checkGameEnd();
     renderGame();
   }
+  syncGameState();
 }
 
 function updateFinalTendencies() {
@@ -2725,12 +2829,14 @@ function resolveAssassin(isMerlin) {
   }
   $('end-assassin-card').style.display = 'none';
   renderEnd();
+  syncGameState();
   toast(isMerlin ? '刺杀成功！反方获胜' : '刺杀失败！好人方获胜');
 }
 
 function setWinner(w) {
   state.winner = w;
   renderEnd();
+  syncGameState();
 }
 
 function saveGameRecord() {
@@ -2779,7 +2885,17 @@ function saveGameRecord() {
         result: m.result,
         failCount: m.failCount,
         launchFailures: m.launchFailures,
-        votes: Object.keys(m.votes).reduce(function(acc, k) {
+        launchAttempts: (m.launchAttempts || []).map(function(att) {
+          return {
+            team: att.team.map(function(i) { return playerLabel(i); }),
+            votes: Object.keys(att.votes).reduce(function(acc, k) {
+              acc[playerLabel(parseInt(k))] = att.votes[k];
+              return acc;
+            }, {}),
+            leader: playerLabel(att.leader)
+          };
+        }),
+        votes: Object.keys(m.votes || {}).reduce(function(acc, k) {
           acc[playerLabel(parseInt(k))] = m.votes[k];
           return acc;
         }, {})
@@ -2820,6 +2936,7 @@ function saveGameRecord() {
   state.playerNames = savedNames;
   state.selfIndex = savedSelf;
   state.myRole = null;
+  syncGameState();
   showPage('setup');
 }
 
@@ -3001,18 +3118,63 @@ function renderStats() {
   $('player-stat-btns').innerHTML = h;
   state._playerSetCache = playerSet;
 
-  // Win rate leaderboard - compact dual-column cards
+  // 今日胜率排行榜：第一天19:00到次日18:59:59为一天
+  var now = new Date();
+  var todayDateStr = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0');
+  var yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  var yesterdayDateStr = yesterday.getFullYear() + '-' +
+    String(yesterday.getMonth() + 1).padStart(2, '0') + '-' +
+    String(yesterday.getDate()).padStart(2, '0');
+  var tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var tomorrowDateStr = tomorrow.getFullYear() + '-' +
+    String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' +
+    String(tomorrow.getDate()).padStart(2, '0');
+
+  var todayDates = {};
+  if (now.getHours() < 19) {
+    todayDates[yesterdayDateStr] = true;
+    todayDates[todayDateStr] = true;
+  } else {
+    todayDates[todayDateStr] = true;
+    todayDates[tomorrowDateStr] = true;
+  }
+
+  // 按玩家汇总今日数据
+  var todayPlayerSet = {};
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    if (!todayDates[rec.date]) continue;
+    for (var j = 0; j < rec.identities.length; j++) {
+      var id = rec.identities[j];
+      var nm = id.name;
+      if (!todayPlayerSet[nm]) todayPlayerSet[nm] = [];
+      todayPlayerSet[nm].push({
+        winner: rec.winner,
+        role: id.role,
+        flipped: rec.lancelotFlips && rec.lancelotFlips[id.index]
+      });
+    }
+  }
+
   var lb = [];
-  for (var nm in playerSet) {
-    var items = playerSet[nm];
+  for (var nm in todayPlayerSet) {
+    var items = todayPlayerSet[nm];
     var totalGames = items.length;
-    var wins = 0;
+    var goodWins = 0, evilWins = 0;
     for (var g = 0; g < items.length; g++) {
       var faction = getFinalFaction(items[g].role, items[g].flipped);
-      if (items[g].winner === faction) wins++;
+      if (items[g].winner === faction) {
+        if (faction === 'good') goodWins++;
+        else evilWins++;
+      }
     }
+    var wins = goodWins + evilWins;
     var rate = totalGames > 0 ? wins / totalGames : 0;
-    lb.push({ name: nm, total: totalGames, wins: wins, rate: rate });
+    lb.push({ name: nm, total: totalGames, goodWins: goodWins, evilWins: evilWins, wins: wins, rate: rate });
   }
   lb.sort(function(a, b) {
     if (b.rate !== a.rate) return b.rate - a.rate;
@@ -3033,7 +3195,7 @@ function renderStats() {
     lh += '<span class="wc-rank">' + (r + 1) + '</span>';
     lh += '<span class="wc-name">' + p.name + '</span>';
     lh += '<div><div class="wc-rate" style="color:' + rateColor + '">' + Math.round(p.rate * 100) + '%</div>';
-    lh += '<div class="wc-sub">' + p.wins + '/' + p.total + '场</div></div>';
+    lh += '<div class="wc-sub">好人' + p.goodWins + ' / 反方' + p.evilWins + ' / 共' + p.total + '场</div></div>';
     lh += '</div>';
   }
   if (lb.length > 10) {
@@ -3042,7 +3204,12 @@ function renderStats() {
     lh += '</div>';
   }
   if (lb.length === 0) {
-    lh = '<div style="text-align:center;padding:16px;color:var(--text-dim)">暂无数据</div>';
+    // 今日无对局，隐藏整个排行榜区域
+    var leaderboardCard = document.getElementById('win-rate-leaderboard').parentNode;
+    if (leaderboardCard) leaderboardCard.style.display = 'none';
+  } else {
+    var leaderboardCard = document.getElementById('win-rate-leaderboard').parentNode;
+    if (leaderboardCard) leaderboardCard.style.display = '';
   }
   $('win-rate-leaderboard').innerHTML = lh;
 
@@ -3258,9 +3425,35 @@ function showGameDetail(idx) {
     if (hasAssassin && i > assassinCutoff) break;
     if (i < rec.missions.length) {
       var m = rec.missions[i];
-      h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
-      if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
-      h += '</div>';
+      // Show launch attempts (including failures) before the final mission result
+      if (m.launchAttempts && m.launchAttempts.length > 0) {
+        for (var la = 0; la < m.launchAttempts.length; la++) {
+          var att = m.launchAttempts[la];
+          var approveCount = 0, rejectCount = 0;
+          for (var vk in att.votes) {
+            if (att.votes[vk] === 'approve') approveCount++;
+            else rejectCount++;
+          }
+          var isLastAttempt = (la === m.launchAttempts.length - 1);
+          var isSucceeded = isLastAttempt && m.result === 'success';
+          var isFailed = isLastAttempt && m.result === 'fail';
+          var label = isSucceeded ? '发车成功' : (isFailed ? '发车失败（最终）' : '发车失败');
+          var bg = isSucceeded ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
+          var borderColor = isSucceeded ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
+          var labelColor = isSucceeded ? 'var(--green-bright)' : 'var(--red-bright)';
+          h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);font-size:13px">';
+          h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
+          h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
+          h += '| 队长 ' + att.leader + ' | 队伍 ' + att.team.join('、');
+          h += ' | 投票 ' + approveCount + ':' + rejectCount;
+          h += '</div>';
+        }
+      } else {
+        // Fallback: no launchAttempts saved (e.g. legacy data), show simple result line
+        h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
+        if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
+        h += '</div>';
+      }
     }
   }
   if (hasAssassin && assassinCutoff < totalRounds - 1) {
@@ -3589,13 +3782,29 @@ function pullInitialData(sb) {
     for (var i = 0; i < res.data.length; i++) {
       if (res.data[i].game_data) cloudRecords.push(res.data[i].game_data);
     }
-    if (cloudRecords.length === 0) return;
     var localHistory = loadHistory();
     var merged = mergeHistories(localHistory, cloudRecords);
     saveHistory(merged);
     console.log('[InitPull] merged game_records, local:', localHistory.length, 'cloud:', cloudRecords.length, 'merged:', merged.length);
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
+
+    // 补推：将本地有但云端没有的记录上传到 Supabase
+    var cloudKeys = {};
+    for (var k = 0; k < cloudRecords.length; k++) {
+      cloudKeys[makeRecordKey(cloudRecords[k])] = true;
+    }
+    var pushCount = 0;
+    for (var j = 0; j < localHistory.length; j++) {
+      var key = makeRecordKey(localHistory[j]);
+      if (!cloudKeys[key]) {
+        (function(rec) {
+          sb.from('game_records').insert({ game_data: rec }).then(function(r) {
+            if (!r.error) { pushCount++; console.log('[InitPull] pushed missing record'); }
+          });
+        })(localHistory[j]);
+      }
+    }
   });
 
   // 拉取 name_pool
@@ -3730,8 +3939,309 @@ function makeRecordKey(record) {
   return (record.date || '') + '|' + (record.playerCount || 0) + '|' + identityStr;
 }
 
+/* ==================== MULTIPLAYER GAME SESSION ==================== */
+
+// 序列化需同步的 state 字段为 JSON
+function serializeGameState() {
+  return {
+    playerCount: state.playerCount,
+    playerNames: state.playerNames.slice(),
+    activeRoles: state.activeRoles.slice(),
+    selfIndex: state.selfIndex,
+    missions: JSON.parse(JSON.stringify(state.missions)),
+    currentRound: state.currentRound,
+    winner: state.winner,
+    tendencies: JSON.parse(JSON.stringify(state.tendencies)),
+    identityMarks: state.identityMarks ? JSON.parse(JSON.stringify(state.identityMarks)) : [],
+    assassinTarget: state.assassinTarget,
+    assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
+    assassinFromMission: state.assassinFromMission,
+    assassinMode: state.assassinMode,
+    _assassinAfterRound: state._assassinAfterRound,
+    ladyOfLakeEnabled: state.ladyOfLakeEnabled,
+    ladyLakeHolder: state.ladyLakeHolder,
+    ladyLakeChecks: state.ladyLakeChecks ? JSON.parse(JSON.stringify(state.ladyLakeChecks)) : [],
+    ladyCheckHistory: state.ladyCheckHistory ? JSON.parse(JSON.stringify(state.ladyCheckHistory)) : [],
+    roundTendencies: state.roundTendencies ? JSON.parse(JSON.stringify(state.roundTendencies)) : [],
+    lancelotFlipped: state.lancelotFlipped,
+    lancelotDeck: state.lancelotDeck ? state.lancelotDeck.slice() : null,
+    lancelotDrawResults: state.lancelotDrawResults ? state.lancelotDrawResults.slice() : [],
+    lancelotFlipCount: state.lancelotFlipCount || 0,
+    lancelotRoundFlips: state.lancelotRoundFlips ? state.lancelotRoundFlips.slice() : [],
+    timerMode: state.timerMode,
+    timerDuration: state.timerSeconds,
+    timerRemaining: state.timerRemaining || 0,
+    _firstLeaderPicked: state._firstLeaderPicked,
+    _lastLeaderIdx: state._lastLeaderIdx,
+    consecutiveRejects: JSON.parse(JSON.stringify(state.consecutiveRejects))
+  };
+}
+
+// 从 Supabase 同步的 JSON 反序列化到 state
+function deserializeGameState(gs) {
+  state.playerCount = gs.playerCount || 7;
+  state.playerNames = gs.playerNames || [];
+  state.activeRoles = gs.activeRoles || [];
+  state.selfIndex = gs.selfIndex !== undefined ? gs.selfIndex : -1;
+  state.missions = gs.missions || [];
+  state.currentRound = gs.currentRound || 0;
+  state.winner = gs.winner || null;
+  state.tendencies = gs.tendencies || {};
+  state.identityMarks = gs.identityMarks || [];
+  state.assassinTarget = gs.assassinTarget || null;
+  state._assassinSuccess = gs.assassinSuccess || null;
+  state.assassinFromMission = gs.assassinFromMission || false;
+  state.assassinMode = gs.assassinMode || false;
+  state._assassinAfterRound = gs._assassinAfterRound !== undefined ? gs._assassinAfterRound : null;
+  state.ladyOfLakeEnabled = gs.ladyOfLakeEnabled || false;
+  state.ladyLakeHolder = gs.ladyLakeHolder !== undefined ? gs.ladyLakeHolder : -1;
+  state.ladyLakeChecks = gs.ladyLakeChecks || [];
+  state.ladyCheckHistory = gs.ladyCheckHistory || [];
+  state.roundTendencies = gs.roundTendencies || [];
+  state.lancelotFlipped = gs.lancelotFlipped || false;
+  state.lancelotDeck = gs.lancelotDeck || null;
+  state.lancelotDrawResults = gs.lancelotDrawResults || [];
+  state.lancelotFlipCount = gs.lancelotFlipCount || 0;
+  state.lancelotRoundFlips = gs.lancelotRoundFlips || [];
+  state.timerMode = gs.timerMode || 'per';
+  state.timerSeconds = gs.timerDuration || 60;
+  state.timerRemaining = gs.timerRemaining || 0;
+  state._firstLeaderPicked = gs._firstLeaderPicked || false;
+  state._lastLeaderIdx = gs._lastLeaderIdx !== undefined ? gs._lastLeaderIdx : -1;
+  state.consecutiveRejects = gs.consecutiveRejects || {};
+  // 确保 internal 字段存在
+  if (!state.identityMarks) state.identityMarks = [];
+  if (!state.roundTendencies) state.roundTendencies = [];
+  if (!state.ladyCheckHistory) state.ladyCheckHistory = [];
+}
+
+// 初始化游戏房间：检查是否有活跃房间，没有则创建（成为host），有则加入（成为viewer）
+function initGameSession(sb, callback) {
+  _deviceId = generateDeviceId();
+
+  sb.from('game_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1).then(function(res) {
+    if (res.error) {
+      console.warn('[Multiplayer] check session failed:', res.error);
+      _isHost = true;
+      _isViewer = false;
+      callback('host');
+      return;
+    }
+
+    if (!res.data || res.data.length === 0) {
+      // 无活跃房间 → 创建新房间，成为房主
+      _isHost = true;
+      _isViewer = false;
+      var initState = serializeGameState();
+      sb.from('game_sessions').insert({
+        host_id: _deviceId,
+        game_state: initState,
+        status: 'waiting'
+      }).select('id').single().then(function(r2) {
+        if (r2.error) {
+          console.warn('[Multiplayer] create session failed:', r2.error);
+          toast('创建房间失败，使用单机模式', 'warn');
+        } else {
+          _gameSessionId = r2.data.id;
+          toast('你是房主 — 创建了新房间', 'success');
+        }
+        callback('host');
+      });
+    } else {
+      // 已有活跃房间 → 成为围观者
+      _isHost = false;
+      _isViewer = true;
+      _gameSessionId = res.data[0].id;
+      var gs = res.data[0].game_state;
+      if (gs && gs.playerCount) {
+        deserializeGameState(gs);
+      }
+      toast('已加入房间，当前为围观模式', 'success');
+      watchGameSession(sb);
+      showPage('game');
+      callback('viewer');
+    }
+  });
+}
+
+// 房主：将完整 state 写入 Supabase
+function syncGameState() {
+  if (!_isHost || !_gameSessionId) return;
+  var sb = getSupabase();
+  if (!sb) return;
+  var gs = serializeGameState();
+  sb.from('game_sessions').update({
+    game_state: gs,
+    status: state.winner ? 'finished' : 'active',
+    updated_at: new Date().toISOString()
+  }).eq('id', _gameSessionId).then(function(r) {
+    if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
+  });
+}
+
+// 围观者：订阅 Supabase Realtime 更新
+function watchGameSession(sb) {
+  if (_gameSessionChannel) return;
+  _gameSessionChannel = sb.channel('game-session-' + _gameSessionId);
+
+  _gameSessionChannel.on(
+    'postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
+    function(payload) {
+      var gs = payload.new.game_state;
+      if (!gs) return;
+      // 检查房间是否被强制重启（status变为waiting且game_state清空）
+      if (payload.new.status === 'waiting' && (!gs.playerCount || gs.playerCount === 0)) {
+        _isViewer = false;
+        _isHost = false;
+        _gameSessionId = null;
+        toast('房间已被房主重置，请重新进入', 'warn');
+        showPage('setup');
+        return;
+      }
+      deserializeGameState(gs);
+      // 重新渲染当前页面
+      if (state._currentPage === 'game') {
+        renderGame();
+        applyViewerMode();
+      } else if (state._currentPage === 'end') {
+        renderEnd();
+      } else if (state._currentPage === 'tend') {
+        renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend();
+        renderIdentitySimGrid(); renderDeduction();
+      } else if (state._currentPage === 'stats') {
+        renderStats();
+      }
+    }
+  );
+
+  // 订阅 DELETE 事件（房间被强制重启）
+  _gameSessionChannel.on(
+    'postgres_changes',
+    { event: 'DELETE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
+    function() {
+      _isViewer = false;
+      _isHost = false;
+      _gameSessionId = null;
+      toast('房间已关闭', 'warn');
+      showPage('setup');
+    }
+  );
+
+  _gameSessionChannel.subscribe(function(status) {
+    console.log('[Multiplayer] channel status:', status);
+  });
+}
+
+// iPad 强制重启：清除房间
+function forceRestartSession() {
+  if (!isIPad()) return;
+  var sb = getSupabase();
+  if (!sb || !_gameSessionId) return;
+  showModal(
+    '<h2>强制重启</h2>' +
+    '<p>将清除当前游戏房间，所有玩家回到等待状态。确定？</p>' +
+    '<div class="modal-actions">' +
+    '<button class="btn danger" onclick="confirmForceRestart()">确认重启</button>' +
+    '<button class="btn" onclick="closeModal()">取消</button>' +
+    '</div>'
+  );
+}
+
+function confirmForceRestart() {
+  closeModal();
+  var sb = getSupabase();
+  if (!sb || !_gameSessionId) return;
+  sb.from('game_sessions').update({
+    game_state: serializeGameState(),
+    status: 'waiting'
+  }).eq('id', _gameSessionId).then(function(r) {
+    if (r.error) {
+      toast('强制重启失败: ' + r.error.message, 'warn');
+      return;
+    }
+    // 然后删除该记录触发所有设备重置
+    sb.from('game_sessions').delete().eq('id', _gameSessionId).then(function(r2) {
+      if (r2.error) {
+        // 删除失败，用 status=waiting 触发重置
+        toast('房间已重置，等待新房主', 'success');
+      } else {
+        toast('房间已关闭，所有玩家回到等待状态', 'success');
+      }
+      _isHost = false;
+      _isViewer = false;
+      _gameSessionId = null;
+      if (_gameSessionChannel) {
+        _gameSessionChannel.unsubscribe();
+        _gameSessionChannel = null;
+      }
+      initState(state.playerCount || 7);
+      showPage('setup');
+    });
+  });
+}
+
+// 更新多人状态栏：显示host/viewer/iPad按钮
+function updateMultiplayerStatusBar() {
+  var bar = document.getElementById('multiplayer-status-bar');
+  if (!bar) return;
+  var h = '';
+  if (_isHost) {
+    h += '<span class="mp-badge host">房主</span>';
+    if (isIPad()) {
+      h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:8px">强制重启</button>';
+    }
+  } else if (_isViewer) {
+    h += '<span class="mp-badge viewer">围观中</span>';
+    h += '<span style="margin-left:8px;color:var(--text-dim);font-size:13px">等待房主操作...</span>';
+  }
+  bar.innerHTML = h;
+  bar.style.display = (_isHost || _isViewer) ? 'flex' : 'none';
+}
+
+// 围观模式下禁用所有操作控件
+function applyViewerMode() {
+  if (!_isViewer) return;
+  // 禁用游戏页所有按钮（除了导航）
+  var gamePage = document.getElementById('page-game');
+  if (!gamePage) return;
+  var btns = gamePage.querySelectorAll('button:not(.nav-btn)');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].disabled = true;
+    btns[i].classList.add('viewer-disabled');
+  }
+  // 禁用 select 和 input
+  var inputs = gamePage.querySelectorAll('select, input');
+  for (var j = 0; j < inputs.length; j++) {
+    inputs[j].disabled = true;
+  }
+  // 隐藏倾向页的操作控件
+  var tendPage = document.getElementById('page-tend');
+  if (tendPage) {
+    var tendBtns = tendPage.querySelectorAll('button:not(.nav-btn)');
+    for (var k = 0; k < tendBtns.length; k++) {
+      tendBtns[k].disabled = true;
+      tendBtns[k].classList.add('viewer-disabled');
+    }
+    var tendInputs = tendPage.querySelectorAll('select, input');
+    for (var m = 0; m < tendInputs.length; m++) {
+      tendInputs[m].disabled = true;
+    }
+  }
+  // 结束页禁用操作
+  var endPage = document.getElementById('page-end');
+  if (endPage) {
+    var endBtns = endPage.querySelectorAll('button:not(.nav-btn)');
+    for (var n = 0; n < endBtns.length; n++) {
+      endBtns[n].disabled = true;
+      endBtns[n].classList.add('viewer-disabled');
+    }
+  }
+}
+
 /* ==================== INIT ==================== */
 (function() {
+  generateDeviceId();
   recordVisitor();
   // 建立 Supabase Realtime 订阅（跨设备实时同步）
   setupRealtimeSubscriptions();

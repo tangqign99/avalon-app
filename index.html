@@ -71,6 +71,7 @@
 </section>
 
 <section class="page" id="page-game">
+  <div id="multiplayer-status-bar" style="display:none;align-items:center;justify-content:flex-end;padding:6px 12px;margin-bottom:4px;border-radius:var(--radius-sm);font-size:13px;font-weight:600"></div>
   <div class="round-tracker" id="round-tracker"></div>
   <div class="lancelot-flip-tracker" id="lancelot-flip-tracker" style="display:none"></div>
   <div id="launch-fail-area"></div>
@@ -222,10 +223,10 @@
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
   <div class="card">
-    <h2>胜率排行榜</h2>
+    <h2>今日胜率排行榜</h2>
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
   </div>
-  <div class="card">
+  <div class="card" style="display:none">
     <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开）</span></h2>
     <div class="btn-row" id="player-stat-btns"></div>
     <div id="player-stat-detail"></div>
@@ -256,9 +257,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=37',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=41',{scope:'./'});
   }).then(function(r){
-    console.log('SW v37 registered:',r.scope);
+    console.log('SW v41 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
