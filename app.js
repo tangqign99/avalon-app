@@ -407,7 +407,7 @@ function renderLancelotFlipTracker() {
       if (drew) {
         drawInfo = '<div class="lancelot-draw-label flip-label"><img src="images/兰斯洛特转移.png?v=3" style="width:16px;height:16px;border-radius:50%;vertical-align:middle"> 反转</div>';
       } else {
-        drawInfo = '<div class="lancelot-draw-label blank-label">&#9711; 空白</div>';
+        drawInfo = '<div class="lancelot-draw-label blank-label">&#9711; 未反转</div>';
       }
     } else if (i > state.currentRound) {
       cls += ' future';
@@ -2261,7 +2261,7 @@ function showLancelotDrawToast(card, round) {
     : '<div style="width:100px;height:100px;margin:12px auto;border-radius:50%;background:rgba(150,150,150,0.2);border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:42px;color:#aaa;animation:lancelot-draw-reveal 0.6s ease-out">&#9675;</div>';
   var msg = isFlip
     ? '<span style="color:var(--red-bright);font-weight:700">反转卡！阵营反转</span>'
-    : '<span style="color:var(--text-dim)">空白卡，无变化</span>';
+    : '<span style="color:var(--text-dim)">未反转，无变化</span>';
   var statusNote = isFlip
     ? (state.lancelotFlipped ? '（当前状态：已反转）' : '（第2次翻转，恢复原阵营）')
     : '';
