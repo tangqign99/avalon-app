@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>阿瓦隆辅�?/title>
+<title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -14,7 +14,7 @@
 <body>
 
 <header>
-  <h1>阿瓦�?/h1>
+  <h1>阿瓦隆</h1>
   <div class="nav-btns">
     <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
     <button id="nav-game" onclick="showPage('game')">游戏</button>
@@ -32,7 +32,7 @@
     <div class="count-grid" id="count-grid"></div>
   </div>
   <div class="card">
-    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择�?/span></h2>
+    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择）</span></h2>
     <div id="player-names"></div>
   </div>
   <div class="card">
@@ -40,14 +40,14 @@
     <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
   </div>
   <div class="card">
-    <h2 style="text-align:center">可选规�?/h2>
+    <h2 style="text-align:center">可选规则</h2>
     <div style="display:flex;justify-content:center"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button></div>
     <div class="timer-setup" id="timer-setup">
       <h3>计时模式</h3>
       <div class="timer-mode-row">
         <button class="timer-mode-btn" id="timer-mode-off" onclick="setTimerMode('off')">关闭计时</button>
         <button class="timer-mode-btn" id="timer-mode-all" onclick="setTimerMode('all')">全体发言 5 分钟</button>
-        <button class="timer-mode-btn selected" id="timer-mode-per" onclick="setTimerMode('per')">每人发言 X �?/button>
+        <button class="timer-mode-btn selected" id="timer-mode-per" onclick="setTimerMode('per')">每人发言 X 秒</button>
       </div>
       <div class="timer-options-row" id="timer-options">
         <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">每人</span>
@@ -58,15 +58,15 @@
         <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
           style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
           onchange="setTimerSecondsInput()" onfocus="this.select()">
-        <span style="color:var(--text-dim);font-size:13px">�?/span>
+        <span style="color:var(--text-dim);font-size:13px">秒</span>
       </div>
     </div>
   </div>
   <div class="card" style="text-align:center">
     <p style="color:var(--text-dim);font-size:14px;margin-bottom:8px">
-      任务轮次�?span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
+      任务轮次：<span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
     </p>
-    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游�?/button>
+    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游戏</button>
   </div>
 </section>
 
@@ -108,9 +108,9 @@
 
 <section class="page" id="page-tend">
   <div class="card">
-    <h2>倾向值面�?/h2>
+    <h2>倾向值面板</h2>
     <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
-      从「我」的视角评估其他玩家。绿�?0 �?0-59 �?lt;40。初�?0�?
+      从「我」的视角评估其他玩家。绿≥60 黄40-59 红&lt;40。初始50。
     </p>
     <div id="tendency-full"></div>
   </div>
@@ -125,7 +125,7 @@
   </div>
   <div class="card" id="identity-sim-card">
     <h2>身份模拟推演</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">为每位玩家假设身份，校验是否与已有线索矛�?/p>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">为每位玩家假设身份，校验是否与已有线索矛盾</p>
     <div id="identity-sim-grid"></div>
     <div style="text-align:center;margin-top:10px">
       <button class="btn primary" onclick="runIdentitySimulation()">校验</button>
@@ -144,10 +144,10 @@
   <div class="card" style="margin-top:8px">
     <h3>推演说明</h3>
     <p style="font-size:12px;color:var(--text-dim);line-height:1.6">
-      好人/坏人概率 = 50% 基础�?+ 投票倾向偏差 + 身份标记加成 + 历史数据<br>
-      梅林概率 = 投票同步率（与已知好人同步投票的概率�? 历史梅林对局中投票吻合度<br>
-      概率受当前倾向值、身份预测标记、历史对局数据综合影响�?br>
-      ★我 = 标记当前用户（阿弟）自身位置�?
+      好人/坏人概率 = 50% 基础值 + 投票倾向偏差 + 身份标记加成 + 历史数据<br>
+      梅林概率 = 投票同步率（与已知好人同步投票的概率）+ 历史梅林对局中投票吻合度<br>
+      概率受当前倾向值、身份预测标记、历史对局数据综合影响。<br>
+      ★我 = 标记当前用户（阿弟）自身位置。
     </p>
   </div>
 </section>
@@ -157,11 +157,11 @@
     <h2>刺客刺杀环节</h2>
     <div id="end-assassin-pick-area"></div>
     <div id="end-assassin-resolve-area" style="display:none">
-      <p style="font-size:14px;margin-bottom:8px">刺杀目标�?strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
+      <p style="font-size:14px;margin-bottom:8px">刺杀目标：<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
       <p style="font-size:14px;margin-bottom:10px">刺杀目标是不是梅林？</p>
       <div class="winner-toggle">
-        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅�?�?反方�?/button>
-        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 �?好人方胜</button>
+        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅林 → 反方胜</button>
+        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
       </div>
     </div>
   </div>
@@ -173,11 +173,11 @@
 
   <div class="card">
     <h2>游戏结束</h2>
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果�?span id="end-round-summary" style="color:var(--gold-light)"></span></p>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果：<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
     <div class="winner-toggle" id="winner-toggle"></div>
   </div>
   <div class="card">
-    <h2>记录身份 <span style="font-size:12px;color:var(--text-dim)">（游戏后填入各人真实身份�?/span></h2>
+    <h2>记录身份 <span style="font-size:12px;color:var(--text-dim)">（游戏后填入各人真实身份）</span></h2>
     <div id="end-identity-grid"></div>
   </div>
   <div style="text-align:center">
@@ -191,26 +191,26 @@
     <div class="stat-grid" id="stats-overview"></div>
   </div>
   <div class="card">
-    <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情�?/span></h2>
+    <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情）</span></h2>
     <div class="history-filter-bar" id="history-filter-bar">
       <div class="filter-row">
         <label class="filter-label">日期</label>
         <input type="date" class="filter-input" id="filter-date-from" onchange="applyHistoryFilter()" title="起始日期">
-        <span class="filter-sep">�?/span>
+        <span class="filter-sep">至</span>
         <input type="date" class="filter-input" id="filter-date-to" onchange="applyHistoryFilter()" title="结束日期">
       </div>
       <div class="filter-row">
         <label class="filter-label">胜负</label>
         <select class="filter-select" id="filter-winner" onchange="applyHistoryFilter()">
           <option value="">全部</option>
-          <option value="good">好人�?/option>
-          <option value="evil">反方�?/option>
+          <option value="good">好人胜</option>
+          <option value="evil">反方胜</option>
         </select>
         <label class="filter-label">玩家</label>
         <select class="filter-select" id="filter-player" onchange="applyHistoryFilter()">
           <option value="">全部</option>
         </select>
-        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛�?>清除</button>
+        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛选">清除</button>
       </div>
     </div>
     <div id="history-compact-list" class="history-compact-list"></div>
@@ -222,23 +222,23 @@
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
   <div class="card">
-    <h2>胜率排行�?/h2>
+    <h2>胜率排行榜</h2>
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
   </div>
   <div class="card">
-    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开�?/span></h2>
+    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开）</span></h2>
     <div class="btn-row" id="player-stat-btns"></div>
     <div id="player-stat-detail"></div>
   </div>
   <div class="card">
-    <h2>添加新玩�?/h2>
+    <h2>添加新玩家</h2>
     <div class="add-name-row">
-      <input class="add-name-input" id="add-name-input" placeholder="输入新名字�? maxlength="10">
+      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
       <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
     </div>
   </div>
   <div style="text-align:center">
-    <button class="btn danger small" onclick="clearStats()">清除所有统�?/button>
+    <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
   </div>
 </section>
 
@@ -252,13 +252,13 @@
 
 <script>
 if('serviceWorker' in navigator){
-  // 先强制注销所有旧SW，再注册新版�?
+  // 先强制注销所有旧SW，再注册新版本
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=38',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=37',{scope:'./'});
   }).then(function(r){
-    console.log('SW v38 registered:',r.scope);
+    console.log('SW v37 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
