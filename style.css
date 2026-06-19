@@ -1020,30 +1020,35 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   50% { opacity: 1; }
 }
 
-/* Name pool action buttons */
-.name-pool-btn {
-  display: inline-flex;
+/* Name pool management in stats page */
+.name-pool-item {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--border);
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
-  background: var(--bg-card);
-  color: var(--text-dim);
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
+  background: var(--parchment);
+  border: 1px solid rgba(201,168,76,0.1);
+  margin-bottom: 5px;
+  transition: border-color 0.2s;
 }
-.name-pool-delete:hover {
-  background: rgba(255,80,80,0.15);
-  color: var(--red-bright);
-  border-color: rgba(255,80,80,0.4);
+.name-pool-item:hover {
+  border-color: rgba(201,168,76,0.3);
 }
-.name-pool-edit:hover {
-  background: rgba(201,168,76,0.15);
-  color: var(--gold-light);
-  border-color: rgba(201,168,76,0.4);
+.name-pool-item .np-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
 }
+.name-pool-item .np-edit-btn {
+  font-size: 12px;
+  padding: 5px 10px;
+  min-height: 32px;
+}
+.name-pool-item .np-del-btn {
+  font-size: 12px;
+  padding: 5px 10px;
+  min-height: 32px;
+}
+

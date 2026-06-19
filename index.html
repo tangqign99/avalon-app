@@ -232,11 +232,12 @@
     <div id="player-stat-detail"></div>
   </div>
   <div class="card">
-    <h2>添加新玩家</h2>
+    <h2>玩家姓名管理</h2>
     <div class="add-name-row">
       <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
-      <button class="btn" onclick="addNameToPool()" style="min-width:80px">+ 添加</button>
+      <button class="btn" onclick="addNameToPool()" style="min-width:80px">新增</button>
     </div>
+    <div id="name-pool-list" style="margin-top:10px"></div>
   </div>
   <div style="text-align:center">
     <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
@@ -257,9 +258,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=41',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=42',{scope:'./'});
   }).then(function(r){
-    console.log('SW v41 registered:',r.scope);
+    console.log('SW v42 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });

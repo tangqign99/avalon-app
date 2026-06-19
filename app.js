@@ -408,9 +408,6 @@ function renderSetup() {
       h += '<option value="' + curName + '" selected>' + curName + '</option>';
     }
     h += '</select>';
-    // Delete and edit buttons for the currently selected name
-    h += '<button class="name-pool-btn name-pool-delete" onclick="event.stopPropagation();deleteNameFromPool(\'' + curName.replace(/'/g, "\\'") + '\')" title="从名字池删除">&times;</button>';
-    h += '<button class="name-pool-btn name-pool-edit" onclick="event.stopPropagation();editNameInPool(\'' + curName.replace(/'/g, "\\'") + '\')" title="修改名字">&#9998;</button>';
     h += '</div>';
   }
   $('player-names').innerHTML = h;
@@ -499,6 +496,7 @@ function addNameToPool() {
   }
   input.value = '';
   renderSetup();
+  renderNamePoolList();
   toast('已添加「' + name + '」');
 }
 
@@ -521,6 +519,7 @@ function deleteNameFromPool(name) {
     }
   }
   renderSetup();
+  renderNamePoolList();
   toast('已删除「' + name + '」');
 }
 
@@ -551,7 +550,27 @@ function editNameInPool(oldName) {
     }
   }
   renderSetup();
+  renderNamePoolList();
   toast('已修改「' + oldName + '」→「' + newName + '」');
+}
+
+function renderNamePoolList() {
+  var el = $('name-pool-list');
+  if (!el) return;
+  if (namePool.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:10px;font-size:13px">暂无玩家姓名</p>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < namePool.length; i++) {
+    var nm = namePool[i];
+    h += '<div class="name-pool-item">';
+    h += '<span class="np-name">' + nm + '</span>';
+    h += '<button class="btn small np-edit-btn" onclick="editNameInPool(\'' + nm.replace(/'/g, "\\'") + '\')" title="修改">&#9998; 编辑</button>';
+    h += '<button class="btn small danger np-del-btn" onclick="deleteNameFromPool(\'' + nm.replace(/'/g, "\\'") + '\')" title="删除">&times; 删除</button>';
+    h += '</div>';
+  }
+  el.innerHTML = h;
 }
 
 function toggleLadyOfLake() {
@@ -3229,6 +3248,7 @@ function renderStats() {
   } else {
     renderVisitorLog();
   }
+  renderNamePoolList();
 }
 
 function toggleLeaderboard() {
