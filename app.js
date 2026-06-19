@@ -2228,19 +2228,110 @@ function applyLancelotAutoDraw(round) {
     renderGame();
     return;
   }
-  var card = state.lancelotDeck.shift(); // true=反转卡, false=空白卡
+
+  // Count available cards
+  var flipCount = 0, blankCount = 0;
+  for (var i = 0; i < state.lancelotDeck.length; i++) {
+    if (state.lancelotDeck[i]) flipCount++;
+    else blankCount++;
+  }
+  var remaining = state.lancelotDeck.length;
+
+  // Mode selection modal
+  var modeHtml = '<h2>兰斯洛特抽卡 · 第 ' + (round + 1) + ' 轮结束</h2>' +
+    '<p style="font-size:14px;text-align:center;color:var(--text-dim);margin:8px 0">剩余牌堆：' + remaining + ' 张（反转 ' + flipCount + ' / 未反转 ' + blankCount + '）</p>' +
+    '<div class="modal-actions" style="justify-content:center;gap:20px">' +
+    '<button class="btn primary" id="lancelot-auto-draw-btn">自动抽卡</button>' +
+    '<button class="btn" id="lancelot-manual-draw-btn">手动录入</button>' +
+    '</div>';
+
+  showModal(modeHtml);
+
+  document.getElementById('lancelot-auto-draw-btn').addEventListener('click', function() {
+    closeModal();
+    lancelotDoAutoDraw(round);
+  });
+
+  document.getElementById('lancelot-manual-draw-btn').addEventListener('click', function() {
+    closeModal();
+    lancelotShowManualModal(round);
+  });
+}
+
+function lancelotDoAutoDraw(round) {
+  var card = state.lancelotDeck.shift();
   if (state.lancelotDrawResults.length <= round) {
     for (var i = state.lancelotDrawResults.length; i <= round; i++) state.lancelotDrawResults.push(null);
   }
   state.lancelotDrawResults[round] = card;
-
   if (card) {
     state.lancelotFlipCount++;
     state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
     state.lancelotRoundFlips[round] = true;
   }
-
   showLancelotDrawToast(card, round);
+  checkGameEnd();
+  renderGame();
+}
+
+function lancelotShowManualModal(round) {
+  // Re-count in case of edge cases
+  var flipCount = 0, blankCount = 0;
+  for (var i = 0; i < state.lancelotDeck.length; i++) {
+    if (state.lancelotDeck[i]) flipCount++;
+    else blankCount++;
+  }
+
+  var flipDisabled = flipCount === 0 ? ' disabled style="opacity:0.35;cursor:not-allowed"' : '';
+  var blankDisabled = blankCount === 0 ? ' disabled style="opacity:0.35;cursor:not-allowed"' : '';
+
+  var flipCard = '<div style="width:72px;height:72px;margin:0 auto 6px;border-radius:50%;overflow:hidden;border:2px solid #ff3030"><img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover"></div>';
+  var blankCard = '<div style="width:72px;height:72px;margin:0 auto 6px;border-radius:50%;background:rgba(150,150,150,0.2);border:2px solid #777;display:flex;align-items:center;justify-content:center;font-size:36px;color:#aaa">&#9675;</div>';
+
+  var html = '<h2>手动录入 · 第 ' + (round + 1) + ' 轮结束</h2>' +
+    '<p style="font-size:13px;text-align:center;color:var(--text-dim);margin:6px 0">请选择实际抽到的卡牌</p>' +
+    '<div class="modal-actions" style="justify-content:center;gap:20px;flex-wrap:wrap">' +
+    '<button class="btn" id="lancelot-manual-flip"' + flipDisabled + '>' + flipCard + '<span style="font-weight:700;color:var(--red-bright)">反转</span>' + (flipCount === 0 ? '<br><span style="font-size:10px;color:var(--text-dim)">已抽完</span>' : '') + '</button>' +
+    '<button class="btn" id="lancelot-manual-blank"' + blankDisabled + '>' + blankCard + '<span>未反转</span>' + (blankCount === 0 ? '<br><span style="font-size:10px;color:var(--text-dim)">已抽完</span>' : '') + '</button>' +
+    '</div>' +
+    '<div class="modal-actions" style="margin-top:6px"><button class="btn" onclick="closeModal();applyLancelotAutoDraw(' + round + ')" style="font-size:12px">← 返回选择模式</button></div>';
+
+  showModal(html);
+
+  if (flipCount > 0) {
+    document.getElementById('lancelot-manual-flip').addEventListener('click', function() {
+      closeModal();
+      lancelotDoManualDraw(round, true);
+    });
+  }
+  if (blankCount > 0) {
+    document.getElementById('lancelot-manual-blank').addEventListener('click', function() {
+      closeModal();
+      lancelotDoManualDraw(round, false);
+    });
+  }
+}
+
+function lancelotDoManualDraw(round, isFlip) {
+  var idx = -1;
+  for (var i = 0; i < state.lancelotDeck.length; i++) {
+    if (state.lancelotDeck[i] === isFlip) { idx = i; break; }
+  }
+  if (idx === -1) return; // Safety guard
+  state.lancelotDeck.splice(idx, 1);
+
+  if (state.lancelotDrawResults.length <= round) {
+    for (var i = state.lancelotDrawResults.length; i <= round; i++) state.lancelotDrawResults.push(null);
+  }
+  state.lancelotDrawResults[round] = isFlip;
+
+  if (isFlip) {
+    state.lancelotFlipCount++;
+    state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+    state.lancelotRoundFlips[round] = true;
+  }
+
+  showLancelotDrawToast(isFlip, round);
   checkGameEnd();
   renderGame();
 }
