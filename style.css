@@ -200,9 +200,11 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   box-shadow:0 0 24px rgba(201,168,76,0.5),inset 0 1px 0 rgba(255,255,255,0.08);
   text-shadow:0 0 8px rgba(232,212,139,0.5);
 }
-.faction-header{grid-column:1/-1;font-weight:700;font-size:29px;padding:8px 20px;border-radius:var(--radius);margin-top:4px}
-.faction-header.good{background:rgba(102,153,255,0.2);color:#99bbff}
-.faction-header.evil{background:rgba(255,102,102,0.15);color:#ff9999}
+.role-horizontal{display:flex;flex-direction:column;gap:24px}
+.role-group{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:space-evenly}
+.faction-label{font-weight:700;font-size:14px;padding:4px 12px;border-radius:var(--radius-sm);margin-right:4px}
+.faction-label.good{background:rgba(102,153,255,0.2);color:#99bbff}
+.faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
 /* 兰斯洛特反转圆圈 */
 .lancelot-flip-tracker{display:flex;gap:14px;justify-content:center;padding:2px 0 6px;align-items:flex-start;flex-wrap:wrap}
 .lancelot-flip-col{display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -674,7 +676,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 @media(max-width:480px){
   .role-checkbox-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
   .role-checkbox-grid label{font-size:16px;padding:10px 14px;min-height:44px}
-  .faction-header{font-size:22px;padding:6px 14px}
+  .role-group{flex-wrap:wrap;gap:6px}
+  .role-horizontal{gap:18px}
+  .faction-label{font-size:13px;padding:3px 10px}
   .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px;max-width:100%}
 }
 @media(min-width:481px) and (max-width:1024px){
