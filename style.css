@@ -544,7 +544,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .review-card .rc-header .rc-title{font-size:15px;font-weight:700;color:var(--gold-light)}
 .review-card .rc-header .rc-toggle{font-size:18px;color:var(--gold);transition:transform 0.2s}
 .review-card .rc-header .rc-toggle.open{transform:rotate(90deg)}
-.review-card .rc-body{display:none;padding:12px 14px;background:rgba(0,0,0,0.2);font-size:13px}
+.review-card .rc-body{display:none;padding:12px 14px;background:rgba(0,0,0,0.2);font-size:15px}
 .review-card .rc-body.open{display:block}
 .rc-vote-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
 .rc-vote-table th,.rc-vote-table td{padding:4px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06)}
@@ -564,7 +564,12 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .vote-row-reject .vote-col-title{color:var(--red-bright)}
 .vote-col-empty{font-size:11px;color:var(--text-dim);text-align:center;font-style:italic}
 .rc-launch-attempts{margin-top:8px;font-size:12px;color:var(--text-dim)}
-.rc-launch-attempts .launch-item{border:1px solid rgba(201,168,76,0.25);background:rgba(201,168,76,0.06);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px}
+.rc-launch-attempts .launch-item{border:1px solid rgba(201,168,76,0.25);background:rgba(201,168,76,0.06);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px;text-align:center;font-size:15px}
+.launch-item strong{font-size:16px}
+.launch-leader{color:var(--gold-light);font-weight:700;font-size:16px}
+.launch-member{display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.08);color:var(--text);font-size:14px;margin:0 1px}
+.launch-first{border-color:var(--gold-light)!important;box-shadow:0 0 14px rgba(201,168,76,0.45),inset 0 0 20px rgba(201,168,76,0.06);animation:launch-glow 2s ease-in-out infinite}
+@keyframes launch-glow{0%,100%{box-shadow:0 0 14px rgba(201,168,76,0.45),inset 0 0 20px rgba(201,168,76,0.06)}50%{box-shadow:0 0 28px rgba(201,168,76,0.7),inset 0 0 30px rgba(201,168,76,0.12)}}
 
 /* ===== 五、统计显示优�?===== */
 .merlin-assassin-card{

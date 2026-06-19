@@ -1679,14 +1679,6 @@ function buildReviewHTML() {
     h += '</div>';
     h += '<div class="rc-body">';
 
-    if (m.leader !== null) {
-      h += '<div style="margin-bottom:4px"><strong>队长：</strong>' + playerLabel(m.leader) + '</div>';
-    }
-
-    if (m.team.length > 0) {
-      h += '<div style="margin-bottom:4px"><strong>队伍：</strong>' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</div>';
-    }
-
     // Show all launch attempts
     var attempts = m.launchAttempts || [];
     if (attempts.length > 0) {
@@ -1696,9 +1688,12 @@ function buildReviewHTML() {
         for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
         var launched = attApproves > Math.floor(pc / 2);
 
-        h += '<div class="launch-item">';
+        var firstClass = (a === 0) ? ' launch-first' : '';
+        h += '<div class="launch-item' + firstClass + '">';
         h += '<strong>第' + (a + 1) + '次组队</strong> ';
-        h += '(队长 ' + playerLabel(att.leader) + ', 队伍 ' + att.team.map(function(i) { return playerLabel(i); }).join('、') + ')';
+        h += '<span class="launch-leader">' + playerLabel(att.leader) + '</span>';
+        h += ' <span style="color:var(--text-dim)">带队：</span>';
+        h += att.team.map(function(i) { return '<span class="launch-member">' + playerLabel(i) + '</span>'; }).join(' ');
         h += ' | 赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves);
         h += launched ? ' <span style="color:var(--green-bright)">发车</span>' : ' <span style="color:var(--red-bright)">否决</span>';
 
