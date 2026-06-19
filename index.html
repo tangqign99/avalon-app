@@ -268,9 +268,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=35',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=36',{scope:'./'});
   }).then(function(r){
-    console.log('SW v35 registered:',r.scope);
+    console.log('SW v36 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });

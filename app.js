@@ -12,6 +12,8 @@ var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客
 var SUPABASE_URL = 'https://nzbpopxrxniixnhnqktw.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56YnBvcHhyeG5paXhuaG5xa3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODQ2MzQsImV4cCI6MjA5NzQ2MDYzNH0.wLk-FdQlKha8YObTvgINW2M_9QVSpJk8c91bKJeQO7Q';
 var _supabase = null;
+var _supabaseConnected = false;
+var _supabaseChannel = null;
 function getSupabase() {
   if (!_supabase && typeof supabase !== 'undefined') {
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -338,6 +340,7 @@ function setActiveNav(page) {
   if (btn) btn.classList.add('active');
 }
 function showPage(page) {
+  state._currentPage = page;
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   var pg = document.getElementById('page-' + page);
   if (pg) pg.classList.add('active');
@@ -2795,9 +2798,8 @@ function saveGameRecord() {
   };
   history.push(record);
   saveHistory(history);
-  toast('对局记录已保存');
 
-  // Supabase: 保存对局记录到云端
+  // Supabase: 静默保存对局记录到云端（实时订阅会自动通知其他设备）
   var sb = getSupabase();
   if (sb) {
     sb.from('game_records').insert({ game_data: record }).then(function(res) {
@@ -2831,6 +2833,7 @@ function saveGameRecord() {
 
 /* ==================== STATS PANEL ==================== */
 function renderStats() {
+  renderConnectionStatus();
   var history = loadHistory();
   var total = history.length;
   var goodWins = history.filter(function(h) { return h.winner === 'good'; }).length;
@@ -3796,6 +3799,96 @@ function syncFromCloud() {
   });
 }
 
+// Supabase Realtime 订阅：跨设备实时同步
+function setupRealtimeSubscriptions() {
+  if (_supabaseChannel) return; // 避免重复订阅
+  var sb = getSupabase();
+  if (!sb) return;
+
+  _supabaseChannel = sb.channel('game-records-channel');
+
+  // 订阅 game_records 的 INSERT 事件
+  _supabaseChannel.on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'game_records' },
+    function(payload) {
+      console.log('[Realtime] new game_record inserted:', payload.new.id);
+      try {
+        var newRecord = payload.new.game_data;
+        if (!newRecord) return;
+        var localHistory = loadHistory();
+        var merged = mergeHistories(localHistory, [newRecord]);
+        saveHistory(merged);
+        console.log('[Realtime] merged new record, total:', merged.length);
+        // 当前在 stats 页面则刷新
+        if (state._currentPage === 'stats') {
+          renderStats();
+        }
+      } catch(e) {
+        console.warn('[Realtime] failed to process game_record:', e);
+      }
+    }
+  );
+
+  // 订阅 key_value 的 UPDATE 事件（name_pool）
+  _supabaseChannel.on(
+    'postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'key_value', filter: 'key=eq.name_pool' },
+    function(payload) {
+      console.log('[Realtime] name_pool updated:', payload.new.value);
+      try {
+        var cloudPool = payload.new.value;
+        if (!cloudPool) return;
+        var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
+        var mergedPool = localPool.slice();
+        for (var i = 0; i < cloudPool.length; i++) {
+          if (mergedPool.indexOf(cloudPool[i]) === -1) mergedPool.push(cloudPool[i]);
+        }
+        namePool = mergedPool;
+        localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
+        console.log('[Realtime] name_pool synced, total:', mergedPool.length);
+      } catch(e) {
+        console.warn('[Realtime] failed to process name_pool update:', e);
+      }
+    }
+  );
+
+  _supabaseChannel.subscribe(function(status) {
+    console.log('[Realtime] channel status:', status);
+    if (status === 'SUBSCRIBED') {
+      _supabaseConnected = true;
+    } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+      _supabaseConnected = false;
+    }
+    // Update connection indicator if on stats page
+    if (state._currentPage === 'stats') {
+      renderConnectionStatus();
+    }
+  });
+}
+
+function renderConnectionStatus() {
+  var el = document.getElementById('connection-indicator');
+  if (!el) {
+    // 在同步状态卡片中创建连接指示器
+    var syncCard = $('sync-status-content');
+    if (!syncCard) return;
+    el = document.createElement('div');
+    el.id = 'connection-indicator';
+    el.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:14px;font-weight:600';
+    syncCard.parentNode.insertBefore(el, syncCard);
+  }
+  if (_supabaseConnected) {
+    el.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,0.6)"></span> 实时同步已连接';
+    el.style.background = 'rgba(74,222,128,0.08)';
+    el.style.color = '#4ade80';
+  } else {
+    el.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6b7280"></span> 离线';
+    el.style.background = 'rgba(107,114,128,0.1)';
+    el.style.color = '#9ca3af';
+  }
+}
+
 // 合并去重：基于 date + playerCount + identities 生成唯一键
 function mergeHistories(local, cloud) {
   var seen = {};
@@ -3823,6 +3916,8 @@ function makeRecordKey(record) {
 /* ==================== INIT ==================== */
 (function() {
   recordVisitor();
+  // 建立 Supabase Realtime 订阅（跨设备实时同步）
+  setupRealtimeSubscriptions();
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
   var initAudioOnce = function() {
     ensureAudioContext();
