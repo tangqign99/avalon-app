@@ -584,10 +584,11 @@ function renderStepPanel() {
   if (votesConfirmed) {
     h += '<hr style="border-color:var(--border);margin-bottom:10px">';
     h += '<div class="step-label">步骤C：全员投票 <span style="font-size:11px;color:var(--text-dim);font-weight:400">（默认反对，点击切换赞成）</span></div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
     for (var i = 0; i < pc; i++) {
       var v = m.votes[i];
       var onTeam = m.team.indexOf(i) !== -1;
-      h += '<div class="vote-row">';
+      h += '<div class="vote-row" style="width:calc(50% - 4px)">';
       h += '<span class="voter-name">' + playerLabel(i) + '</span>';
       if (onTeam) h += '<span class="on-team">⚔队伍</span>';
       h += '<div class="vote-btns">';
@@ -596,7 +597,8 @@ function renderStepPanel() {
       h += '<div class="vote-btn reject' + (v !== 'approve' ? ' selected' : '') + '" onclick="castVote(' + i + ',\'reject\')">&#128078;</div>';
       h += '</div></div>';
     }
-    h += '<div style="display:flex;justify-content:flex-end;padding-right:8px;margin-top:4px"><button class="btn small success" onclick="allApprove()">全员赞成</button></div>';
+    h += '</div>';
+    h += '<div style="display:flex;justify-content:flex-end;padding-right:8px;margin-top:4px;gap:8px"><button class="btn small success" onclick="allApprove()">全员赞成</button><button class="btn small danger" onclick="allReject()">全员反对</button></div>';
     h += '<div style="text-align:center;margin-top:8px">';
     h += '<button class="btn primary" onclick="confirmVotes()">投票完成</button></div>';
   }
@@ -1857,6 +1859,14 @@ function allApprove() {
   var m = state.missions[state.currentRound];
   for (var i = 0; i < state.playerCount; i++) {
     m.votes[i] = 'approve';
+  }
+  renderStepPanel();
+}
+
+function allReject() {
+  var m = state.missions[state.currentRound];
+  for (var i = 0; i < state.playerCount; i++) {
+    m.votes[i] = 'reject';
   }
   renderStepPanel();
 }

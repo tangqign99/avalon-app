@@ -258,7 +258,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .game-side{width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
 @media(max-width:900px){.game-layout{flex-direction:column}.game-side{width:100%}}
 .step-label{font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;font-family:var(--font-display)}
-.vote-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--parchment);border-radius:var(--radius);margin-bottom:5px;border:1px solid rgba(201,168,76,0.1)}
+.vote-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--parchment);border-radius:var(--radius);margin-bottom:5px;border:1px solid rgba(201,168,76,0.1);box-sizing:border-box}
 .vote-row .voter-name{font-size:15px;font-weight:600;min-width:80px}
 .vote-row .on-team{color:var(--gold);font-size:12px;margin-left:4px}
 .vote-btns{display:flex;gap:8px}
