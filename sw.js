@@ -1,5 +1,5 @@
-/* ==================== Service Worker v23 ==================== */
-var CACHE_NAME = 'avalon-pwa-v23';
+/* ==================== Service Worker v25 ==================== */
+var CACHE_NAME = 'avalon-pwa-v25';
 var ASSETS = [
   './',
   './index.html',

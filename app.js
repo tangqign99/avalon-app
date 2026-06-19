@@ -184,23 +184,18 @@ function renderSetup() {
   }
   $('player-names').innerHTML = h;
 
-  h = '<div class="role-horizontal">';
-  h += '<div class="role-group good-group">';
-  h += '<span class="faction-label good">好人方</span>';
+  h += '<span class="faction-header good">好人方</span>';
   for (var i = 0; i < GOOD_ROLES.length; i++) {
     var r = GOOD_ROLES[i];
     var checked = state.activeRoles.indexOf(r) !== -1;
     h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
   }
-  h += '</div>';
-  h += '<div class="role-group evil-group">';
-  h += '<span class="faction-label evil">反方</span>';
+  h += '<span class="faction-header evil">反方</span>';
   for (var i = 0; i < EVIL_ROLES.length; i++) {
     var r = EVIL_ROLES[i];
     var checked = state.activeRoles.indexOf(r) !== -1;
     h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
   }
-  h += '</div></div>';
   $('role-checkbox-grid').innerHTML = h;
 
   var mc = MISSION_COUNTS[state.playerCount];
