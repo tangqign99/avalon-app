@@ -2797,6 +2797,18 @@ function saveGameRecord() {
   saveHistory(history);
   toast('对局记录已保存');
 
+  // Supabase: 保存对局记录到云端
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('game_records').insert({ game_data: record }).then(function(res) {
+      if (res.error) console.warn('[Supabase] saveGameRecord failed:', res.error);
+    });
+    // 同步 name_pool 到云端
+    sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+      if (res.error) console.warn('[Supabase] save name_pool failed:', res.error);
+    });
+  }
+
   // 自动更新 data.json 以便云端同步
   var syncData = {
     avalon_name_pool: namePool,
@@ -3728,53 +3740,84 @@ function syncFromCloud() {
     syncOk: false,
     cloudGames: 0
   };
-  showModal('<h2>从云端同步</h2><p style="font-size:14px;margin-bottom:10px">正在从 GitHub Pages 拉取最新数据...</p>');
-  fetch('https://tangqign99.github.io/avalon-app/data.json?t=' + Date.now())
-    .then(function(res) {
-      if (!res.ok) {
-        if (res.status === 404) {
-          closeModal();
-          localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
-          toast('云端暂无数据文件。请先在本地保存数据并推送到 GitHub。', 'info');
-          renderSyncStatus();
-          return;
-        }
-        throw new Error('HTTP ' + res.status);
-      }
-      return res.json();
-    })
-    .then(function(data) {
-      if (!data || typeof data !== 'object') {
-        toast('云端数据格式无效', 'warn'); closeModal(); renderSyncStatus(); return;
-      }
-      var validKeys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
-      var synced = 0;
-      var cloudGameCount = 0;
-      for (var i = 0; i < validKeys.length; i++) {
-        var k = validKeys[i];
-        if (k in data) {
-          localStorage.setItem(k, JSON.stringify(data[k]));
-          synced++;
-          if (k === 'avalon_history_v2' && Array.isArray(data[k])) {
-            cloudGameCount = data[k].length;
-          }
-        }
-      }
-      meta.syncOk = true;
-      meta.cloudGames = cloudGameCount;
-      localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
-      if (synced === 0) { toast('云端未找到有效数据', 'warn'); closeModal(); renderSyncStatus(); return; }
-      closeModal();
-      toast('已同步 ' + synced + ' 项数据（云端 ' + cloudGameCount + ' 局）');
-      renderSyncStatus();
-      setTimeout(function() { showPage('stats'); }, 800);
-    })
-    .catch(function(err) {
+  showModal('<h2>从云端同步</h2><p style="font-size:14px;margin-bottom:10px">正在从 Supabase 拉取最新数据...</p>');
+  var sb = getSupabase();
+  if (!sb) {
+    closeModal();
+    toast('Supabase 未初始化，请刷新页面后重试', 'warn');
+    renderSyncStatus();
+    return;
+  }
+
+  // 获取云端对局记录
+  sb.from('game_records').select('*').order('created_at', { ascending: true }).then(function(res) {
+    if (res.error) {
       closeModal();
       localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
-      toast('同步失败：' + err.message, 'warn');
+      toast('同步失败：' + res.error.message, 'warn');
       renderSyncStatus();
-    });
+      return;
+    }
+
+    var cloudRecords = (res.data || []).map(function(r) { return r.game_data; });
+    var localHistory = loadHistory();
+
+    // 合并去重：基于 date + playerCount + identities 匹配
+    var merged = mergeHistories(localHistory, cloudRecords);
+    saveHistory(merged);
+
+    meta.cloudGames = merged.length;
+    meta.syncOk = true;
+    localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
+
+    // 获取云端 name_pool
+    return sb.from('key_value').select('*').eq('key', 'name_pool').maybeSingle();
+  }).then(function(res) {
+    if (res && res.data && res.data.value) {
+      var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
+      var cloudPool = res.data.value;
+      var mergedPool = localPool.slice();
+      for (var i = 0; i < cloudPool.length; i++) {
+        if (mergedPool.indexOf(cloudPool[i]) === -1) mergedPool.push(cloudPool[i]);
+      }
+      namePool = mergedPool;
+      localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
+    }
+
+    closeModal();
+    toast('已同步 ' + meta.cloudGames + ' 条对局记录');
+    renderSyncStatus();
+    setTimeout(function() { showPage('stats'); }, 800);
+  }).catch(function(err) {
+    closeModal();
+    localStorage.setItem('avalon_sync_meta', JSON.stringify(meta));
+    toast('同步失败：' + (err.message || '网络错误'), 'warn');
+    renderSyncStatus();
+  });
+}
+
+// 合并去重：基于 date + playerCount + identities 生成唯一键
+function mergeHistories(local, cloud) {
+  var seen = {};
+  var result = local.slice();
+  for (var i = 0; i < result.length; i++) {
+    var key = makeRecordKey(result[i]);
+    seen[key] = true;
+  }
+  for (var j = 0; j < cloud.length; j++) {
+    var ck = makeRecordKey(cloud[j]);
+    if (!seen[ck]) {
+      result.push(cloud[j]);
+      seen[ck] = true;
+    }
+  }
+  return result;
+}
+
+function makeRecordKey(record) {
+  if (!record || !record.identities) return '';
+  var identityStr = record.identities.map(function(id) { return (id.name || '') + '|' + (id.role || ''); }).sort().join(',');
+  return (record.date || '') + '|' + (record.playerCount || 0) + '|' + identityStr;
 }
 
 /* ==================== INIT ==================== */

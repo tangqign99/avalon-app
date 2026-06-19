@@ -15,3 +15,27 @@ CREATE POLICY "allow_anon_insert" ON visitors FOR INSERT WITH CHECK (true);
 
 -- 允许匿名用户查询
 CREATE POLICY "allow_anon_select" ON visitors FOR SELECT USING (true);
+
+-- ===== 对局记录表 =====
+CREATE TABLE IF NOT EXISTS game_records (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  game_data JSONB NOT NULL
+);
+
+ALTER TABLE game_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_anon_insert" ON game_records FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "allow_anon_select" ON game_records FOR SELECT USING (true);
+
+-- ===== 键值存储表（name_pool 等全局配置）=====
+CREATE TABLE IF NOT EXISTS key_value (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE key_value ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_anon_all" ON key_value FOR ALL USING (true);
