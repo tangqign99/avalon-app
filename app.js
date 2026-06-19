@@ -64,6 +64,7 @@ function initState(n) {
   state.assassinFromMission = false;
   state.assassinMode = false;
   state._assassinPickTarget = null;
+  state._assassinAfterRound = null;
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
   state.lancelotDeck = null;
@@ -356,6 +357,7 @@ function doStartGame() {
   state.assassinFromMission = false;
   state.assassinMode = false;
   state._assassinPickTarget = null;
+  state._assassinAfterRound = null;
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
   state.lancelotFlipCount = 0;
@@ -542,6 +544,7 @@ function confirmAssassinAction() {
 
 function resolveInGameAssassin(isMerlin, targetIdx) {
   closeModal();
+  state._assassinAfterRound = state.currentRound;
   state.assassinTarget = targetIdx;
   state.assassinFromMission = true;
   state.winner = isMerlin ? 'evil' : 'good';
@@ -2192,6 +2195,7 @@ function checkGameEnd() {
   if (successCount >= 3) {
     state.assassinTarget = null;
     state.assassinFromMission = true;
+    state._assassinAfterRound = state.currentRound;
     stopTimer();
     showPage('end');
     return;
@@ -2556,6 +2560,7 @@ function saveGameRecord() {
     roundTendencies: state.roundTendencies || [],
     assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
     assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
+    assassinAfterRound: state._assassinAfterRound !== null ? state._assassinAfterRound : null,
     identityMarks: state.identityMarks.map(function(m) {
       return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
     }),
@@ -2703,7 +2708,11 @@ function renderStats() {
       h += '</div>';
     }
     if (rec.assassinTarget) {
-      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">刺杀：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '成功' : '失败') + '</div>';
+      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">刺杀';
+      if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+        h += '（第' + (rec.assassinAfterRound + 1) + '轮任务后）';
+      }
+      h += '：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '成功' : '失败') + '</div>';
     }
     h += '<div class="hci-actions">';
     h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
@@ -2990,7 +2999,11 @@ function showGameDetail(idx) {
   var h = '<h2>对局详情</h2>';
   h += '<p><strong>日期：</strong>' + rec.date + ' | <strong>人数：</strong>' + rec.playerCount + '人 | <strong>胜方：</strong>' + (rec.winner === 'good' ? '好人方' : '反方') + '</p>';
   if (rec.assassinTarget) {
-    h += '<p><strong>刺杀目标：</strong>' + rec.assassinTarget + ' | <strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">刺杀成功</span>' : '<span style="color:#99ff99">刺杀失败</span>') + '</p>';
+    h += '<p><strong>拍刀：</strong>';
+    if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+      h += '第' + (rec.assassinAfterRound + 1) + '轮任务后反方拍刀 | ';
+    }
+    h += '<strong>目标：</strong>' + rec.assassinTarget + ' | <strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中梅林，反方胜</span>' : '<span style="color:#99ff99">未命中，好人方胜</span>') + '</p>';
   }
   if (rec.activeRoles) {
     h += '<p><strong>使用角色：</strong>' + rec.activeRoles.join('、') + '</p>';
@@ -3008,11 +3021,16 @@ function showGameDetail(idx) {
   }
 
   h += '<h3 style="margin-top:10px">任务记录</h3>';
+  var assassinCutoff = (rec.assassinTarget && rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) ? rec.assassinAfterRound : rec.missions.length;
   for (var i = 0; i < rec.missions.length; i++) {
     var m = rec.missions[i];
     h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
     if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
     h += '</div>';
+    if (i >= assassinCutoff) break;
+  }
+  if (assassinCutoff < rec.missions.length - 1) {
+    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (rec.missions.length - assassinCutoff - 1) + '轮未进行，游戏在拍刀环节终止）</div>';
   }
 
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
@@ -3074,8 +3092,12 @@ function showEditGameRecord(idx) {
   h += '</div>';
 
   if (rec.assassinTarget) {
-    h += '<h3 style="margin-top:8px">刺杀</h3>';
-    h += '<p style="font-size:13px">目标：' + rec.assassinTarget + '</p>';
+    h += '<h3 style="margin-top:8px">拍刀</h3>';
+    h += '<p style="font-size:13px">目标：' + rec.assassinTarget;
+    if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+      h += ' | 第' + (rec.assassinAfterRound + 1) + '轮任务后';
+    }
+    h += '</p>';
     h += '<div class="btn-row" style="margin-bottom:8px">';
     h += '<button class="btn small' + (rec.assassinSuccess ? ' selected' : '') + '" id="edit-assassin-success" onclick="editToggleAssassin(true)">刺杀成功</button>';
     h += '<button class="btn small' + (!rec.assassinSuccess ? ' selected' : '') + '" id="edit-assassin-fail" onclick="editToggleAssassin(false)">刺杀失败</button>';
