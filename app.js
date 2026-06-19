@@ -29,6 +29,10 @@ var state = {
   _assassinPickTarget: null,
   _historyPage: 0,
   _historyPageSize: 5,
+  _visitorPage: 0,
+  _visitorPageSize: 10,
+  _assassinTimerRemaining: 0,
+  _assassinTimerInterval: null,
   ladyOfLakeEnabled: false,
   ladyLakeHolder: -1,
   ladyLakeChecks: [],
@@ -70,6 +74,9 @@ function initState(n) {
   state.lancelotDeck = null;
   state.lancelotDrawResults = [];
   state._historyPage = 0;
+  state._visitorPage = 0;
+  state._assassinTimerRemaining = 0;
+  state._assassinTimerInterval = null;
   state.ladyOfLakeEnabled = false;
   state.ladyLakeHolder = -1;
   state.ladyLakeChecks = [];
@@ -129,6 +136,147 @@ function loadLastGame() {
   } catch(e) { return null; }
 }
 loadNamePool();
+
+/* ==================== VISITOR LOG ==================== */
+function getDeviceType() {
+  var ua = navigator.userAgent;
+  if (/iPhone|iPod/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Mac/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Windows';
+  if (/Linux/.test(ua)) return 'Linux';
+  return 'Unknown';
+}
+
+function loadVisitors() {
+  try { return JSON.parse(localStorage.getItem('avalon_visitors') || '[]'); } catch(e) { return []; }
+}
+
+function saveVisitors(data) {
+  localStorage.setItem('avalon_visitors', JSON.stringify(data));
+}
+
+function recordVisitor() {
+  var visitors = loadVisitors();
+  var now = new Date();
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  var timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' '
+    + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  visitors.push({ time: timeStr, device: getDeviceType() });
+  if (visitors.length > 500) visitors = visitors.slice(-500);
+  saveVisitors(visitors);
+}
+
+function renderVisitorLog() {
+  var visitors = loadVisitors();
+  // reverse chronological
+  visitors = visitors.slice().reverse();
+  var ps = state._visitorPageSize;
+  var totalPages = Math.ceil(visitors.length / ps);
+  if (state._visitorPage >= totalPages && totalPages > 0) state._visitorPage = totalPages - 1;
+  if (state._visitorPage < 0) state._visitorPage = 0;
+  var start = state._visitorPage * ps;
+  var pageItems = visitors.slice(start, start + ps);
+
+  var h = '';
+  for (var i = 0; i < pageItems.length; i++) {
+    var v = pageItems[i];
+    h += '<div class="visitor-item">';
+    h += '<span class="v-time">' + v.time + '</span>';
+    h += '<span class="v-device">' + v.device + '</span>';
+    h += '</div>';
+  }
+  if (pageItems.length === 0) {
+    h = '<div style="text-align:center;padding:16px;color:var(--text-dim)">暂无访客记录</div>';
+  }
+  var listEl = document.getElementById('visitor-list');
+  if (listEl) listEl.innerHTML = h;
+
+  // pagination
+  var pageArea = document.getElementById('visitor-pagination-area');
+  if (pageArea) {
+    if (totalPages <= 1) {
+      pageArea.innerHTML = '';
+    } else {
+      var ph = '<div class="visitor-pagination">';
+      ph += '<button class="page-btn" onclick="goVisitorPage(' + (state._visitorPage - 1) + ')"' + (state._visitorPage === 0 ? ' disabled' : '') + '>‹</button>';
+      var pageButtons = [];
+      if (totalPages <= 7) {
+        for (var p = 0; p < totalPages; p++) pageButtons.push(p);
+      } else {
+        pageButtons.push(0);
+        if (state._visitorPage > 3) pageButtons.push('...');
+        var pStart = Math.max(1, state._visitorPage - 1);
+        var pEnd = Math.min(totalPages - 2, state._visitorPage + 1);
+        for (var p = pStart; p <= pEnd; p++) pageButtons.push(p);
+        if (state._visitorPage < totalPages - 4) pageButtons.push('...');
+        pageButtons.push(totalPages - 1);
+      }
+      for (var k = 0; k < pageButtons.length; k++) {
+        var bp = pageButtons[k];
+        if (bp === '...') {
+          ph += '<span class="page-ellipsis">…</span>';
+        } else {
+          ph += '<button class="page-btn' + (bp === state._visitorPage ? ' active' : '') + '" onclick="goVisitorPage(' + bp + ')">' + (bp + 1) + '</button>';
+        }
+      }
+      ph += '<button class="page-btn" onclick="goVisitorPage(' + (state._visitorPage + 1) + ')"' + (state._visitorPage >= totalPages - 1 ? ' disabled' : '') + '>›</button>';
+      ph += '</div>';
+      pageArea.innerHTML = ph;
+    }
+  }
+}
+
+function goVisitorPage(p) {
+  var visitors = loadVisitors();
+  var totalPages = Math.ceil(visitors.length / state._visitorPageSize);
+  if (p < 0 || p >= totalPages) return;
+  state._visitorPage = p;
+  renderVisitorLog();
+}
+
+/* ==================== ASSASSIN COUNTDOWN ==================== */
+function startAssassinTimer() {
+  stopAssassinTimer();
+  ensureAudioContext();
+  state._assassinTimerRemaining = 3 * 60; // 3 minutes
+  renderAssassinTimer();
+  state._assassinTimerInterval = setInterval(function() {
+    state._assassinTimerRemaining--;
+    renderAssassinTimer();
+    if (state._assassinTimerRemaining <= 0) {
+      stopAssassinTimer();
+      playBeepSound();
+    }
+  }, 1000);
+}
+
+function stopAssassinTimer() {
+  if (state._assassinTimerInterval) {
+    clearInterval(state._assassinTimerInterval);
+    state._assassinTimerInterval = null;
+  }
+  var el = document.getElementById('assassin-countdown-display');
+  if (el) el.innerHTML = '';
+}
+
+function renderAssassinTimer() {
+  var el = document.getElementById('assassin-countdown-display');
+  if (!el) return;
+  var min = Math.floor(state._assassinTimerRemaining / 60);
+  var sec = state._assassinTimerRemaining % 60;
+  var timeStr = (min < 10 ? '0' : '') + min + ':' + (sec < 10 ? '0' : '') + sec;
+  var warning = state._assassinTimerRemaining <= 30 && state._assassinTimerRemaining > 0;
+  el.innerHTML = '<div class="assassin-countdown' + (warning ? ' warning' : '') + '">'
+    + '<div class="ac-value">' + timeStr + '</div>'
+    + '<div class="ac-label">刺杀倒计时</div></div>';
+  if (state._assassinTimerRemaining <= 0) {
+    el.innerHTML = '<div class="assassin-countdown warning">'
+      + '<div class="ac-value">00:00</div>'
+      + '<div class="ac-label">倒计时结束</div></div>';
+  }
+}
 
 /* ==================== UTILS ==================== */
 function $(id) { return document.getElementById(id); }
@@ -492,6 +640,7 @@ function enterAssassinMode() {
   overlay.className = 'assassin-overlay active';
   var h = '<div class="assassin-modal">';
   h += '<h2 style="text-align:center;margin:0 0 4px">反方拍刀</h2>';
+  h += '<div id="assassin-countdown-display"></div>';
   h += '<p style="text-align:center;color:var(--text-dim);font-size:13px;margin:0 0 16px">选择一名玩家作为梅林</p>';
   h += '<div class="assassin-player-grid">';
   for (var i = 0; i < state.playerCount; i++) {
@@ -507,9 +656,11 @@ function enterAssassinMode() {
     if (e.target === overlay) exitAssassinMode();
   });
   document.body.appendChild(overlay);
+  startAssassinTimer();
 }
 
 function exitAssassinMode() {
+  stopAssassinTimer();
   state.assassinMode = false;
   state._assassinPickTarget = null;
   var overlay = document.getElementById('assassin-overlay');
@@ -527,6 +678,7 @@ function pickAssassinTarget(idx) {
 }
 
 function confirmAssassinAction() {
+  stopAssassinTimer();
   if (state._assassinPickTarget === null) return;
   var targetIdx = state._assassinPickTarget;
   var targetName = playerLabel(targetIdx);
@@ -2207,7 +2359,8 @@ function checkGameEnd() {
 
 /* ==================== ASSASSIN PHASE (inline on end page) ==================== */
 function renderEndAssassinPick() {
-  var h = '<p class="sub">好人方已完成 3 轮任务，请刺客选择刺杀目标（可参考下方复盘信息）</p>';
+  var h = '<div id="assassin-countdown-display"></div>';
+  h += '<p class="sub">好人方已完成 3 轮任务，请刺客选择刺杀目标（可参考下方复盘信息）</p>';
   h += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
   for (var i = 0; i < state.playerCount; i++) {
     h += '<button class="assassin-target-btn' + (state.assassinTarget === i ? ' selected' : '') + '" onclick="pickEndAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
@@ -2218,6 +2371,7 @@ function renderEndAssassinPick() {
   if (state.assassinTarget === null) h += ' disabled';
   h += '>确认刺杀目标</button></div>';
   $('end-assassin-pick-area').innerHTML = h;
+  startAssassinTimer();
 }
 
 function pickEndAssassinTarget(idx) {
@@ -2231,6 +2385,7 @@ function pickEndAssassinTarget(idx) {
 }
 
 function confirmEndAssassin() {
+  stopAssassinTimer();
   if (state.assassinTarget === null) return;
   $('end-assassin-pick-area').style.display = 'none';
   $('end-assassin-resolve-area').style.display = 'block';
@@ -2837,6 +2992,23 @@ function renderStats() {
   }
   $('win-rate-leaderboard').innerHTML = lh;
   renderSyncStatus();
+
+  // Visitor log card
+  var vc = document.getElementById('visitor-card');
+  if (!vc) {
+    vc = document.createElement('div');
+    vc.className = 'card';
+    vc.id = 'visitor-card';
+    vc.innerHTML = '<h2>访客记录 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（每次打开页面自动记录）</span></h2>'
+      + '<div class="visitor-list" id="visitor-list"></div>'
+      + '<div id="visitor-pagination-area"></div>'
+      + '<div style="text-align:center;margin-top:8px">'
+      + '<button class="btn small" onclick="state._visitorPage=0;renderVisitorLog()">刷新</button></div>';
+    $('page-stats').appendChild(vc);
+    renderVisitorLog();
+  } else {
+    renderVisitorLog();
+  }
 }
 
 function toggleLeaderboard() {
@@ -3548,7 +3720,7 @@ function syncFromCloud() {
       closeModal();
       toast('已同步 ' + synced + ' 项数据（云端 ' + cloudGameCount + ' 局）');
       renderSyncStatus();
-      setTimeout(function() { location.reload(); }, 800);
+      setTimeout(function() { showPage('stats'); }, 800);
     })
     .catch(function(err) {
       closeModal();
@@ -3560,6 +3732,7 @@ function syncFromCloud() {
 
 /* ==================== INIT ==================== */
 (function() {
+  recordVisitor();
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
   var initAudioOnce = function() {
     ensureAudioContext();

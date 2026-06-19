@@ -906,3 +906,78 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     right: 10px;
   }
 }
+
+/* ==================== VISITOR LOG ==================== */
+.visitor-card {
+  background: var(--parchment);
+  border: 1px solid rgba(201,168,76,0.18);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-top: 8px;
+}
+.visitor-card h2 {
+  font-size: 17px;
+  color: var(--gold-light);
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+}
+.visitor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.visitor-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: 13px;
+  border: 1px solid rgba(201,168,76,0.08);
+}
+.visitor-item .v-time {
+  color: var(--text);
+  font-weight: 500;
+}
+.visitor-item .v-device {
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(201,168,76,0.06);
+}
+.visitor-pagination {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* ==================== ASSASSIN COUNTDOWN ==================== */
+.assassin-countdown {
+  text-align: center;
+  padding: 8px 14px;
+  margin: 8px 0 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(201,168,76,0.15);
+}
+.assassin-countdown .ac-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gold-light);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+}
+.assassin-countdown.warning .ac-value {
+  color: var(--red-bright);
+  animation: timer-flash 0.6s infinite;
+}
+.assassin-countdown .ac-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
