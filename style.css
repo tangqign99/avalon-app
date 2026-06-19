@@ -687,6 +687,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .faction-label{font-size:13px;padding:3px 10px}
   .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px}
 }
+@media(min-width:481px) and (max-width:1024px){
+  .role-checkbox-grid{grid-template-columns:repeat(auto-fill,150px)}
+}
 
 /* Deduction / 身份推演 */
 .deduction-player-card {
