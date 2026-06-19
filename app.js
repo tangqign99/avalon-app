@@ -1696,7 +1696,7 @@ function buildReviewHTML() {
         for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
         var launched = attApproves > Math.floor(pc / 2);
 
-        h += '<div class="launch-item' + (launched ? '' : '') + '" style="' + (launched ? 'border-left-color:var(--green);' : '') + '">';
+        h += '<div class="launch-item">';
         h += '<strong>第' + (a + 1) + '次组队</strong> ';
         h += '(队长 ' + playerLabel(att.leader) + ', 队伍 ' + att.team.map(function(i) { return playerLabel(i); }).join('、') + ')';
         h += ' | 赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves);
@@ -1709,17 +1709,15 @@ function buildReviewHTML() {
           else rejectList.push(playerLabel(k));
         }
         h += '<div class="vote-result-split">';
-        h += '<div class="vote-col-approve">';
-        h += '<div class="vote-col-title">赞成 (' + approveList.length + '人)</div>';
+        h += '<div class="vote-row-h vote-row-approve"><span class="vote-col-title">赞成 (' + approveList.length + '人)：</span>';
         if (approveList.length > 0) {
-          for (var ai = 0; ai < approveList.length; ai++) h += '<div class="vote-player-name">' + approveList[ai] + '</div>';
-        } else { h += '<div class="vote-col-empty">无</div>'; }
+          h += approveList.map(function(n) { return '<span class="vote-player-name">' + n + '</span>'; }).join('');
+        } else { h += '<span class="vote-col-empty">无</span>'; }
         h += '</div>';
-        h += '<div class="vote-col-reject">';
-        h += '<div class="vote-col-title">反对 (' + rejectList.length + '人)</div>';
+        h += '<div class="vote-row-h vote-row-reject"><span class="vote-col-title">反对 (' + rejectList.length + '人)：</span>';
         if (rejectList.length > 0) {
-          for (var ri = 0; ri < rejectList.length; ri++) h += '<div class="vote-player-name">' + rejectList[ri] + '</div>';
-        } else { h += '<div class="vote-col-empty">无</div>'; }
+          h += rejectList.map(function(n) { return '<span class="vote-player-name">' + n + '</span>'; }).join('');
+        } else { h += '<span class="vote-col-empty">无</span>'; }
         h += '</div></div>';
         h += '</div>';
       }

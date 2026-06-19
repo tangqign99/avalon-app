@@ -551,17 +551,20 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .rc-vote-table th{color:var(--gold);font-size:11px}
 .rc-vote-table .vote-ap{color:var(--green-bright)}
 .rc-vote-table .vote-rj{color:var(--red-bright)}
-.vote-result-split{display:flex;gap:12px;margin-top:6px}
+.vote-result-split{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.vote-row-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .vote-col-approve,.vote-col-reject{flex:1;border-radius:var(--radius-sm);padding:8px 10px;background:rgba(0,0,0,0.15)}
 .vote-col-title{font-size:11px;font-weight:700;margin-bottom:4px;text-align:center}
 .vote-col-approve .vote-col-title{color:var(--green-bright)}
 .vote-col-reject .vote-col-title{color:var(--red-bright)}
-.vote-player-name{font-size:12px;padding:2px 0;text-align:center}
-.vote-col-approve .vote-player-name{color:var(--green)}
-.vote-col-reject .vote-player-name{color:var(--red)}
+.vote-player-name{display:inline-block;font-size:11px;padding:2px 6px;margin:1px 2px;border-radius:3px;background:rgba(0,0,0,0.2)}
+.vote-row-approve .vote-player-name{color:var(--green)}
+.vote-row-reject .vote-player-name{color:var(--red)}
+.vote-row-approve .vote-col-title{color:var(--green-bright)}
+.vote-row-reject .vote-col-title{color:var(--red-bright)}
 .vote-col-empty{font-size:11px;color:var(--text-dim);text-align:center;font-style:italic}
 .rc-launch-attempts{margin-top:8px;font-size:12px;color:var(--text-dim)}
-.rc-launch-attempts .launch-item{padding:4px 8px;border-left:2px solid rgba(201,168,76,0.2);margin-bottom:4px;background:rgba(0,0,0,0.1);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.rc-launch-attempts .launch-item{border:1px solid rgba(201,168,76,0.25);background:rgba(201,168,76,0.06);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px}
 
 /* ===== 五、统计显示优�?===== */
 .merlin-assassin-card{
