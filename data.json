@@ -13,7 +13,8 @@
     "浩文",
     "宝强",
     "小洪",
-    "如意"
+    "如意",
+    "小小黄"
   ],
   "avalon_history_v2": [
     {
@@ -592,23 +593,262 @@
           "votes": {}
         }
       ]
+    },
+    {
+      "date": "2026-06-19",
+      "playerCount": 8,
+      "winner": "good",
+      "identities": [
+        {
+          "name": "阿弟",
+          "index": 0,
+          "role": "兰斯洛特(蓝)"
+        },
+        {
+          "name": "振宁",
+          "index": 1,
+          "role": "忠臣"
+        },
+        {
+          "name": "延平",
+          "index": 2,
+          "role": "莫甘娜"
+        },
+        {
+          "name": "小小黄",
+          "index": 3,
+          "role": "刺客"
+        },
+        {
+          "name": "小黄",
+          "index": 4,
+          "role": "兰斯洛特(红)"
+        },
+        {
+          "name": "小小",
+          "index": 5,
+          "role": "派西维尔"
+        },
+        {
+          "name": "小洪",
+          "index": 6,
+          "role": "梅林"
+        },
+        {
+          "name": "鹭文",
+          "index": 7,
+          "role": "忠臣"
+        }
+      ],
+      "lancelotFlips": {
+        "0": true,
+        "4": true
+      },
+      "activeRoles": [
+        "梅林",
+        "派西维尔",
+        "忠臣",
+        "莫甘娜",
+        "刺客",
+        "兰斯洛特(蓝)",
+        "兰斯洛特(红)"
+      ],
+      "roundTendencies": [
+        {
+          "0": 50,
+          "1": 41,
+          "2": 62,
+          "3": 59,
+          "4": 67,
+          "5": 67,
+          "6": 67,
+          "7": 44
+        },
+        {
+          "0": 50,
+          "1": 46,
+          "2": 59,
+          "3": 59,
+          "4": 54,
+          "5": 72,
+          "6": 67,
+          "7": 31
+        },
+        {
+          "0": 65,
+          "1": 63,
+          "2": 79,
+          "3": 68,
+          "4": 74,
+          "5": 89,
+          "6": 84,
+          "7": 51
+        },
+        {
+          "0": 65,
+          "1": 50,
+          "2": 79,
+          "3": 68,
+          "4": 61,
+          "5": 89,
+          "6": 83,
+          "7": 38
+        }
+      ],
+      "assassinTarget": "2号 振宁",
+      "assassinSuccess": false,
+      "assassinAfterRound": 4,
+      "currentRound": 4,
+      "identityMarks": [],
+      "missions": [
+        {
+          "round": 0,
+          "size": 3,
+          "leader": "4号 小小黄",
+          "team": [
+            "1号 阿弟",
+            "3号 延平",
+            "8号 鹭文"
+          ],
+          "result": "success",
+          "failCount": 0,
+          "launchFailures": 1,
+          "votes": {
+            "1号 阿弟": "approve",
+            "2号 振宁": "reject",
+            "3号 延平": "approve",
+            "4号 小小黄": "approve",
+            "5号 小黄": "approve",
+            "6号 小小": "approve",
+            "7号 小洪": "approve",
+            "8号 鹭文": "reject"
+          }
+        },
+        {
+          "round": 1,
+          "size": 4,
+          "leader": "5号 小黄",
+          "team": [
+            "1号 阿弟",
+            "3号 延平",
+            "5号 小黄",
+            "8号 鹭文"
+          ],
+          "result": "fail",
+          "failCount": 1,
+          "launchFailures": 0,
+          "votes": {
+            "1号 阿弟": "approve",
+            "2号 振宁": "reject",
+            "3号 延平": "reject",
+            "4号 小小黄": "approve",
+            "5号 小黄": "approve",
+            "6号 小小": "reject",
+            "7号 小洪": "approve",
+            "8号 鹭文": "approve"
+          }
+        },
+        {
+          "round": 2,
+          "size": 4,
+          "leader": "7号 小洪",
+          "team": [
+            "1号 阿弟",
+            "3号 延平",
+            "5号 小黄",
+            "8号 鹭文"
+          ],
+          "result": "success",
+          "failCount": 0,
+          "launchFailures": 1,
+          "votes": {
+            "1号 阿弟": "approve",
+            "2号 振宁": "approve",
+            "3号 延平": "approve",
+            "4号 小小黄": "approve",
+            "5号 小黄": "approve",
+            "6号 小小": "approve",
+            "7号 小洪": "approve",
+            "8号 鹭文": "approve"
+          }
+        },
+        {
+          "round": 3,
+          "size": 5,
+          "leader": "8号 鹭文",
+          "team": [
+            "1号 阿弟",
+            "2号 振宁",
+            "5号 小黄",
+            "7号 小洪",
+            "8号 鹭文"
+          ],
+          "result": "fail",
+          "failCount": 3,
+          "launchFailures": 0,
+          "votes": {
+            "1号 阿弟": "approve",
+            "2号 振宁": "approve",
+            "3号 延平": "approve",
+            "4号 小小黄": "approve",
+            "5号 小黄": "approve",
+            "6号 小小": "approve",
+            "7号 小洪": "approve",
+            "8号 鹭文": "approve"
+          }
+        },
+        {
+          "round": 4,
+          "size": 5,
+          "leader": "1号 阿弟",
+          "team": [],
+          "result": null,
+          "failCount": 0,
+          "launchFailures": 0,
+          "votes": {}
+        }
+      ],
+      "ladyCheckHistory": [
+        {
+          "round": 2,
+          "holder": 1,
+          "holderName": "2号 振宁",
+          "target": 0,
+          "targetName": "1号 阿弟",
+          "result": "good"
+        },
+        {
+          "round": 3,
+          "holder": 0,
+          "holderName": "1号 阿弟",
+          "target": 6,
+          "targetName": "7号 小洪",
+          "result": "good"
+        },
+        {
+          "round": 4,
+          "holder": 6,
+          "holderName": "7号 小洪",
+          "target": 5,
+          "targetName": "6号 小小",
+          "result": "good"
+        }
+      ]
     }
   ],
   "avalon_last_game": {
-    "date": "2026-06-18",
-    "playerCount": 10,
+    "date": "2026-06-19",
+    "playerCount": 8,
     "playerNames": [
-      "玩家1",
-      "玩家2",
-      "玩家3",
-      "玩家4",
-      "玩家5",
       "阿弟",
-      "玩家7",
-      "玩家8",
-      "玩家9",
-      "玩家10"
+      "振宁",
+      "延平",
+      "小小黄",
+      "小黄",
+      "小小",
+      "小洪",
+      "鹭文"
     ],
-    "selfIndex": 5
+    "selfIndex": 0
   }
 }
