@@ -1700,15 +1700,25 @@ function buildReviewHTML() {
         h += ' | 赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves);
         h += launched ? ' <span style="color:var(--green-bright)">发车</span>' : ' <span style="color:var(--red-bright)">否决</span>';
 
-        // Vote detail table
-        h += '<table class="rc-vote-table"><tr><th>玩家</th><th>投票</th></tr>';
+        // Vote detail - two-column layout
+        var approveList = [], rejectList = [];
         for (var k = 0; k < pc; k++) {
-          var v = att.votes[k];
-          h += '<tr><td>' + playerLabel(k) + '</td>';
-          h += '<td class="' + (v === 'approve' ? 'vote-ap' : 'vote-rj') + '">';
-          h += (v === 'approve' ? '赞成' : '反对') + '</td></tr>';
+          if (att.votes[k] === 'approve') approveList.push(playerLabel(k));
+          else rejectList.push(playerLabel(k));
         }
-        h += '</table>';
+        h += '<div class="vote-result-split">';
+        h += '<div class="vote-col-approve">';
+        h += '<div class="vote-col-title">赞成 (' + approveList.length + '人)</div>';
+        if (approveList.length > 0) {
+          for (var ai = 0; ai < approveList.length; ai++) h += '<div class="vote-player-name">' + approveList[ai] + '</div>';
+        } else { h += '<div class="vote-col-empty">无</div>'; }
+        h += '</div>';
+        h += '<div class="vote-col-reject">';
+        h += '<div class="vote-col-title">反对 (' + rejectList.length + '人)</div>';
+        if (rejectList.length > 0) {
+          for (var ri = 0; ri < rejectList.length; ri++) h += '<div class="vote-player-name">' + rejectList[ri] + '</div>';
+        } else { h += '<div class="vote-col-empty">无</div>'; }
+        h += '</div></div>';
         h += '</div>';
       }
     }
