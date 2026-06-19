@@ -480,7 +480,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   background:linear-gradient(180deg,var(--parchment-light),var(--parchment));
   font-size:20px;font-weight:700;cursor:pointer;
   transition:all 0.2s;white-space:nowrap;min-height:68px;
-  font-family:var(--font);color:var(--text);
+  font-family:var(--font);color:var(--text);max-width:100%;
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.03),0 2px 6px rgba(0,0,0,0.3);
 }
 .lady-toggle-btn:hover{border-color:var(--gold);transform:scale(1.03);box-shadow:0 0 16px rgba(201,168,76,0.2)}
@@ -674,21 +674,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 }
 /* ===== 手机端适配 ===== */
 @media(max-width:480px){
-  .role-checkbox-grid label{
-    font-size:16px;
-    padding:10px 14px;
-    min-height:44px;
-  }
-  .role-group{
-    flex-wrap:wrap;
-    gap:6px;
-  }
+  .role-checkbox-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .role-checkbox-grid label{font-size:16px;padding:10px 14px;min-height:44px}
+  .role-group{flex-wrap:wrap;gap:6px}
   .role-horizontal{gap:18px}
   .faction-label{font-size:13px;padding:3px 10px}
-  .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px}
+  .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px;max-width:100%}
 }
 @media(min-width:481px) and (max-width:1024px){
-  .role-checkbox-grid{grid-template-columns:repeat(auto-fill,150px)}
+  .role-checkbox-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 }
 
 /* Deduction / 身份推演 */
