@@ -10,7 +10,7 @@
     "小吴",
     "涛",
     "小黄",
-    "浩文",
+    "淏文",
     "宝强",
     "小洪",
     "如意",
@@ -23,7 +23,7 @@
       "winner": "good",
       "identities": [
         {
-          "name": "浩文",
+          "name": "淏文",
           "index": 0,
           "role": "梅林"
         },
@@ -111,7 +111,7 @@
           "failCount": 0,
           "launchFailures": 2,
           "votes": {
-            "1号 浩文": "reject",
+            "1号 淏文": "reject",
             "2号 涛": "approve",
             "3号 振宁": "approve",
             "4号 鹭文": "approve",
@@ -137,7 +137,7 @@
           "failCount": 1,
           "launchFailures": 2,
           "votes": {
-            "1号 浩文": "approve",
+            "1号 淏文": "approve",
             "2号 涛": "approve",
             "3号 振宁": "approve",
             "4号 鹭文": "approve",
@@ -163,7 +163,7 @@
           "failCount": 0,
           "launchFailures": 3,
           "votes": {
-            "1号 浩文": "approve",
+            "1号 淏文": "approve",
             "2号 涛": "approve",
             "3号 振宁": "approve",
             "4号 鹭文": "approve",
@@ -178,9 +178,9 @@
         {
           "round": 3,
           "size": 5,
-          "leader": "1号 浩文",
+          "leader": "1号 淏文",
           "team": [
-            "1号 浩文",
+            "1号 淏文",
             "4号 鹭文",
             "5号 菜头",
             "6号 阿弟",
@@ -190,7 +190,7 @@
           "failCount": 0,
           "launchFailures": 0,
           "votes": {
-            "1号 浩文": "approve",
+            "1号 淏文": "approve",
             "2号 涛": "approve",
             "3号 振宁": "approve",
             "4号 鹭文": "approve",
@@ -260,7 +260,7 @@
           "role": "忠臣"
         },
         {
-          "name": "浩文",
+          "name": "淏文",
           "index": 8,
           "role": "莫甘娜"
         }
@@ -309,7 +309,7 @@
             "6号 阿弟": "approve",
             "7号 齐齐": "reject",
             "8号 小黄": "approve",
-            "9号 浩文": "approve"
+            "9号 淏文": "approve"
           }
         },
         {
@@ -334,7 +334,7 @@
             "6号 阿弟": "approve",
             "7号 齐齐": "approve",
             "8号 小黄": "approve",
-            "9号 浩文": "approve"
+            "9号 淏文": "approve"
           }
         },
         {
@@ -359,7 +359,7 @@
             "6号 阿弟": "approve",
             "7号 齐齐": "approve",
             "8号 小黄": "approve",
-            "9号 浩文": "approve"
+            "9号 淏文": "approve"
           }
         },
         {
@@ -390,7 +390,7 @@
       "winner": "good",
       "identities": [
         {
-          "name": "浩文",
+          "name": "淏文",
           "index": 0,
           "role": "忠臣"
         },
@@ -508,7 +508,7 @@
           "failCount": 0,
           "launchFailures": 1,
           "votes": {
-            "1号 浩文": "approve",
+            "1号 淏文": "approve",
             "2号 涛": "reject",
             "3号 振宁": "approve",
             "4号 鹭文": "reject",
@@ -534,7 +534,7 @@
           "failCount": 0,
           "launchFailures": 1,
           "votes": {
-            "1号 浩文": "approve",
+            "1号 淏文": "approve",
             "2号 涛": "approve",
             "3号 振宁": "approve",
             "4号 鹭文": "reject",
@@ -560,7 +560,7 @@
           "failCount": 0,
           "launchFailures": 0,
           "votes": {
-            "1号 浩文": "approve",
+            "1号 淏文": "approve",
             "2号 涛": "approve",
             "3号 振宁": "approve",
             "4号 鹭文": "reject",
