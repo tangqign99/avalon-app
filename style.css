@@ -208,7 +208,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* 兰斯洛特反转圆圈 */
 .lancelot-flip-tracker{display:flex;gap:18px;justify-content:center;padding:2px 0 6px}
 .lancelot-flip-dot{
-  width:78px;height:78px;border-radius:50%;border:2px solid #555;
+  width:78px;height:78px;border-radius:50%;border:2px solid #555;overflow:hidden;
   background:rgba(100,100,100,0.08);display:flex;align-items:center;justify-content:center;
   color:#666;transition:all 0.2s;position:relative;
 }
