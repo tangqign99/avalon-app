@@ -2635,7 +2635,7 @@ function renderStats() {
     var rec = history[i];
     if (!rec.missions) continue;
     var sc = rec.missions.filter(function(m) { return m.result === 'success'; }).length;
-    if (sc >= 3) {
+    if (sc >= 3 || rec.assassinAfterRound !== null) {
       merlinGames++;
       if (rec.assassinSuccess === true) merlinKilled++;
     }
