@@ -626,21 +626,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .predict-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;flex-wrap:wrap}
 .predict-player-row .predict-pname{font-size:13px;font-weight:600;color:var(--text-bright);min-width:70px}
 
-/* ===== 同步诊断 ===== */
-.sync-status-card{
-  background:linear-gradient(135deg,rgba(74,144,217,0.08),rgba(74,144,217,0.03));
-  border:1px solid rgba(74,144,217,0.3);border-radius:var(--radius);
-  padding:14px 16px;margin-bottom:10px;
-}
-.sync-status-card h3{color:var(--blue);font-size:15px;margin-bottom:10px;font-family:var(--font-display)}
-.sync-stat-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
-.sync-stat-row .sync-key{color:var(--text-dim)}
-.sync-stat-row .sync-val{font-weight:600;color:var(--text-bright)}
-.sync-stat-row .sync-val.ok{color:var(--green-bright)}
-.sync-stat-row .sync-val.warn{color:var(--orange)}
-.sync-stat-row .sync-val.bad{color:var(--red-bright)}
-.sync-hint{font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.5}
-
 /* ===== 倾向/统计/结束页背景骑士装�?===== */
 #page-stats,#page-end{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
 #page-end{

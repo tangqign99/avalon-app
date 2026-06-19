@@ -218,7 +218,6 @@
     <div class="btn-row" style="justify-content:center;margin-top:10px">
       <button class="btn small" onclick="exportData()">导出数据</button>
       <button class="btn small" onclick="importData()">导入数据</button>
-      <button class="btn small" onclick="syncFromCloud()">从云端同步</button>
     </div>
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
@@ -230,17 +229,6 @@
     <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开）</span></h2>
     <div class="btn-row" id="player-stat-btns"></div>
     <div id="player-stat-detail"></div>
-  </div>
-  <div class="card">
-    <h2>同步状态</h2>
-    <div id="sync-status-content">
-      <p style="color:var(--text-dim);font-size:13px">正在检查...</p>
-    </div>
-    <div class="btn-row" style="margin-top:10px;justify-content:center">
-      <button class="btn small" onclick="syncFromCloud()">从云端同步</button>
-      <button class="btn small success" onclick="pushDataToFile()">保存数据到本地文件</button>
-    </div>
-    <p class="sync-hint" id="sync-hint-text"></p>
   </div>
   <div class="card">
     <h2>添加新玩家</h2>
@@ -268,9 +256,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=36',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=37',{scope:'./'});
   }).then(function(r){
-    console.log('SW v36 registered:',r.scope);
+    console.log('SW v37 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
