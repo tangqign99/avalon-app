@@ -206,9 +206,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .faction-label.good{background:rgba(102,153,255,0.2);color:#99bbff}
 .faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
 /* 兰斯洛特反转圆圈 */
-.lancelot-flip-tracker{display:flex;gap:10px;justify-content:center;padding:2px 0 6px}
+.lancelot-flip-tracker{display:flex;gap:18px;justify-content:center;padding:2px 0 6px}
 .lancelot-flip-dot{
-  width:56px;height:56px;border-radius:50%;border:2px solid #555;
+  width:78px;height:78px;border-radius:50%;border:2px solid #555;
   background:rgba(100,100,100,0.08);display:flex;align-items:center;justify-content:center;
   color:#666;transition:all 0.2s;position:relative;
 }

@@ -381,7 +381,7 @@ function renderLancelotFlipTracker() {
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   if (!hasLancelot) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
-  var flipSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18A7 7 0 0 1 17 6"/><polyline points="16 2 18 6 14 6"/><path d="M17 6A7 7 0 0 1 7 18"/><polyline points="8 22 6 18 10 18"/></svg>';
+  var flipSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18A7 7 0 0 1 17 6"/><polyline points="16 2 18 6 14 6"/><path d="M17 6A7 7 0 0 1 7 18"/><polyline points="8 22 6 18 10 18"/></svg>';
   var h = '';
   for (var i = 0; i < 5; i++) {
     var cls = 'lancelot-flip-dot';
