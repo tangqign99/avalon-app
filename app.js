@@ -380,18 +380,11 @@ function renderLancelotFlipTracker() {
   if (!el) return;
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   if (!hasLancelot) { el.style.display = 'none'; return; }
+  var currentFlipped = state.lancelotRoundFlips[state.currentRound];
+  if (!currentFlipped) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
   var flipImg = '<img src="images/兰斯洛特转移.png?v=2" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
-  var h = '';
-  for (var i = 0; i < 5; i++) {
-    var cls = 'lancelot-flip-dot';
-    if (i === 0) { cls += ' blank'; }
-    else if (i > state.currentRound) { cls += ' future'; }
-    else if (state.lancelotRoundFlips[i]) { cls += ' flipped'; }
-    else { cls += ' no-flip'; }
-    h += '<div class="' + cls + '">' + flipImg + '</div>';
-  }
-  el.innerHTML = h;
+  el.innerHTML = '<div class="lancelot-flip-dot flipped">' + flipImg + '</div>';
 }
 
 function renderGame() {
