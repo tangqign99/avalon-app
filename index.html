@@ -263,8 +263,8 @@
 
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js?v=24',{scope:'./'}).then(function(r){
-    console.log('SW v24 registered:',r.scope);
+  navigator.serviceWorker.register('./sw.js?v=23',{scope:'./'}).then(function(r){
+    console.log('SW v23 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
