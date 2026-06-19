@@ -2629,13 +2629,13 @@ function renderStats() {
   h += '<div class="stat-card"><div class="stat-value" style="color:#ff9999">' + evilWins + '</div><div class="stat-label">反方胜场</div>';
   h += '<div class="stat-sub">' + (total > 0 ? Math.round(evilWins / total * 100) : 0) + '%</div></div>';
 
-  // Merlin assassination rate: count games where good won 3 missions and assassin guessed correctly
+  // Merlin assassination rate: count all games except evil won by 3 mission failures
   var merlinGames = 0, merlinKilled = 0;
   for (var i = 0; i < history.length; i++) {
     var rec = history[i];
     if (!rec.missions) continue;
-    var sc = rec.missions.filter(function(m) { return m.result === 'success'; }).length;
-    if (sc >= 3 || rec.assassinAfterRound !== null) {
+    var failCount = rec.missions.filter(function(m) { return m.result === 'fail'; }).length;
+    if (!(failCount >= 3 && rec.winner === 'evil')) {
       merlinGames++;
       if (rec.assassinSuccess === true) merlinKilled++;
     }
