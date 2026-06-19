@@ -206,7 +206,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .faction-label.good{background:rgba(102,153,255,0.2);color:#99bbff}
 .faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
 /* 兰斯洛特反转圆圈 */
-.lancelot-flip-tracker{display:flex;gap:18px;justify-content:center;padding:2px 0 6px}
+.lancelot-flip-tracker{display:flex;gap:14px;justify-content:center;padding:2px 0 6px;align-items:flex-start;flex-wrap:wrap}
+.lancelot-flip-col{display:flex;flex-direction:column;align-items:center;gap:4px}
 .lancelot-flip-dot{
   width:78px;height:78px;border-radius:50%;border:2px solid #555;overflow:hidden;
   background:rgba(100,100,100,0.08);display:flex;align-items:center;justify-content:center;
@@ -219,6 +220,26 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .lancelot-flip-dot.no-flip{border-color:#777;background:rgba(150,150,150,0.12);color:#aaa}
 .lancelot-flip-dot.no-flip svg{opacity:0.7}
 .lancelot-flip-dot.future{opacity:0.25;border-style:dashed;border-color:#444;background:transparent;color:#444}
+/* Draw result labels */
+.lancelot-draw-label{font-size:11px;font-weight:600;text-align:center;line-height:1.2;min-height:16px}
+.lancelot-draw-label.flip-label{color:var(--red-bright)}
+.lancelot-draw-label.blank-label{color:var(--text-dim)}
+/* Deck counter */
+.lancelot-deck-counter{
+  display:flex;align-items:center;gap:4px;padding:4px 10px;
+  border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.25);
+  background:rgba(201,168,76,0.06);font-size:13px;font-weight:700;
+  color:var(--gold-light);cursor:default;align-self:center;
+}
+.lancelot-deck-counter .deck-icon{font-size:18px}
+.lancelot-deck-counter .deck-num{font-size:14px}
+.lancelot-deck-counter.empty{color:var(--text-dim);border-color:rgba(150,150,150,0.2);background:rgba(150,150,150,0.04)}
+/* Draw reveal animation */
+@keyframes lancelot-draw-reveal{
+  0%{transform:scale(0) rotateY(180deg);opacity:0}
+  50%{transform:scale(1.15) rotateY(0);opacity:1}
+  100%{transform:scale(1) rotateY(0);opacity:1}
+}
 .round-tracker{display:flex;gap:18px;justify-content:center;padding:6px 0}
 .round-dot{
   width:78px;height:78px;border-radius:50%;border:2px solid rgba(201,168,76,0.2);

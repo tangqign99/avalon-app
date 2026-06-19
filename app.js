@@ -36,6 +36,8 @@ var state = {
   timerRemaining: 0,
   lancelotFlipped: false,
   _lancelotAsked: false,
+  lancelotDeck: null,
+  lancelotDrawResults: [],
   roundTendencies: [],
   identityMarks: [],
   ladyCheckHistory: []
@@ -60,6 +62,8 @@ function initState(n) {
   state.assassinFromMission = false;
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
+  state.lancelotDeck = null;
+  state.lancelotDrawResults = [];
   state._historyPage = 0;
   state.ladyOfLakeEnabled = false;
   state.ladyLakeHolder = -1;
@@ -350,6 +354,9 @@ function doStartGame() {
   state._lancelotAsked = false;
   state.lancelotFlipCount = 0;
   state.lancelotRoundFlips = [false, false, false, false, false];
+  state.lancelotDrawResults = [false]; // index 0 = round 0, no draw before game starts
+  var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+  state.lancelotDeck = hasLancelot ? shuffleLancelotDeck() : null;
   state.autoRoles = null;
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
@@ -383,16 +390,54 @@ function renderLancelotFlipTracker() {
   el.style.display = 'flex';
   var flipSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18A7 7 0 0 1 17 6"/><polyline points="16 2 18 6 14 6"/><path d="M17 6A7 7 0 0 1 7 18"/><polyline points="8 22 6 18 10 18"/></svg>';
   var flipImg = '<img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  var remaining = state.lancelotDeck ? state.lancelotDeck.length : 0;
+
   var h = '';
   for (var i = 0; i < 5; i++) {
     var cls = 'lancelot-flip-dot';
     var inner = flipSVG;
-    if (i === 0) { cls += ' blank'; }
-    else if (i > state.currentRound) { cls += ' future'; }
-    else if (state.lancelotRoundFlips[i]) { cls += ' flipped'; inner = flipImg; }
-    else { cls += ' no-flip'; }
-    h += '<div class="' + cls + '">' + inner + '</div>';
+    var drawInfo = '';
+
+    // Draw result sub-label
+    if (i === 0) {
+      cls += ' blank';
+      drawInfo = '<div class="lancelot-draw-label" style="color:var(--text-dim);font-size:10px">第1轮</div>';
+    } else if (i < state.lancelotDrawResults.length && state.lancelotDrawResults[i] !== null && state.lancelotDrawResults[i] !== undefined) {
+      var drew = state.lancelotDrawResults[i];
+      if (drew) {
+        drawInfo = '<div class="lancelot-draw-label flip-label"><img src="images/兰斯洛特转移.png?v=3" style="width:16px;height:16px;border-radius:50%;vertical-align:middle"> 反转</div>';
+      } else {
+        drawInfo = '<div class="lancelot-draw-label blank-label">&#9711; 空白</div>';
+      }
+    } else if (i > state.currentRound) {
+      cls += ' future';
+      drawInfo = '<div class="lancelot-draw-label" style="color:var(--text-dim);font-size:10px">待抽</div>';
+    } else {
+      // Round happened but draw result not recorded (unlikely)
+      drawInfo = '<div class="lancelot-draw-label" style="color:var(--orange);font-size:10px">?</div>';
+    }
+
+    // Flip dot styling
+    if (i > 0 && i <= state.currentRound && state.lancelotRoundFlips[i]) {
+      cls += ' flipped'; inner = flipImg;
+    } else if (i > 0 && i <= state.currentRound && !(state.lancelotDrawResults[i] !== undefined && state.lancelotDrawResults[i] !== null)) {
+      cls += ' future';
+    } else if (i > state.currentRound) {
+      cls += ' future';
+    } else if (i > 0 && i <= state.currentRound) {
+      cls += ' no-flip';
+    }
+
+    h += '<div class="lancelot-flip-col"><div class="' + cls + '">' + inner + '</div>' + drawInfo + '</div>';
   }
+
+  // Remaining deck counter
+  if (state.lancelotDeck && state.lancelotDeck.length > 0) {
+    h += '<div class="lancelot-deck-counter" title="剩余牌堆"><span class="deck-icon">&#127136;</span><span class="deck-num">' + remaining + '</span></div>';
+  } else if (state.lancelotDeck) {
+    h += '<div class="lancelot-deck-counter empty" title="牌堆已耗尽"><span class="deck-icon">&#127136;</span><span class="deck-num">0</span></div>';
+  }
+
   el.innerHTML = h;
 }
 
@@ -1969,11 +2014,11 @@ function finalizeMission() {
     var sc = state.missions.filter(function(mm) { return mm.result === 'success'; }).length;
     var fc = state.missions.filter(function(mm) { return mm.result === 'fail'; }).length;
     if (sc >= 3 || fc >= 3) {
-      // 已决定胜负，跳过反转确认直接推进游戏结束
+      // 已决定胜负，跳过抽卡直接推进游戏结束
       checkGameEnd();
       renderGame();
     } else {
-      showLancelotFlipModal(state.currentRound);
+      applyLancelotAutoDraw(state.currentRound);
     }
   } else {
     checkGameEnd();
@@ -2166,34 +2211,84 @@ function onEndRoleChange(idx) {
   }
 }
 
-function showLancelotFlipModal(roundNum) {
-  var flips = state.lancelotFlipCount;
-  var currentlyFlipped = (flips % 2 !== 0);
-  var flipStatus = currentlyFlipped ? '（当前状态：已反转）' : '（当前状态：未反转）';
+/* ==================== LANCELOT AUTO-DRAW ==================== */
+function shuffleLancelotDeck() {
+  var deck = [true, true, false, false, false, false, false]; // 2反转+5空白
+  for (var i = deck.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = deck[i]; deck[i] = deck[j]; deck[j] = tmp;
+  }
+  return deck;
+}
+
+function applyLancelotAutoDraw(round) {
+  if (!state.lancelotDeck || state.lancelotDeck.length === 0) {
+    showLancelotDrawToast(null, round);
+    checkGameEnd();
+    renderGame();
+    return;
+  }
+  var card = state.lancelotDeck.shift(); // true=反转卡, false=空白卡
+  if (state.lancelotDrawResults.length <= round) {
+    for (var i = state.lancelotDrawResults.length; i <= round; i++) state.lancelotDrawResults.push(null);
+  }
+  state.lancelotDrawResults[round] = card;
+
+  if (card) {
+    state.lancelotFlipCount++;
+    state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+    state.lancelotRoundFlips[round] = true;
+  }
+
+  showLancelotDrawToast(card, round);
+  checkGameEnd();
+  renderGame();
+}
+
+function showLancelotDrawToast(card, round) {
+  if (card === null) {
+    showModal(
+      '<h2>兰斯洛特抽卡</h2>' +
+      '<p style="font-size:16px;text-align:center;margin:10px 0">第 ' + (round + 1) + ' 轮结束</p>' +
+      '<p style="font-size:14px;text-align:center;color:var(--orange)">牌堆已耗尽，本轮无法抽卡</p>' +
+      '<div class="modal-actions"><button class="btn" onclick="closeModal()">确定</button></div>'
+    );
+    return;
+  }
+  var isFlip = card === true;
+  var cardDisplay = isFlip
+    ? '<div style="width:100px;height:100px;margin:12px auto;border-radius:50%;overflow:hidden;border:3px solid #ff3030;box-shadow:0 0 30px rgba(255,48,48,0.7);animation:lancelot-draw-reveal 0.6s ease-out"><img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover"></div>'
+    : '<div style="width:100px;height:100px;margin:12px auto;border-radius:50%;background:rgba(150,150,150,0.2);border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:42px;color:#aaa;animation:lancelot-draw-reveal 0.6s ease-out">&#9675;</div>';
+  var msg = isFlip
+    ? '<span style="color:var(--red-bright);font-weight:700">反转卡！阵营反转</span>'
+    : '<span style="color:var(--text-dim)">空白卡，无变化</span>';
+  var statusNote = isFlip
+    ? (state.lancelotFlipped ? '（当前状态：已反转）' : '（第2次翻转，恢复原阵营）')
+    : '';
+  var remaining = state.lancelotDeck ? state.lancelotDeck.length : 0;
+
   showModal(
-    '<h2>兰斯洛特反转卡</h2>' +
-    '<p style="font-size:15px;text-align:center;margin:10px 0">第 ' + (roundNum + 1) + ' 轮结束，是否抽到反转卡？</p>' +
-    '<p style="font-size:13px;text-align:center;color:var(--text-dim)">已抽到 ' + flips + ' 次 ' + flipStatus + '</p>' +
-    '<p style="font-size:11px;text-align:center;color:var(--text-dim)">抽到2次恢复原阵营</p>' +
-    '<div class="modal-actions">' +
-    '<button class="btn primary" onclick="closeModal();applyLancelotFlip()">&#9989; 是，反转</button>' +
-    '<button class="btn" onclick="closeModal();skipLancelotFlip()">&#10060; 否，不反转</button>' +
-    '</div>'
+    '<h2>兰斯洛特抽卡 · 第 ' + (round + 1) + ' 轮结束</h2>' +
+    cardDisplay +
+    '<p style="font-size:16px;text-align:center;margin:8px 0">' + msg + ' ' + statusNote + '</p>' +
+    '<p style="font-size:12px;text-align:center;color:var(--text-dim)">剩余牌堆：' + remaining + ' 张</p>' +
+    '<div class="modal-actions"><button class="btn primary" onclick="closeModal()">确定</button></div>'
   );
 }
 
+// Legacy: kept for backward compatibility but no longer called from game flow
+function showLancelotFlipModal(roundNum) {
+  applyLancelotAutoDraw(roundNum);
+}
+
 function applyLancelotFlip() {
-  state.lancelotFlipCount++;
-  state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
-  if (state.currentRound >= 0 && state.currentRound < 5) {
-    state.lancelotRoundFlips[state.currentRound] = true;
-  }
-  toast(state.lancelotFlipped ? '兰斯洛特阵营已反转（第 ' + state.lancelotFlipCount + ' 次）' : '兰斯洛特阵营恢复原状（反转2次）');
+  closeModal();
   checkGameEnd();
   renderGame();
 }
 
 function skipLancelotFlip() {
+  closeModal();
   checkGameEnd();
   renderGame();
 }
