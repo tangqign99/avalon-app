@@ -39,3 +39,11 @@ CREATE TABLE IF NOT EXISTS key_value (
 ALTER TABLE key_value ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "allow_anon_all" ON key_value FOR ALL USING (true);
+
+-- ===== Realtime 配置（必须执行！否则跨设备同步不生效）=====
+ALTER TABLE game_records REPLICA IDENTITY FULL;
+ALTER TABLE key_value REPLICA IDENTITY FULL;
+
+-- 将表加入 realtime publication（Supabase Realtime v2）
+ALTER PUBLICATION supabase_realtime ADD TABLE game_records;
+ALTER PUBLICATION supabase_realtime ADD TABLE key_value;

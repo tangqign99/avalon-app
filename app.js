@@ -3577,10 +3577,50 @@ function doImport() {
 }
 
 // Supabase Realtime 订阅：跨设备实时同步
+// 页面加载时从 Supabase 拉取历史数据合并到本地（补充实时推送之前的记录）
+function pullInitialData(sb) {
+  // 拉取对局记录
+  sb.from('game_records').select('game_data').then(function(res) {
+    if (res.error || !res.data) {
+      console.warn('[InitPull] game_records fetch failed:', res.error);
+      return;
+    }
+    var cloudRecords = [];
+    for (var i = 0; i < res.data.length; i++) {
+      if (res.data[i].game_data) cloudRecords.push(res.data[i].game_data);
+    }
+    if (cloudRecords.length === 0) return;
+    var localHistory = loadHistory();
+    var merged = mergeHistories(localHistory, cloudRecords);
+    saveHistory(merged);
+    console.log('[InitPull] merged game_records, local:', localHistory.length, 'cloud:', cloudRecords.length, 'merged:', merged.length);
+    // 当前在 stats 页面则刷新
+    if (state._currentPage === 'stats') renderStats();
+  });
+
+  // 拉取 name_pool
+  sb.from('key_value').select('value').eq('key', 'name_pool').single().then(function(res) {
+    if (res.error || !res.data) return;
+    var cloudPool = res.data.value;
+    if (!cloudPool || !cloudPool.length) return;
+    var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
+    var mergedPool = localPool.slice();
+    for (var j = 0; j < cloudPool.length; j++) {
+      if (mergedPool.indexOf(cloudPool[j]) === -1) mergedPool.push(cloudPool[j]);
+    }
+    namePool = mergedPool;
+    localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
+    console.log('[InitPull] name_pool synced, total:', mergedPool.length);
+  });
+}
+
 function setupRealtimeSubscriptions() {
   if (_supabaseChannel) return; // 避免重复订阅
   var sb = getSupabase();
   if (!sb) return;
+
+  // 首次加载时从 Supabase 回拉历史数据（补充 realtime 订阅之前的记录）
+  pullInitialData(sb);
 
   _supabaseChannel = sb.channel('game-records-channel');
 
