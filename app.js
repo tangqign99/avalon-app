@@ -25,6 +25,8 @@ var state = {
   _lastLeaderIdx: -1,
   assassinTarget: null,
   assassinFromMission: false,
+  assassinMode: false,
+  _assassinPickTarget: null,
   _historyPage: 0,
   _historyPageSize: 5,
   ladyOfLakeEnabled: false,
@@ -60,6 +62,8 @@ function initState(n) {
   state._lastLeaderIdx = -1;
   state.assassinTarget = null;
   state.assassinFromMission = false;
+  state.assassinMode = false;
+  state._assassinPickTarget = null;
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
   state.lancelotDeck = null;
@@ -350,6 +354,8 @@ function doStartGame() {
   state._lastLeaderIdx = -1;
   state.assassinTarget = null;
   state.assassinFromMission = false;
+  state.assassinMode = false;
+  state._assassinPickTarget = null;
   state.lancelotFlipped = false;
   state._lancelotAsked = false;
   state.lancelotFlipCount = 0;
@@ -450,7 +456,104 @@ function renderGame() {
   renderLadyLakeEntry();
   renderTimerDisplay();
   renderReviewEntry();
+  renderAssassinButton();
   $('launch-fail-area').innerHTML = '';
+}
+
+/* ==================== ASSASSIN MODE (in-game) ==================== */
+function renderAssassinButton() {
+  var existing = document.getElementById('assassin-float-btn');
+  if (state.winner) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (!existing) {
+    var btn = document.createElement('button');
+    btn.id = 'assassin-float-btn';
+    btn.className = 'assassin-float-btn';
+    btn.textContent = '拍刀';
+    btn.title = '反方拍刀：选择一名玩家作为梅林';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      enterAssassinMode();
+    });
+    var gamePage = document.getElementById('page-game');
+    if (gamePage) gamePage.appendChild(btn);
+  }
+}
+
+function enterAssassinMode() {
+  state.assassinMode = true;
+  state._assassinPickTarget = null;
+  var overlay = document.createElement('div');
+  overlay.id = 'assassin-overlay';
+  overlay.className = 'assassin-overlay active';
+  var h = '<div class="assassin-modal">';
+  h += '<h2 style="text-align:center;margin:0 0 4px">反方拍刀</h2>';
+  h += '<p style="text-align:center;color:var(--text-dim);font-size:13px;margin:0 0 16px">选择一名玩家作为梅林</p>';
+  h += '<div class="assassin-player-grid">';
+  for (var i = 0; i < state.playerCount; i++) {
+    h += '<button class="assassin-player-btn" onclick="pickAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
+  }
+  h += '</div>';
+  h += '<div class="assassin-actions">';
+  h += '<button class="btn primary" id="assassin-confirm-btn" disabled onclick="confirmAssassinAction()">确认拍刀</button>';
+  h += '<button class="btn" onclick="exitAssassinMode()">取消</button>';
+  h += '</div></div>';
+  overlay.innerHTML = h;
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) exitAssassinMode();
+  });
+  document.body.appendChild(overlay);
+}
+
+function exitAssassinMode() {
+  state.assassinMode = false;
+  state._assassinPickTarget = null;
+  var overlay = document.getElementById('assassin-overlay');
+  if (overlay) overlay.remove();
+}
+
+function pickAssassinTarget(idx) {
+  state._assassinPickTarget = idx;
+  var btns = document.querySelectorAll('#assassin-overlay .assassin-player-btn');
+  btns.forEach(function(b, i) {
+    b.className = 'assassin-player-btn' + (i === idx ? ' selected' : '');
+  });
+  var confirmBtn = document.getElementById('assassin-confirm-btn');
+  if (confirmBtn) confirmBtn.disabled = false;
+}
+
+function confirmAssassinAction() {
+  if (state._assassinPickTarget === null) return;
+  var targetIdx = state._assassinPickTarget;
+  var targetName = playerLabel(targetIdx);
+  exitAssassinMode();
+
+  var h = '<h2>拍刀结果</h2>';
+  h += '<p style="text-align:center;font-size:15px;margin:12px 0">拍刀目标：<strong style="color:var(--red-bright)">' + targetName + '</strong></p>';
+  h += '<p style="text-align:center;font-size:14px;margin-bottom:16px">目标是否为梅林？</p>';
+  h += '<div class="modal-actions" style="justify-content:center;gap:16px">';
+  h += '<button class="winner-btn evil" onclick="resolveInGameAssassin(true, ' + targetIdx + ')">是梅林 → 反方胜</button>';
+  h += '<button class="winner-btn good" onclick="resolveInGameAssassin(false, ' + targetIdx + ')">不是梅林 → 好人方胜</button>';
+  h += '</div>';
+  showModal(h);
+}
+
+function resolveInGameAssassin(isMerlin, targetIdx) {
+  closeModal();
+  state.assassinTarget = targetIdx;
+  state.assassinFromMission = true;
+  state.winner = isMerlin ? 'evil' : 'good';
+  if (isMerlin) {
+    state.autoRoles = state.autoRoles || {};
+    state.autoRoles[targetIdx] = '梅林';
+  }
+  stopTimer();
+  var btn = document.getElementById('assassin-float-btn');
+  if (btn) btn.remove();
+  toast(isMerlin ? '拍刀成功！反方获胜' : '拍刀失败！好人方获胜');
+  renderGame();
 }
 
 function renderRoundTracker() {

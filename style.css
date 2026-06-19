@@ -791,3 +791,118 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     min-width: 60px;
   }
 }
+
+/* ==================== ASSASSIN MODE (in-game) ==================== */
+.assassin-float-btn {
+  position: fixed;
+  top: 72px;
+  right: 12px;
+  z-index: 100;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: #fff;
+  border: 2px solid #ff6b6b;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(231,76,60,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+  letter-spacing: 1px;
+}
+.assassin-float-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 20px rgba(231,76,60,0.6);
+}
+.assassin-float-btn:active {
+  transform: scale(0.96);
+}
+
+.assassin-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.assassin-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.assassin-modal {
+  background: var(--bg-card, #1a1a2e);
+  border: 2px solid var(--red-bright, #e74c3c);
+  border-radius: 12px;
+  padding: 20px 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(231,76,60,0.2);
+}
+
+.assassin-player-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.assassin-player-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-dark, #0d0d1a);
+  color: var(--text, #e0d6c2);
+  border: 2px solid var(--border, #3a2a1a);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  font-family: var(--font-display, 'Cinzel', serif);
+}
+.assassin-player-btn:hover {
+  border-color: var(--gold, #c9a84c);
+  background: rgba(201,168,76,0.08);
+}
+.assassin-player-btn.selected {
+  border-color: var(--red-bright, #e74c3c);
+  background: rgba(231,76,60,0.15);
+  color: var(--red-bright, #e74c3c);
+  box-shadow: 0 0 12px rgba(231,76,60,0.3);
+}
+
+.assassin-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Responsive: assassin mode */
+@media(max-width:480px){
+  .assassin-float-btn {
+    top: 64px;
+    right: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+  .assassin-modal {
+    padding: 16px;
+    width: 94%;
+  }
+  .assassin-player-btn {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+@media(min-width:481px) and (max-width:1024px){
+  .assassin-float-btn {
+    top: 68px;
+    right: 10px;
+  }
+}
