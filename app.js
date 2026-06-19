@@ -3024,19 +3024,22 @@ function showGameDetail(idx) {
   h += '<h3 style="margin-top:10px">任务记录</h3>';
   var hasAssassin = (rec.assassinTarget && rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined);
   var assassinCutoff = hasAssassin ? rec.assassinAfterRound : rec.missions.length;
-  for (var i = 0; i < rec.missions.length; i++) {
+  var totalRounds = hasAssassin ? Math.max(rec.missions.length, assassinCutoff + 1) : rec.missions.length;
+  for (var i = 0; i < totalRounds; i++) {
     if (hasAssassin && i === assassinCutoff) {
       h += '<div style="margin-bottom:4px;padding:8px 12px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)"><span style="font-weight:700">第' + (i + 1) + '轮：</span><span style="color:#ff9999;font-weight:700">反方拍刀</span> — 游戏在此轮终止</div>';
       continue;
     }
     if (hasAssassin && i > assassinCutoff) break;
-    var m = rec.missions[i];
-    h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
-    if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
-    h += '</div>';
+    if (i < rec.missions.length) {
+      var m = rec.missions[i];
+      h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
+      if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
+      h += '</div>';
+    }
   }
-  if (hasAssassin && assassinCutoff < rec.missions.length - 1) {
-    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (rec.missions.length - assassinCutoff - 1) + '轮未进行，游戏在拍刀环节终止）</div>';
+  if (hasAssassin && assassinCutoff < totalRounds - 1) {
+    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (totalRounds - assassinCutoff - 1) + '轮未进行，游戏在拍刀环节终止）</div>';
   }
 
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
