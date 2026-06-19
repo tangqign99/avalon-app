@@ -675,7 +675,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* ===== 手机端适配 ===== */
 @media(max-width:480px){
   .role-checkbox-grid label{
-    font-size:20px;
+    font-size:17px;
     padding:10px 14px;
     min-height:44px;
   }
