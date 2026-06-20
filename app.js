@@ -4011,9 +4011,22 @@ function pullInitialData(sb) {
       cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
       console.log('[InitPull] filtered out', cloudDeletedKeys.length, 'deleted records');
     }
-    // 以云端为唯一数据源，直接覆盖本地（不再与本地数据合并）
-    saveHistory(cloudRecords);
-    console.log('[InitPull] cloud records saved:', cloudRecords.length);
+    // 与本地数据合并：取并集，避免云端插入未完成时覆盖本地新记录
+    var localHistory = loadHistory();
+    var mergedKeys = {};
+    var merged = [];
+    // 先加云端的
+    for (var ri = 0; ri < cloudRecords.length; ri++) {
+      var ck = makeRecordKey(cloudRecords[ri]);
+      if (!mergedKeys[ck]) { mergedKeys[ck] = true; merged.push(cloudRecords[ri]); }
+    }
+    // 再加本地的（云端没有的）
+    for (var li = 0; li < localHistory.length; li++) {
+      var lk = makeRecordKey(localHistory[li]);
+      if (!mergedKeys[lk]) { mergedKeys[lk] = true; merged.push(localHistory[li]); }
+    }
+    saveHistory(merged);
+    console.log('[InitPull] merged: cloud=' + cloudRecords.length + ' local=' + localHistory.length + ' final=' + merged.length);
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
   });
