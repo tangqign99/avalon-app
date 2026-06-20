@@ -59,7 +59,8 @@ var state = {
   lancelotDrawResults: [],
   roundTendencies: [],
   identityMarks: [],
-  ladyCheckHistory: []
+  ladyCheckHistory: [],
+  knownIdentities: {}
 };
 
 function initState(n) {
@@ -94,6 +95,7 @@ function initState(n) {
   state.ladyLakeHolder = -1;
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
+  state.knownIdentities = {};
   state.timerMode = 'per';
   state.timerSeconds = 60;
   state.timerInterval = null;
@@ -380,7 +382,7 @@ function showPage(page) {
     if (_isViewer) applyViewerMode();
   }
   if (page === 'setup') { renderSetup(); renderVisitorLog(); }
-  if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); renderDeduction(); }
+  if (page === 'tend') { renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
@@ -4616,5 +4618,481 @@ function applyViewerMode() {
   }
   showPage('setup');
 
+
+/* ==================== NEW TENDENCY SYSTEM ==================== */
+
+var ROLE_CATEGORY = {
+  '梅林': 'good', '派西维尔': 'good', '忠臣': 'good',
+  '莫甘娜': 'evil', '刺客': 'evil', '莫德雷德': 'evil',
+  '奥伯伦': 'evil', '爪牙': 'evil', '兰斯洛特': 'evil'
+};
+
+function isGoodRole(role) { return ROLE_CATEGORY[role] === 'good'; }
+function isEvilRole(role) { return ROLE_CATEGORY[role] === 'evil'; }
+
+function getPerspective() {
+  if (!state.myRole) return 'unknown';
+  return isGoodRole(state.myRole) ? 'good' : 'evil';
+}
+
+function getKnownLabel(idx) {
+  return state.knownIdentities[idx] || null;
+}
+
+function getRoleOptions() {
+  return [
+    { value: '', label: '不明' },
+    { value: '正方', label: '正方（通用）' },
+    { value: '反方', label: '反方（通用）' },
+    { value: '梅林', label: '梅林' },
+    { value: '派西维尔', label: '派西维尔' },
+    { value: '忠臣', label: '忠臣' },
+    { value: '莫甘娜', label: '莫甘娜' },
+    { value: '刺客', label: '刺客' },
+    { value: '莫德雷德', label: '莫德雷德' },
+    { value: '奥伯伦', label: '奥伯伦' },
+    { value: '爪牙', label: '爪牙' },
+    { value: '兰斯洛特', label: '兰斯洛特' }
+  ];
+}
+
+/* ------- Perspective header ------- */
+function renderTendPerspective() {
+  var persp = getPerspective();
+  var titleEl = document.getElementById('tend-perspective-title');
+  var descEl = document.getElementById('tend-perspective-desc');
+
+  if (!state.myRole) {
+    titleEl.textContent = '倾向分析';
+    descEl.textContent = '请先在游戏设置中选择你的角色';
+    return;
+  }
+
+  if (persp === 'good') {
+    titleEl.textContent = '好人视角：寻找反方';
+    descEl.textContent = '你当前身份是「' + state.myRole + '」，正在分析其他玩家是反方的概率';
+  } else {
+    titleEl.textContent = '反方视角：寻找梅林';
+    descEl.textContent = '你当前身份是「' + state.myRole + '」，正在分析其他玩家是梅林的概率';
+  }
+}
+
+/* ------- Known identity grid ------- */
+function renderKnownIdentityGrid() {
+  var el = document.getElementById('known-identity-grid');
+  var opts = getRoleOptions();
+  var h = '<div class="known-identity-row">';
+
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === state.selfIndex) continue;
+    var cur = state.knownIdentities[i] || '';
+    h += '<div class="known-item">';
+    h += '<span class="known-name">' + escapeHtml(state.playerNames[i]) + '</span>';
+    h += '<select class="known-select" onchange="setKnownIdentity(' + i + ', this.value)"' +
+         ' id="known-sel-' + i + '">';
+    for (var j = 0; j < opts.length; j++) {
+      h += '<option value="' + opts[j].value + '"' + (opts[j].value === cur ? ' selected' : '') + '>' +
+           opts[j].label + '</option>';
+    }
+    h += '</select>';
+    h += '</div>';
+  }
+
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+function setKnownIdentity(idx, value) {
+  if (value === '') {
+    delete state.knownIdentities[idx];
+  } else {
+    state.knownIdentities[idx] = value;
+  }
+  renderTendResult();
+}
+
+/* ------- Scoring engine ------- */
+function computeSuspectScores() {
+  var pc = state.playerCount;
+  var persp = getPerspective();
+  var scores = {};
+
+  // Initialize
+  for (var i = 0; i < pc; i++) {
+    if (i === state.selfIndex) continue;
+    scores[i] = { idx: i, score: 50, evidence: [] };
+  }
+
+  // Known identities: lock scores
+  for (var i = 0; i < pc; i++) {
+    if (i === state.selfIndex) continue;
+    var label = getKnownLabel(i);
+    if (!label) continue;
+
+    if (persp === 'good') {
+      // Good perspective: known goods → low suspicion; known evils → high suspicion
+      if (isGoodRole(label) || label === '正方') {
+        scores[i].score = 0;
+        scores[i].evidence.push('已知正方：' + label);
+      } else if (isEvilRole(label) || label === '反方') {
+        scores[i].score = 100;
+        scores[i].evidence.push('已知反方：' + label);
+      }
+    } else {
+      // Evil perspective: looking for Merlin
+      if (label === '梅林') {
+        scores[i].score = 100;
+        scores[i].evidence.push('已知就是梅林');
+      } else if (isGoodRole(label) || label === '正方') {
+        scores[i].score = 100;  // No longer need to find Merlin if we know them
+        scores[i].evidence.push('已知正方（排除出梅林搜索）：' + label);
+      } else if (isEvilRole(label) || label === '反方') {
+        scores[i].score = 0;
+        scores[i].evidence.push('已知反方（排除）：' + label);
+      }
+    }
+  }
+
+  if (persp === 'good') {
+    computeGoodScores(scores, pc);
+  } else {
+    computeEvilScores(scores, pc);
+  }
+
+  // Convert to sorted list
+  var list = [];
+  for (var i = 0; i < pc; i++) {
+    if (i === state.selfIndex) continue;
+    list.push(scores[i]);
+  }
+  list.sort(function(a, b) { return b.score - a.score; });
+  return list;
+}
+
+function computeGoodScores(scores, pc) {
+  // Good perspective: find evil players
+  var missions = state.missions;
+
+  for (var r = 0; r < missions.length; r++) {
+    var m = missions[r];
+    if (!m || !m.team || m.team.length === 0) continue;
+
+    // Mission result analysis
+    if (m.result === 'fail') {
+      // Failed mission: team members are suspected
+      for (var t = 0; t < m.team.length; t++) {
+        var pi = m.team[t];
+        if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
+        scores[pi].score += 18;
+        scores[pi].evidence.push('在第' + (r + 1) + '轮失败任务队伍中');
+      }
+    }
+    if (m.result === 'success') {
+      // Success mission: those who approved and were on team get a small trust bonus
+      for (var t = 0; t < m.team.length; t++) {
+        var pi = m.team[t];
+        if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
+        scores[pi].score -= 5;
+        scores[pi].evidence.push('成功完成第' + (r + 1) + '轮任务');
+      }
+    }
+
+    // Launch attempt voting analysis
+    var attempts = m.launchAttempts || [];
+    for (var a = 0; a < attempts.length; a++) {
+      var att = attempts[a];
+      var teamSet = {};
+      for (var t = 0; t < (att.proposedTeam || []).length; t++) {
+        teamSet[att.proposedTeam[t]] = true;
+      }
+
+      // Count approves
+      var approves = 0;
+      for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') approves++; }
+      var needed = Math.floor(pc / 2) + 1;
+
+      if (approves < needed) {
+        // Proposal rejected
+        var hasSelf = teamSet[state.selfIndex];
+        for (var k = 0; k < pc; k++) {
+          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
+          var vote = att.votes[k];
+
+          if (hasSelf) {
+            // Self was on team: those who rejected are sus
+            if (vote === 'reject') {
+              scores[k].score += 8;
+              scores[k].evidence.push('第' + (r + 1) + '轮拒绝含自己的队伍提案');
+            }
+          }
+          // Evil players often avoid approving teams with known goods
+          if (vote === 'approve' && approves <= needed) {
+            // Approving when it barely passes → slightly sus
+          }
+        }
+      } else {
+        // Proposal approved
+        var isSuccess = (m.result === 'success');
+        for (var k = 0; k < pc; k++) {
+          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
+          var vote = att.votes[k];
+
+          if (isSuccess && vote === 'reject') {
+            // Rejected a successful mission → sus
+            scores[k].score += 7;
+            scores[k].evidence.push('第' + (r + 1) + '轮拒绝成功的任务');
+          }
+          if (!isSuccess && vote === 'approve') {
+            // Approved a failing mission → sus if they weren't on it (why approve?）
+            if (!teamSet[k]) {
+              scores[k].score += 6;
+              scores[k].evidence.push('第' + (r + 1) + '轮批准了失败的任务（未在队伍中）');
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Lady Lake analysis (good perspective)
+  if (state.ladyLakeEnabled && state.ladyLakeChecks.length > 0) {
+    for (var c = 0; c < state.ladyLakeChecks.length; c++) {
+      var check = state.ladyLakeChecks[c];
+      var checker = check.checker;
+      var target = check.target;
+      var owner = check.owner;
+      var result = check.result;
+
+      if (checker === state.selfIndex) {
+        // Self checked someone → result is reliable
+        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
+          if (result === 'evil') {
+            scores[target].score += 25;
+            scores[target].evidence.push('湖中仙女确认是反方');
+          } else {
+            scores[target].score -= 20;
+            scores[target].evidence.push('湖中仙女确认是正方');
+          }
+        }
+      }
+
+      // Known good used Lady Lake on someone
+      var checkerLabel = getKnownLabel(checker);
+      if (checkerLabel && isGoodRole(checkerLabel)) {
+        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
+          if (result === 'evil') {
+            scores[target].score += 20;
+            scores[target].evidence.push('已知正方' + state.playerNames[checker] + '用湖仙女确认是反方');
+          } else {
+            scores[target].score -= 15;
+            scores[target].evidence.push('已知正方' + state.playerNames[checker] + '用湖仙女确认是正方');
+          }
+        }
+      }
+    }
+  }
+
+  // Cap at 0-100
+  for (var i = 0; i < pc; i++) {
+    if (scores[i]) {
+      scores[i].score = Math.max(0, Math.min(100, scores[i].score));
+    }
+  }
+}
+
+function computeEvilScores(scores, pc) {
+  // Evil perspective: find Merlin
+  var missions = state.missions;
+
+  for (var r = 0; r < missions.length; r++) {
+    var m = missions[r];
+    if (!m || !m.team || m.team.length === 0) continue;
+
+    // Mission result analysis
+    if (m.result === 'fail') {
+      // Failed mission: those who WEREN'T on the team but rejected → not Merlin (Merlin knows the evil team)
+      for (var t = 0; t < m.team.length; t++) {
+        var pi = m.team[t];
+        if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
+        scores[pi].score -= 3;
+      }
+    }
+
+    // Launch attempt voting
+    var attempts = m.launchAttempts || [];
+    for (var a = 0; a < attempts.length; a++) {
+      var att = attempts[a];
+      var teamSet = {};
+      for (var t = 0; t < (att.proposedTeam || []).length; t++) {
+        teamSet[att.proposedTeam[t]] = true;
+      }
+
+      var hasSelf = teamSet[state.selfIndex];
+      var hasKnownEvil = false;
+      for (var k = 0; k < pc; k++) {
+        var label = getKnownLabel(k);
+        if (teamSet[k] && label && (isEvilRole(label) || label === '反方')) {
+          hasKnownEvil = true;
+          break;
+        }
+      }
+
+      // Merlin tends to avoid approving teams with known/knowable evils
+      if (hasSelf || hasKnownEvil) {
+        for (var k = 0; k < pc; k++) {
+          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
+          if (att.votes[k] === 'reject') {
+            scores[k].score += 10;
+            scores[k].evidence.push('第' + (r + 1) + '轮拒绝含反方的队伍（梅林行为）');
+          }
+          if (att.votes[k] === 'approve' && !teamSet[k]) {
+            scores[k].score -= 3;
+          }
+        }
+      }
+
+      // Mission approval pattern: Merlin often approves successful missions, rejects risky ones
+      if (m.result === 'success') {
+        for (var k = 0; k < pc; k++) {
+          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
+          if (att.votes[k] === 'approve') {
+            scores[k].score += 4;
+            scores[k].evidence.push('第' + (r + 1) + '轮批准成功任务（梅林倾向）');
+          }
+        }
+      }
+    }
+  }
+
+  // Lady Lake analysis (evil perspective)
+  if (state.ladyLakeEnabled && state.ladyLakeChecks.length > 0) {
+    for (var c = 0; c < state.ladyLakeChecks.length; c++) {
+      var check = state.ladyLakeChecks[c];
+      var checker = check.checker;
+      var target = check.target;
+      var result = check.result;
+
+      // Known evil checking someone → Merlin won't check an evil
+      var checkerLabel = getKnownLabel(checker);
+      if (checkerLabel && isEvilRole(checkerLabel)) {
+        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
+          scores[target].score -= 15;
+          scores[target].evidence.push('已知反方' + state.playerNames[checker] + '检查过');
+        }
+      }
+    }
+  }
+
+  // Cap at 0-100
+  for (var i = 0; i < pc; i++) {
+    if (scores[i]) {
+      scores[i].score = Math.max(0, Math.min(100, scores[i].score));
+    }
+  }
+}
+
+/* ------- Result rendering ------- */
+function renderTendResult() {
+  var persp = getPerspective();
+  var titleEl = document.getElementById('tend-result-title');
+  var descEl = document.getElementById('tend-result-desc');
+  var listEl = document.getElementById('tend-result-list');
+
+  if (!state.myRole) {
+    titleEl.textContent = '分析结果';
+    descEl.textContent = '';
+    listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">请先在游戏设置中选择你的角色</p>';
+    return;
+  }
+
+  if (persp === 'good') {
+    titleEl.textContent = '反方嫌疑排行';
+    descEl.textContent = '分数越高，是反方的概率越大。绿色=低嫌疑 黄色=中等 红色=高嫌疑';
+  } else {
+    titleEl.textContent = '梅林概率排行';
+    descEl.textContent = '分数越高，是梅林的概率越大。绿色=低概率 黄色=中等 红色=高概率';
+  }
+
+  var list = computeSuspectScores();
+
+  if (list.length === 0) {
+    listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">暂无数据</p>';
+    renderEvidencePanel(list);
+    return;
+  }
+
+  var h = '';
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i];
+    var cls = 'suspect';
+    if (item.score < 40) cls = 'trust';
+    else if (item.score < 65) cls = 'neutral';
+
+    var label = getKnownLabel(item.idx);
+    var labeled = label ? ' <span style="font-size:11px;color:var(--accent);background:rgba(201,168,76,0.15);padding:1px 6px;border-radius:3px">' + escapeHtml(label) + '</span>' : '';
+
+    h += '<div class="tend-result-item">';
+    h += '<span class="tend-result-name">' + escapeHtml(state.playerNames[item.idx]) + labeled + '</span>';
+    h += '<div class="tend-bar-wrap">';
+    h += '<div class="tend-bar-fill ' + cls + '" style="width:' + item.score + '%"></div>';
+    h += '</div>';
+    h += '<span class="tend-score ' + cls + '">' + item.score + '</span>';
+    h += '<button class="btn tiny" onclick="toggleEvidence(' + item.idx + ')" style="font-size:11px;margin-left:8px;min-width:24px">▼</button>';
+    h += '</div>';
+    h += '<div id="ev-' + item.idx + '" class="evidence-panel" style="display:none">';
+    if (item.evidence.length === 0) {
+      h += '<p style="font-size:11px;color:var(--text-dim);padding:4px 20px">暂无具体证据</p>';
+    } else {
+      for (var e = 0; e < item.evidence.length; e++) {
+        h += '<p style="font-size:11px;color:var(--text-dim);margin:0;padding:2px 20px">• ' + escapeHtml(item.evidence[e]) + '</p>';
+      }
+    }
+    h += '</div>';
+  }
+
+  listEl.innerHTML = h;
+  renderEvidencePanel(list);
+}
+
+function renderEvidencePanel(list) {
+  var panel = document.getElementById('tend-evidence-list');
+  if (!panel) return;
+
+  var allEvidence = [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].evidence.length > 0) {
+      allEvidence.push({
+        player: state.playerNames[list[i].idx],
+        idx: list[i].idx,
+        score: list[i].score,
+        evidence: list[i].evidence
+      });
+    }
+  }
+
+  if (allEvidence.length === 0) {
+    panel.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:12px">随游戏推进，关键证据将在此汇总</p>';
+    return;
+  }
+
+  var h = '';
+  for (var i = 0; i < allEvidence.length; i++) {
+    var e = allEvidence[i];
+    h += '<div class="evidence-item">';
+    h += '<strong style="color:var(--text-bright)">' + escapeHtml(e.player) + '（分数：' + e.score + '）</strong>';
+    h += '<ul style="margin:4px 0 0 16px;padding:0">';
+    for (var j = 0; j < e.evidence.length; j++) {
+      h += '<li style="font-size:12px;color:var(--text-dim)">' + escapeHtml(e.evidence[j]) + '</li>';
+    }
+    h += '</ul></div>';
+  }
+  panel.innerHTML = h;
+}
+
+function toggleEvidence(idx) {
+  var el = document.getElementById('ev-' + idx);
+  if (!el) return;
+  el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+}
 
 })();

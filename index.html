@@ -109,47 +109,25 @@
 
 <section class="page" id="page-tend">
   <div class="card">
-    <h2>倾向值面板</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
-      从「我」的视角评估其他玩家。绿≥60 黄40-59 红&lt;40。初始50。
-    </p>
-    <div id="tendency-full"></div>
+    <h2 id="tend-perspective-title">倾向分析</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
   </div>
-  <div class="card">
-    <h2>身份预测</h2>
-    <div id="predict-player-dropdowns-full"></div>
+
+  <div class="card" id="known-identity-card">
+    <h2>已知身份标注</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范围</p>
+    <div id="known-identity-grid"></div>
   </div>
-  <div class="card">
-    <h2>梅林预测</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">基于投票行为和倾向值计算各玩家为梅林的概率</p>
-    <div id="merlin-predict-tend"></div>
+
+  <div class="card" id="tend-result-card">
+    <h2 id="tend-result-title">分析结果</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px" id="tend-result-desc"></p>
+    <div id="tend-result-list"></div>
   </div>
-  <div class="card" id="identity-sim-card">
-    <h2>身份模拟推演</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">为每位玩家假设身份，校验是否与已有线索矛盾</p>
-    <div id="identity-sim-grid"></div>
-    <div style="text-align:center;margin-top:10px">
-      <button class="btn primary" onclick="runIdentitySimulation()">校验</button>
-    </div>
-    <div id="identity-sim-result" style="margin-top:10px"></div>
-  </div>
-  <div class="card" id="deduction-grid">
-    <h2>身份推演</h2>
-    <p class="sub">基于投票记录与对局数据，自动计算各玩家阵营概率</p>
-    <p style="color:var(--text-dim);text-align:center;padding:16px">正在进行中或尚无对局数据</p>
-  </div>
-  <div class="card" id="deduction-merlin" style="display:none">
-    <h3>梅林概率排行</h3>
-    <div id="deduction-merlin-list"></div>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <h3>推演说明</h3>
-    <p style="font-size:12px;color:var(--text-dim);line-height:1.6">
-      好人/坏人概率 = 50% 基础值 + 投票倾向偏差 + 身份标记加成 + 历史数据<br>
-      梅林概率 = 投票同步率（与已知好人同步投票的概率）+ 历史梅林对局中投票吻合度<br>
-      概率受当前倾向值、身份预测标记、历史对局数据综合影响。<br>
-      ★我 = 标记当前用户（阿弟）自身位置。
-    </p>
+
+  <div class="card" id="tend-evidence-card">
+    <h2>关键证据</h2>
+    <div id="tend-evidence-list"></div>
   </div>
 </section>
 
