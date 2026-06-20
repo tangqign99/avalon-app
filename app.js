@@ -3515,7 +3515,6 @@ function showGameDetail(idx) {
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
           h += '| 队长 ' + att.leader + ' | 队伍 ' + att.team.join('、');
-          h += ' | 投票 ' + approveCount + ':' + rejectCount;
           // Per-player vote details
           var approveNames = [], rejectNames = [];
           for (var vk in att.votes) {
@@ -3563,7 +3562,6 @@ function showGameDetail(idx) {
           h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
           h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
           if (m.votes && (lgc + lbc > 0)) {
-            h += ' | 投票 ' + lgc + ':' + lbc;
             var ltotal = lgc + lbc;
             var lall = (lbc === 0);
             h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
