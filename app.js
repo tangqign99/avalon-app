@@ -4010,15 +4010,26 @@ function pullInitialData(sb) {
         cloudRecords.push(gameRes.data[i].game_data);
       }
     }
-    // 以云端删除黑名单为准，直接覆盖本地（不再合并本地残留）
+    // 合并本地和云端删除黑名单，防止离线删除标记被云端覆盖
     var cloudDeletedKeys = (dkRes.data && dkRes.data.value) ? dkRes.data.value : [];
-    saveDeletedKeys(cloudDeletedKeys);
+    var localDeletedKeys = loadDeletedKeys();
+    var mergedDK = {};
+    for (var d = 0; d < cloudDeletedKeys.length; d++) { mergedDK[cloudDeletedKeys[d]] = true; }
+    for (var d = 0; d < localDeletedKeys.length; d++) { mergedDK[localDeletedKeys[d]] = true; }
+    var allDeletedKeys = Object.keys(mergedDK);
+    saveDeletedKeys(allDeletedKeys);
+    // 同步合并后黑名单到云端
+    if (sb) {
+      sb.from('key_value').upsert({ key: 'avalon_deleted_keys', value: allDeletedKeys, updated_at: new Date().toISOString() }).then(function(r) {
+        if (r.error) console.warn('[InitPull] sync merged deletedKeys failed:', r.error);
+      });
+    }
     // 过滤删除黑名单
-    if (cloudDeletedKeys.length > 0) {
+    if (allDeletedKeys.length > 0) {
       var dkSet = {};
-      for (var d = 0; d < cloudDeletedKeys.length; d++) { dkSet[cloudDeletedKeys[d]] = true; }
+      for (var d = 0; d < allDeletedKeys.length; d++) { dkSet[allDeletedKeys[d]] = true; }
       cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
-      console.log('[InitPull] filtered out', cloudDeletedKeys.length, 'deleted records');
+      console.log('[InitPull] filtered by', allDeletedKeys.length, 'deleted keys');
     }
     // 以云端为唯一数据源，直接覆盖本地（云端为空时保留本地，避免离线记录被清空）
     var localHistory = loadHistory();
