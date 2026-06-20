@@ -1118,3 +1118,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .tend-result-name{flex:1;font-size:14px;font-weight:600;color:var(--text-bright);min-width:80px}
 .evidence-panel{padding:2px 0 6px 0;border-bottom:1px solid rgba(201,168,76,0.05);margin-bottom:6px}
 .evidence-item{padding:6px 8px;margin-bottom:4px;background:var(--parchment);border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.06)}
+
+.tend-result-item .tend-bar-wrap{width:100px;height:8px;border-radius:4px;background:#333;overflow:hidden;flex-shrink:0}
+.tend-result-item .tend-bar-fill{height:100%;border-radius:4px;transition:width 0.4s}
+
+.btn.tiny{padding:2px 8px;font-size:11px;min-width:unset}

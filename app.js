@@ -4621,6 +4621,12 @@ function applyViewerMode() {
 
 /* ==================== NEW TENDENCY SYSTEM ==================== */
 
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
 var ROLE_CATEGORY = {
   '梅林': 'good', '派西维尔': 'good', '忠臣': 'good',
   '莫甘娜': 'evil', '刺客': 'evil', '莫德雷德': 'evil',
