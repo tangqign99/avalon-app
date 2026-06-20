@@ -2976,37 +2976,46 @@ function saveGameRecord() {
   history.push(record);
   saveHistory(history);
 
-  // Supabase: 静默保存对局记录到云端（实时订阅会自动通知其他设备）
+  // Supabase: 等待插入完成再跳转，防止刷新丢失
   var sb = getSupabase();
+  var done = false;
+  function finishSave() {
+    if (done) return;
+    done = true;
+    var savedCount = state.playerCount;
+    var savedNames = state.playerNames.slice();
+    var savedSelf = state.selfIndex;
+    var savedRoles = state.activeRoles.slice();
+    initState(savedCount);
+    state.activeRoles = savedRoles;
+    state.playerNames = savedNames;
+    state.selfIndex = savedSelf;
+    state.myRole = null;
+    syncGameState();
+    showPage('setup');
+  }
   if (sb) {
     var recordKey = makeRecordKey(record);
     sb.from('game_records').insert({ game_data: record, record_key: recordKey }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
+        toast('保存失败：' + res.error.message, 'warn');
       } else if (res.data && res.data.id) {
-        // 回写 Supabase 记录 ID 到本地，供后续删除时使用
         record._supabaseId = res.data.id;
         history[history.length - 1]._supabaseId = res.data.id;
         saveHistory(history);
       }
+      finishSave();
     });
     // 同步 name_pool 到云端
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(function(res) {
       if (res.error) console.warn('[Supabase] save name_pool failed:', res.error);
     });
+    // 超时兜底：5 秒后无论如何跳转
+    setTimeout(finishSave, 5000);
+  } else {
+    finishSave();
   }
-
-  var savedCount = state.playerCount;
-  var savedNames = state.playerNames.slice();
-  var savedSelf = state.selfIndex;
-  var savedRoles = state.activeRoles.slice();
-  initState(savedCount);
-  state.activeRoles = savedRoles;
-  state.playerNames = savedNames;
-  state.selfIndex = savedSelf;
-  state.myRole = null;
-  syncGameState();
-  showPage('setup');
 }
 
 /* ==================== STATS PANEL ==================== */
@@ -4011,22 +4020,9 @@ function pullInitialData(sb) {
       cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
       console.log('[InitPull] filtered out', cloudDeletedKeys.length, 'deleted records');
     }
-    // 与本地数据合并：取并集，避免云端插入未完成时覆盖本地新记录
-    var localHistory = loadHistory();
-    var mergedKeys = {};
-    var merged = [];
-    // 先加云端的
-    for (var ri = 0; ri < cloudRecords.length; ri++) {
-      var ck = makeRecordKey(cloudRecords[ri]);
-      if (!mergedKeys[ck]) { mergedKeys[ck] = true; merged.push(cloudRecords[ri]); }
-    }
-    // 再加本地的（云端没有的）
-    for (var li = 0; li < localHistory.length; li++) {
-      var lk = makeRecordKey(localHistory[li]);
-      if (!mergedKeys[lk]) { mergedKeys[lk] = true; merged.push(localHistory[li]); }
-    }
-    saveHistory(merged);
-    console.log('[InitPull] merged: cloud=' + cloudRecords.length + ' local=' + localHistory.length + ' final=' + merged.length);
+    // 以云端为唯一数据源，直接覆盖本地
+    saveHistory(cloudRecords);
+    console.log('[InitPull] cloud records saved:', cloudRecords.length);
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
   });
