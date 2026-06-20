@@ -3519,8 +3519,9 @@ function showGameDetail(idx) {
           // Per-player vote details
           var approveNames = [], rejectNames = [];
           for (var vk in att.votes) {
-            var vn = nameByIndex[parseInt(vk)];
-            if (!vn) vn = '玩家' + (parseInt(vk) + 1);
+            var vidx = parseInt(vk) - 1;
+            var vn = nameByIndex[vidx];
+            if (!vn) vn = '玩家' + (parseInt(vk));
             if (att.votes[vk] === 'approve') approveNames.push(vn);
             else rejectNames.push(vn);
           }
@@ -3559,8 +3560,9 @@ function showGameDetail(idx) {
           h += ' | 投票 ' + lgc + ':' + lbc;
           var lgn = [], lbn = [];
           for (var lvk in m.votes) {
-            var ln = nameByIndex[parseInt(lvk)];
-            if (!ln) ln = '玩家' + (parseInt(lvk) + 1);
+            var lidx = parseInt(lvk) - 1;
+            var ln = nameByIndex[lidx];
+            if (!ln) ln = '玩家' + (parseInt(lvk));
             if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
           }
           h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
