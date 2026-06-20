@@ -3052,12 +3052,12 @@ function renderStats() {
   var totalPages = Math.ceil(filtered.length / ps);
   if (state._historyPage >= totalPages && totalPages > 0) state._historyPage = totalPages - 1;
   if (state._historyPage < 0) state._historyPage = 0;
-  var start = filtered.length - 1 - state._historyPage * ps;
-  var end = Math.max(-1, start - ps);
+  var start = state._historyPage * ps;
+  var end = Math.min(filtered.length, start + ps);
 
   var cl = $('history-compact-list');
   h = '';
-  for (var fi = start; fi > end; fi--) {
+  for (var fi = start; fi < end; fi++) {
     var frec = filtered[fi];
     var rec = frec.rec;
     var i = frec.origIdx;
