@@ -615,7 +615,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .history-compact-item .hci-body .hci-missions{color:var(--text-dim);margin-top:4px}
 .history-compact-item .hci-actions{display:flex;gap:6px;margin-top:8px}
 .hci-right{display:flex;align-items:center;gap:6px;margin-left:auto}
-.hci-delete-btn{padding:2px 5px;font-size:11px;min-height:24px;line-height:1;flex-shrink:0}
 
 /* ===== 六、身份预测标�?===== */
 .identity-predict-section{margin-top:10px;padding-top:10px;border-top:1px solid rgba(201,168,76,0.15)}

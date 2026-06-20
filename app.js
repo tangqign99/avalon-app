@@ -3071,7 +3071,6 @@ function renderStats() {
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
     h += '<div class="hci-right">';
     h += '<span class="hci-result" style="color:' + winnerColor + '">' + winnerLabel + '</span>';
-    h += '<button class="btn small danger hci-delete-btn" onclick="event.stopPropagation();deleteGameRecord(' + i + ')" title="删除此记录">&#10005;</button>';
     h += '<span class="hci-toggle">&#9654;</span>';
     h += '</div></div>';
     h += '<div class="hci-body">';
@@ -3113,6 +3112,7 @@ function renderStats() {
     }
     h += '<div class="hci-actions">';
     h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
+    h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')">删除</button>';
     h += '</div></div></div>';
   }
   cl.innerHTML = h;
