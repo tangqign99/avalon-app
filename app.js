@@ -2996,7 +2996,7 @@ function saveGameRecord() {
   }
   if (sb) {
     var recordKey = makeRecordKey(record);
-    sb.from('game_records').insert({ game_data: record, record_key: recordKey }).select('id').single().then(function(res) {
+    sb.from('game_records').insert({ game_data: record }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
         toast('保存失败：' + res.error.message, 'warn');
