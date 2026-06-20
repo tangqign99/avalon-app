@@ -3830,6 +3830,7 @@ function confirmDeleteGame(idx) {
 function showModal(html) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
+  overlay.id = 'dynamic-modal-overlay';
   overlay.innerHTML = '<div class="modal" id="temp-modal">' + html + '</div>';
   overlay.addEventListener('click', function(e) {
     if (e.target === overlay) overlay.remove();
@@ -3837,8 +3838,8 @@ function showModal(html) {
   document.body.appendChild(overlay);
 }
 function closeModal() {
-  var overlays = document.querySelectorAll('.modal-overlay');
-  overlays.forEach(function(o) { o.remove(); });
+  var overlay = document.getElementById('dynamic-modal-overlay');
+  if (overlay) overlay.remove();
 }
 
 function clearStats() {
