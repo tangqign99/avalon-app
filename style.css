@@ -351,7 +351,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .toast.show{opacity:1}
 .toast.info{background:var(--blue);color:#fff}
 .toast.warn{background:var(--orange);color:#fff}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:300;display:none;align-items:center;justify-content:center}
 .modal-overlay.active{display:flex}
 .modal{
   background:linear-gradient(175deg,var(--parchment-light) 0%,var(--parchment) 100%);
@@ -551,18 +551,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .rc-vote-table th{color:var(--gold);font-size:11px}
 .rc-vote-table .vote-ap{color:var(--green-bright)}
 .rc-vote-table .vote-rj{color:var(--red-bright)}
-.vote-result-split{display:flex;flex-direction:column;gap:6px;margin-top:6px}
-.vote-row-h{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
-.vote-col-approve,.vote-col-reject{flex:1;border-radius:var(--radius-sm);padding:8px 10px;background:rgba(0,0,0,0.15)}
-.vote-col-title{font-size:11px;font-weight:700;margin-bottom:4px;text-align:center}
+.vote-result-split{display:flex;flex-direction:row;gap:6px;margin-top:6px}
+.vote-col-approve,.vote-col-reject{flex:1;border-radius:var(--radius-sm);padding:8px 10px;background:rgba(0,0,0,0.15);min-width:0}
 .vote-col-approve .vote-col-title{color:var(--green-bright)}
 .vote-col-reject .vote-col-title{color:var(--red-bright)}
+.vote-col-title{font-size:11px;font-weight:700;margin-bottom:4px;text-align:center;display:block}
 .vote-player-name{display:inline-block;font-size:11px;padding:2px 6px;margin:1px 2px;border-radius:3px;background:rgba(0,0,0,0.2)}
-.vote-row-approve .vote-player-name{color:var(--green)}
-.vote-row-reject .vote-player-name{color:var(--red)}
-.vote-row-approve .vote-col-title{color:var(--green-bright)}
-.vote-row-reject .vote-col-title{color:var(--red-bright)}
-.vote-col-empty{font-size:11px;color:var(--text-dim);text-align:center;font-style:italic}
+.vote-col-approve .vote-player-name{color:var(--green)}
+.vote-col-reject .vote-player-name{color:var(--red)}
+.vote-col-empty{font-size:11px;color:var(--text-dim);text-align:center;font-style:italic;display:block}
 .rc-launch-attempts{margin-top:8px;font-size:12px;color:var(--text-dim)}
 .rc-launch-attempts .launch-item{border:1px solid rgba(201,168,76,0.25);background:rgba(201,168,76,0.06);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px;text-align:center;font-size:15px}
 .launch-item strong{font-size:16px}
@@ -570,6 +567,12 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .launch-member{display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.08);color:var(--text);font-size:14px;margin:0 1px}
 .launch-first{border-color:var(--gold-light)!important;box-shadow:0 0 14px rgba(201,168,76,0.45),inset 0 0 20px rgba(201,168,76,0.06);animation:launch-glow 2s ease-in-out infinite}
 @keyframes launch-glow{0%,100%{box-shadow:0 0 14px rgba(201,168,76,0.45),inset 0 0 20px rgba(201,168,76,0.06)}50%{box-shadow:0 0 28px rgba(201,168,76,0.7),inset 0 0 30px rgba(201,168,76,0.12)}}
+
+/* mobile: stack vote columns vertically */
+@media(max-width:480px){
+  .vote-result-split{flex-direction:column}
+}
+
 
 /* ===== 五、统计显示优�?===== */
 .merlin-assassin-card{

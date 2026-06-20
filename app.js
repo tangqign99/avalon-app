@@ -951,7 +951,7 @@ function renderStepPanel() {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
   h += '<span class="step-label">第' + (state.currentRound + 1) + '轮 · 需要 ' + reqSize + ' 人出任务</span>';
   h += '<span style="font-size:13px;color:var(--text-dim)">' + (m.result ? (m.result === 'success' ? '已完成 ✓' : '已失败 ✕') : '进行中');
-  if (m.launchFailures > 0) h += ' · 发车失败 ' + m.launchFailures + ' 次';
+  if (m.launchFailures > 0) h += ' · 组队未通过 ' + m.launchFailures + ' 次';
   h += '</span></div>';
 
   if (m.result) {
@@ -2162,7 +2162,7 @@ function buildReviewHTML() {
         h += ' <span style="color:var(--text-dim)">带队：</span>';
         h += att.team.map(function(i) { return '<span class="launch-member">' + playerLabel(i) + '</span>'; }).join(' ');
         h += ' | 赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves);
-        h += launched ? ' <span style="color:var(--green-bright)">发车</span>' : ' <span style="color:var(--red-bright)">否决</span>';
+        h += launched ? ' <span style="color:var(--green-bright)">组队成功</span>' : ' <span style="color:var(--red-bright)">组队未通过</span>';
 
         // Vote detail - two-column layout
         var approveList = [], rejectList = [];
@@ -2171,12 +2171,12 @@ function buildReviewHTML() {
           else rejectList.push(playerLabel(k));
         }
         h += '<div class="vote-result-split">';
-        h += '<div class="vote-row-h vote-row-approve"><span class="vote-col-title">赞成 (' + approveList.length + '人)：</span>';
+        h += '<div class="vote-col-approve"><span class="vote-col-title">赞成 (' + approveList.length + '人)：</span>';
         if (approveList.length > 0) {
           h += approveList.map(function(n) { return '<span class="vote-player-name">' + n + '</span>'; }).join('');
         } else { h += '<span class="vote-col-empty">无</span>'; }
         h += '</div>';
-        h += '<div class="vote-row-h vote-row-reject"><span class="vote-col-title">反对 (' + rejectList.length + '人)：</span>';
+        h += '<div class="vote-col-reject"><span class="vote-col-title">反对 (' + rejectList.length + '人)：</span>';
         if (rejectList.length > 0) {
           h += rejectList.map(function(n) { return '<span class="vote-player-name">' + n + '</span>'; }).join('');
         } else { h += '<span class="vote-col-empty">无</span>'; }
@@ -2194,7 +2194,7 @@ function buildReviewHTML() {
     }
 
     if (m.launchFailures > 0) {
-      h += '<div style="margin-top:4px;color:var(--orange)">发车失败 ' + m.launchFailures + ' 次</div>';
+      h += '<div style="margin-top:4px;color:var(--orange)">组队未通过 ' + m.launchFailures + ' 次</div>';
     }
 
     h += '</div></div>';
@@ -2366,7 +2366,7 @@ function confirmVotes() {
       checkGameEnd();
       renderGame();
       syncGameState();
-      var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮连续 <span class="count">5</span> 次发车失败，任务自动失败！</div>';
+      var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮连续 <span class="count">5</span> 次组队未通过，任务自动失败！</div>';
       $('launch-fail-area').innerHTML = banner;
       return;
     }
@@ -2377,9 +2377,9 @@ function confirmVotes() {
     m.votes = {};
 
     renderGame();
-    var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮第 <span class="count">' + m.launchFailures + '</span> 次发车失败！赞成 ' + approves + ' / 反对 ' + rejects + '（赞成≤反对）队长轮换至 ' + playerLabel(m.leader) + '</div>';
+    var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮第 <span class="count">' + m.launchFailures + '</span> 次组队未通过！赞成 ' + approves + ' / 反对 ' + rejects + '（赞成≤反对）队长轮换至 ' + playerLabel(m.leader) + '</div>';
     $('launch-fail-area').innerHTML = banner;
-    toast('发车失败！队长轮换', 'warn');
+    toast('组队未通过！队长轮换', 'warn');
   }
 }
 
@@ -2420,7 +2420,7 @@ function renderStepPanelWithResult() {
 
   var approves = Object.values(m.votes).filter(function(v) { return v === 'approve'; }).length;
   var rejects = state.playerCount - approves;
-  h += '<div style="font-size:14px;color:var(--green-bright);margin-bottom:10px">发车成功！赞成 ' + approves + ' / 反对 ' + rejects + '</div>';
+  h += '<div style="font-size:14px;color:var(--green-bright);margin-bottom:10px">组队成功！赞成 ' + approves + ' / 反对 ' + rejects + '</div>';
 
   h += '<hr style="border-color:var(--border);margin-bottom:10px">';
   h += '<div class="step-label">步骤D：任务结果</div>';
@@ -3336,6 +3336,12 @@ function getFilteredHistory(history) {
 
     result.push({ rec: rec, origIdx: i });
   }
+  // 按日期倒序排列（最近的在前）
+  result.sort(function(a, b) {
+    if (a.rec.date > b.rec.date) return -1;
+    if (a.rec.date < b.rec.date) return 1;
+    return b.origIdx - a.origIdx;
+  });
   return result;
 }
 
@@ -3478,6 +3484,12 @@ function showGameDetail(idx) {
     if (hasAssassin && i > assassinCutoff) break;
     if (i < rec.missions.length) {
       var m = rec.missions[i];
+      // 游戏已结束，本轮未进行（result 为 null 表示该轮未实际执行）
+      if (!m.result && (m.launchAttempts ? m.launchAttempts.length === 0 : true)) {
+        h += '<div style="margin-bottom:3px;padding:6px 10px;color:var(--text-dim);font-size:13px;font-style:italic">';
+        h += '<span style="font-weight:700">第' + (i + 1) + '轮：</span>游戏已结束，本轮未进行</div>';
+        continue;
+      }
       // Show launch attempts (including failures) before the final mission result
       if (m.launchAttempts && m.launchAttempts.length > 0) {
         for (var la = 0; la < m.launchAttempts.length; la++) {
@@ -3490,7 +3502,7 @@ function showGameDetail(idx) {
           var isLastAttempt = (la === m.launchAttempts.length - 1);
           var isSucceeded = isLastAttempt && m.result === 'success';
           var isFailed = isLastAttempt && m.result === 'fail';
-          var label = isSucceeded ? '发车成功' : (isFailed ? '发车失败（最终）' : '发车失败');
+          var label = isSucceeded ? '组队成功，任务执行成功' : (isFailed ? '组队成功，任务执行失败' : '组队未通过');
           var bg = isSucceeded ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
           var borderColor = isSucceeded ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
           var labelColor = isSucceeded ? 'var(--green-bright)' : 'var(--red-bright)';
@@ -3508,7 +3520,7 @@ function showGameDetail(idx) {
         for (var f = 0; f < lf; f++) {
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:13px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
-          h += '<span style="font-weight:700;color:var(--red-bright)">发车失败</span>';
+          h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
           h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
           h += '</div>';
         }
@@ -3517,7 +3529,7 @@ function showGameDetail(idx) {
         var color2 = isSuccess ? 'var(--green-bright)' : 'var(--red-bright)';
         h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:13px">';
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
-        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '发车成功' : '发车失败（最终）') + '</span>';
+        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败') + '</span>';
         h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
         h += '</div>';
       }
