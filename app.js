@@ -3923,7 +3923,6 @@ function pullInitialData(sb) {
         cloudRecords.push(gameRes.data[i].game_data);
       }
     }
-    var localHistory = loadHistory();
     // 以云端删除黑名单为准，直接覆盖本地（不再合并本地残留）
     var cloudDeletedKeys = (dkRes.data && dkRes.data.value) ? dkRes.data.value : [];
     saveDeletedKeys(cloudDeletedKeys);
@@ -3932,7 +3931,6 @@ function pullInitialData(sb) {
       var dkSet = {};
       for (var d = 0; d < cloudDeletedKeys.length; d++) { dkSet[cloudDeletedKeys[d]] = true; }
       cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
-      localHistory = localHistory.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
       console.log('[InitPull] filtered out', cloudDeletedKeys.length, 'deleted records');
     }
     // 以云端为唯一数据源，直接覆盖本地（不再与本地数据合并）
@@ -3940,23 +3938,6 @@ function pullInitialData(sb) {
     console.log('[InitPull] cloud records saved:', cloudRecords.length);
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
-
-    // 补推：将本地有但云端没有的记录上传到 Supabase（排除已删除的）
-    var cloudKeys = {};
-    for (var k = 0; k < cloudRecords.length; k++) {
-      cloudKeys[makeRecordKey(cloudRecords[k])] = true;
-    }
-    var pushCount = 0;
-    for (var j = 0; j < localHistory.length; j++) {
-      var key = makeRecordKey(localHistory[j]);
-      if (!cloudKeys[key] && (!dkSet || !dkSet[key])) {
-        (function(rec) {
-          sb.from('game_records').insert({ game_data: rec }).select('id').then(function(r) {
-            if (!r.error) { pushCount++; console.log('[InitPull] pushed missing record'); }
-          });
-        })(localHistory[j]);
-      }
-    }
   });
 
   // 拉取 name_pool
