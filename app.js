@@ -3924,20 +3924,16 @@ function pullInitialData(sb) {
       }
     }
     var localHistory = loadHistory();
-    // 合并云端和本地的删除黑名单
+    // 以云端删除黑名单为准，直接覆盖本地（不再合并本地残留）
     var cloudDeletedKeys = (dkRes.data && dkRes.data.value) ? dkRes.data.value : [];
-    var localDeletedKeys = loadDeletedKeys();
-    for (var d = 0; d < cloudDeletedKeys.length; d++) {
-      if (localDeletedKeys.indexOf(cloudDeletedKeys[d]) === -1) localDeletedKeys.push(cloudDeletedKeys[d]);
-    }
-    saveDeletedKeys(localDeletedKeys);
+    saveDeletedKeys(cloudDeletedKeys);
     // 过滤删除黑名单
-    if (localDeletedKeys.length > 0) {
+    if (cloudDeletedKeys.length > 0) {
       var dkSet = {};
-      for (var d = 0; d < localDeletedKeys.length; d++) { dkSet[localDeletedKeys[d]] = true; }
+      for (var d = 0; d < cloudDeletedKeys.length; d++) { dkSet[cloudDeletedKeys[d]] = true; }
       cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
       localHistory = localHistory.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
-      console.log('[InitPull] filtered out', (localDeletedKeys.length), 'deleted records');
+      console.log('[InitPull] filtered out', cloudDeletedKeys.length, 'deleted records');
     }
     // 以云端为唯一数据源，直接覆盖本地（不再与本地数据合并）
     saveHistory(cloudRecords);
@@ -3968,15 +3964,10 @@ function pullInitialData(sb) {
     if (res.error || !res.data) return;
     var cloudPool = res.data.value;
     if (!cloudPool || !cloudPool.length) return;
-    var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
-    // 以云端为准，本地新增的保留（云端已删则本地同步删除）
-    var mergedPool = cloudPool.slice();
-    for (var j = 0; j < localPool.length; j++) {
-      if (mergedPool.indexOf(localPool[j]) === -1) mergedPool.push(localPool[j]);
-    }
-    namePool = mergedPool;
-    localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
-    console.log('[InitPull] name_pool synced, total:', mergedPool.length);
+    // 以云端为准，直接覆盖本地
+    namePool = cloudPool;
+    localStorage.setItem('avalon_name_pool', JSON.stringify(cloudPool));
+    console.log('[InitPull] name_pool synced, total:', cloudPool.length);
   });
 }
 
@@ -4035,15 +4026,10 @@ function setupRealtimeSubscriptions() {
       try {
         var cloudPool = payload.new.value;
         if (!cloudPool) return;
-        var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
-        // 以云端为准，本地新增的保留
-        var mergedPool = cloudPool.slice();
-        for (var i = 0; i < localPool.length; i++) {
-          if (mergedPool.indexOf(localPool[i]) === -1) mergedPool.push(localPool[i]);
-        }
-        namePool = mergedPool;
-        localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
-        console.log('[Realtime] name_pool synced, total:', mergedPool.length);
+        // 以云端为准，直接覆盖本地
+        namePool = cloudPool;
+        localStorage.setItem('avalon_name_pool', JSON.stringify(cloudPool));
+        console.log('[Realtime] name_pool synced, total:', cloudPool.length);
       } catch(e) {
         console.warn('[Realtime] failed to process name_pool update:', e);
       }
