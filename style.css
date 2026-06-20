@@ -1096,3 +1096,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   margin-top: 0;
 }
 
+
+/* ===== Mobile Performance Optimizations ===== */
+@media(max-width:768px){
+  body::before{background-image:none;opacity:0}
+  body::after{background-image:none;height:40px}
+  main{will-change:scroll-position;transform:translateZ(0);-webkit-overflow-scrolling:touch}
+  .card{contain:layout style}
+  .card,.btn,.round-dot,.mission-btn,.identity-card,.modal{box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+  .launch-first{animation:none}
+  .lancelot-flip-dot.flipped{animation:none}
+  .viewer-hint{animation:none}
+}

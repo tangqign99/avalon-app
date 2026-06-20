@@ -1,6 +1,6 @@
 /* ==================== DATA ==================== */
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
-var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','浩文','宝强','小洪'];
+var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
 var MULTI_ROLES = ['忠臣','爪牙'];
@@ -2475,8 +2475,8 @@ function finalizeMission() {
   if (!m.result) { toast('请选择任务结果', 'warn'); return; }
   if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
 
-  // 第4轮保护轮：需2张失败票任务才失败，1张失败任务仍成功
-  if (state.currentRound === 3 && m.result === 'fail' && (m.failCount || 0) === 1) {
+  // 第4轮保护轮：需2张失败票任务才失败，1张失败任务仍成功（6人局例外，无保护）
+  if (state.currentRound === 3 && m.result === 'fail' && (m.failCount || 0) === 1 && state.playerCount !== 6) {
     m.result = 'success';
     m.failCount = 1;
     toast('第4轮保护轮：1张失败票，任务仍成功');
@@ -3511,6 +3511,18 @@ function showGameDetail(idx) {
           h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
           h += '| 队长 ' + att.leader + ' | 队伍 ' + att.team.join('、');
           h += ' | 投票 ' + approveCount + ':' + rejectCount;
+          // Per-player vote details
+          var approveNames = [], rejectNames = [];
+          for (var vk in att.votes) {
+            if (att.votes[vk] === 'approve') approveNames.push(vk);
+            else rejectNames.push(vk);
+          }
+          if (approveNames.length || rejectNames.length) {
+            h += '<div style="margin-top:2px;font-size:11px;color:var(--text-dim)">';
+            if (approveNames.length) h += '<span style="color:var(--green-bright)">同意：' + approveNames.join('、') + '</span> ';
+            if (rejectNames.length) h += '<span style="color:var(--red-bright)">反对：' + rejectNames.join('、') + '</span>';
+            h += '</div>';
+          }
           h += '</div>';
         }
       } else {
