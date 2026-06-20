@@ -3526,9 +3526,15 @@ function showGameDetail(idx) {
             else rejectNames.push(vn);
           }
           if (approveNames.length || rejectNames.length) {
+            var totalVotes = approveNames.length + rejectNames.length;
+            var allApprove = (rejectNames.length === 0);
             h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
-            if (approveNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意</span><span style="color:var(--text-dim);margin-left:6px">' + approveNames.join(' / ') + '</span></div>';
-            if (rejectNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对</span><span style="color:var(--text-dim);margin-left:6px">' + rejectNames.join(' / ') + '</span></div>';
+            if (allApprove) {
+              h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + totalVotes + '人)</span></div>';
+            } else {
+              if (approveNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + approveNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + approveNames.join(' / ') + '</span></div>';
+              if (rejectNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + rejectNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + rejectNames.join(' / ') + '</span></div>';
+            }
             h += '</div>';
           }
           h += '</div>';
@@ -3537,11 +3543,28 @@ function showGameDetail(idx) {
         // Legacy data: no launchAttempts, render from mission data with same style
         var lf = m.launchFailures || 0;
         var isSuccess = m.result === 'success';
+        // Precompute legacy vote details (shared by failures and result)
+        var lgc = 0, lbc = 0;
+        var lgn = [], lbn = [];
+        if (m.votes) {
+          for (var lvk in m.votes) {
+            if (m.votes[lvk] === 'approve') lgc++; else lbc++;
+          }
+          for (var lvk in m.votes) {
+            var lidx = parseInt(lvk) - 1;
+            var ln = nameByIndex[lidx];
+            if (!ln) ln = '玩家' + (parseInt(lvk));
+            if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
+          }
+        }
         for (var f = 0; f < lf; f++) {
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:13px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
           h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
+          if (m.votes && (lgc + lbc > 0)) {
+            h += ' | 投票 ' + lgc + ':' + lbc;
+          }
           h += '</div>';
         }
         var bg2 = isSuccess ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
@@ -3552,22 +3575,17 @@ function showGameDetail(idx) {
         h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败') + '</span>';
         h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
         // Vote details for legacy data
-        if (m.votes) {
-          var lgc = 0, lbc = 0;
-          for (var lvk in m.votes) {
-            if (m.votes[lvk] === 'approve') lgc++; else lbc++;
-          }
+        if (m.votes && (lgc + lbc > 0)) {
           h += ' | 投票 ' + lgc + ':' + lbc;
-          var lgn = [], lbn = [];
-          for (var lvk in m.votes) {
-            var lidx = parseInt(lvk) - 1;
-            var ln = nameByIndex[lidx];
-            if (!ln) ln = '玩家' + (parseInt(lvk));
-            if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
-          }
+          var ltotal = lgc + lbc;
+          var lall = (lbc === 0);
           h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
-          if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意</span><span style="color:var(--text-dim);margin-left:6px">' + lgn.join(' / ') + '</span></div>';
-          if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对</span><span style="color:var(--text-dim);margin-left:6px">' + lbn.join(' / ') + '</span></div>';
+          if (lall) {
+            h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
+          } else {
+            if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lgn.join(' / ') + '</span></div>';
+            if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lbn.join(' / ') + '</span></div>';
+          }
           h += '</div>';
         }
         h += '</div>';
