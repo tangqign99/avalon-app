@@ -3748,34 +3748,47 @@ function confirmDeleteGame(idx) {
   }
 
   if (sb) {
-    // 构建 Promise 数组：按 _supabaseId 和 record_key 双重删除
-    var promises = [];
-    if (record._supabaseId) {
-      promises.push(sb.from('game_records').delete().eq('id', record._supabaseId));
-    }
-    if (key) {
-      promises.push(sb.from('game_records').delete().eq('record_key', key));
-    }
-    if (promises.length === 0) {
-      // 无 Supabase 数据可删，直接本地删除
-      doLocalDelete();
-    } else {
-      Promise.allSettled(promises).then(function(results) {
-        var anyOk = false;
-        for (var r = 0; r < results.length; r++) {
-          if (results[r].status === 'fulfilled' && !results[r].value.error) {
-            anyOk = true;
-            console.log('[Supabase] deleteGameRecord success');
-          } else {
-            console.warn('[Supabase] deleteGameRecord failed:', results[r].reason || results[r].value?.error);
-          }
-        }
-        if (anyOk) {
+    // 按 _supabaseId 删除；若无则按 game_data 匹配查找后删除
+    function doDeleteById(sid) {
+      sb.from('game_records').delete().eq('id', sid).then(function(res) {
+        if (!res.error) {
+          console.log('[Supabase] deleteGameRecord success by id:', sid);
           doLocalDelete();
         } else {
-          toast('云端删除失败，记录将在刷新后恢复。请重试或手动清理。');
+          console.warn('[Supabase] deleteGameRecord failed:', res.error);
+          toast('云端删除失败，请重试');
         }
       });
+    }
+
+    if (record._supabaseId) {
+      doDeleteById(record._supabaseId);
+    } else {
+      // 无 _supabaseId，按 date + playerCount + identities 匹配查找
+      sb.from('game_records').select('id')
+        .eq('game_data->>date', record.date)
+        .eq('game_data->>playerCount', record.playerCount)
+        .then(function(res) {
+          if (res.error || !res.data || !res.data.length) {
+            // 云端无匹配，直接本地删除
+            doLocalDelete();
+            return;
+          }
+          // 进一步按 identities 匹配
+          var recIds = (record.identities || []).map(function(id) { return (id.name||'')+'|'+(id.role||''); }).sort().join(',');
+          var found = null;
+          for (var i = 0; i < res.data.length; i++) {
+            var gd = res.data[i].game_data;
+            if (!gd || !gd.identities) continue;
+            var cIds = gd.identities.map(function(id) { return (id.name||'')+'|'+(id.role||''); }).sort().join(',');
+            if (cIds === recIds) { found = res.data[i].id; break; }
+          }
+          if (found) {
+            doDeleteById(found);
+          } else {
+            doLocalDelete();
+          }
+        });
     }
   } else {
     // 无 Supabase 连接，仅本地删除
@@ -3911,7 +3924,7 @@ function pullInitialData(sb) {
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
 
-    // 补推：将本地有但云端没有的记录上传到 Supabase
+    // 补推：将本地有但云端没有的记录上传到 Supabase（排除已删除的）
     var cloudKeys = {};
     for (var k = 0; k < cloudRecords.length; k++) {
       cloudKeys[makeRecordKey(cloudRecords[k])] = true;
@@ -3919,7 +3932,7 @@ function pullInitialData(sb) {
     var pushCount = 0;
     for (var j = 0; j < localHistory.length; j++) {
       var key = makeRecordKey(localHistory[j]);
-      if (!cloudKeys[key]) {
+      if (!cloudKeys[key] && (!dkSet || !dkSet[key])) {
         (function(rec) {
           sb.from('game_records').insert({ game_data: rec }).then(function(r) {
             if (!r.error) { pushCount++; console.log('[InitPull] pushed missing record'); }
@@ -3935,9 +3948,10 @@ function pullInitialData(sb) {
     var cloudPool = res.data.value;
     if (!cloudPool || !cloudPool.length) return;
     var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
-    var mergedPool = localPool.slice();
-    for (var j = 0; j < cloudPool.length; j++) {
-      if (mergedPool.indexOf(cloudPool[j]) === -1) mergedPool.push(cloudPool[j]);
+    // 以云端为准，本地新增的保留（云端已删则本地同步删除）
+    var mergedPool = cloudPool.slice();
+    for (var j = 0; j < localPool.length; j++) {
+      if (mergedPool.indexOf(localPool[j]) === -1) mergedPool.push(localPool[j]);
     }
     namePool = mergedPool;
     localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
@@ -4042,17 +4056,17 @@ function renderConnectionStatus() {
 
 // 合并去重：基于 date + playerCount + identities 生成唯一键
 function mergeHistories(local, cloud) {
+  // 以云端为准，本地新增的保留（云端已删则本地同步删除）
   var seen = {};
-  var result = local.slice();
+  var result = cloud.slice();
   for (var i = 0; i < result.length; i++) {
-    var key = makeRecordKey(result[i]);
-    seen[key] = true;
+    seen[makeRecordKey(result[i])] = true;
   }
-  for (var j = 0; j < cloud.length; j++) {
-    var ck = makeRecordKey(cloud[j]);
-    if (!seen[ck]) {
-      result.push(cloud[j]);
-      seen[ck] = true;
+  for (var j = 0; j < local.length; j++) {
+    var lk = makeRecordKey(local[j]);
+    if (!seen[lk]) {
+      result.push(local[j]);
+      seen[lk] = true;
     }
   }
   return result;
