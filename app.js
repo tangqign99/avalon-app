@@ -3740,6 +3740,12 @@ function confirmDeleteGame(idx) {
     if (key && deletedKeys.indexOf(key) === -1) {
       deletedKeys.push(key);
       saveDeletedKeys(deletedKeys);
+      // 同步 deletedKeys 到云端
+      if (sb) {
+        sb.from('key_value').upsert({ key: 'avalon_deleted_keys', value: deletedKeys, updated_at: new Date().toISOString() }).then(function(r) {
+          if (r.error) console.warn('[Supabase] sync deletedKeys failed:', r.error);
+        });
+      }
     }
     history.splice(idx, 1);
     saveHistory(history);
@@ -3899,25 +3905,40 @@ function doImport() {
 // Supabase Realtime 订阅：跨设备实时同步
 // 页面加载时从 Supabase 拉取历史数据合并到本地（补充实时推送之前的记录）
 function pullInitialData(sb) {
-  // 拉取对局记录
-  sb.from('game_records').select('game_data').then(function(res) {
-    if (res.error || !res.data) {
-      console.warn('[InitPull] game_records fetch failed:', res.error);
+  // 同时拉取对局记录和云端删除黑名单
+  Promise.all([
+    sb.from('game_records').select('game_data'),
+    sb.from('key_value').select('value').eq('key', 'avalon_deleted_keys').maybeSingle()
+  ]).then(function(results) {
+    var gameRes = results[0];
+    var dkRes = results[1];
+    if (gameRes.error || !gameRes.data) {
+      console.warn('[InitPull] game_records fetch failed:', gameRes.error);
       return;
     }
     var cloudRecords = [];
-    for (var i = 0; i < res.data.length; i++) {
-      if (res.data[i].game_data) cloudRecords.push(res.data[i].game_data);
-    }
-    // 过滤删除黑名单
-    var deletedKeys = loadDeletedKeys();
-    if (deletedKeys.length > 0) {
-      var dkSet = {};
-      for (var d = 0; d < deletedKeys.length; d++) { dkSet[deletedKeys[d]] = true; }
-      cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
-      console.log('[InitPull] filtered out', (deletedKeys.length), 'deleted records from cloud');
+    for (var i = 0; i < gameRes.data.length; i++) {
+      if (gameRes.data[i].game_data) {
+        gameRes.data[i].game_data._supabaseId = gameRes.data[i].id;
+        cloudRecords.push(gameRes.data[i].game_data);
+      }
     }
     var localHistory = loadHistory();
+    // 合并云端和本地的删除黑名单
+    var cloudDeletedKeys = (dkRes.data && dkRes.data.value) ? dkRes.data.value : [];
+    var localDeletedKeys = loadDeletedKeys();
+    for (var d = 0; d < cloudDeletedKeys.length; d++) {
+      if (localDeletedKeys.indexOf(cloudDeletedKeys[d]) === -1) localDeletedKeys.push(cloudDeletedKeys[d]);
+    }
+    saveDeletedKeys(localDeletedKeys);
+    // 过滤删除黑名单
+    if (localDeletedKeys.length > 0) {
+      var dkSet = {};
+      for (var d = 0; d < localDeletedKeys.length; d++) { dkSet[localDeletedKeys[d]] = true; }
+      cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
+      localHistory = localHistory.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
+      console.log('[InitPull] filtered out', (localDeletedKeys.length), 'deleted records');
+    }
     var merged = mergeHistories(localHistory, cloudRecords);
     saveHistory(merged);
     console.log('[InitPull] merged game_records, local:', localHistory.length, 'cloud:', cloudRecords.length, 'merged:', merged.length);
@@ -3934,7 +3955,7 @@ function pullInitialData(sb) {
       var key = makeRecordKey(localHistory[j]);
       if (!cloudKeys[key] && (!dkSet || !dkSet[key])) {
         (function(rec) {
-          sb.from('game_records').insert({ game_data: rec }).then(function(r) {
+          sb.from('game_records').insert({ game_data: rec }).select('id').then(function(r) {
             if (!r.error) { pushCount++; console.log('[InitPull] pushed missing record'); }
           });
         })(localHistory[j]);
@@ -4005,15 +4026,41 @@ function setupRealtimeSubscriptions() {
         var cloudPool = payload.new.value;
         if (!cloudPool) return;
         var localPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]');
-        var mergedPool = localPool.slice();
-        for (var i = 0; i < cloudPool.length; i++) {
-          if (mergedPool.indexOf(cloudPool[i]) === -1) mergedPool.push(cloudPool[i]);
+        // 以云端为准，本地新增的保留
+        var mergedPool = cloudPool.slice();
+        for (var i = 0; i < localPool.length; i++) {
+          if (mergedPool.indexOf(localPool[i]) === -1) mergedPool.push(localPool[i]);
         }
         namePool = mergedPool;
         localStorage.setItem('avalon_name_pool', JSON.stringify(mergedPool));
         console.log('[Realtime] name_pool synced, total:', mergedPool.length);
       } catch(e) {
         console.warn('[Realtime] failed to process name_pool update:', e);
+      }
+    }
+  );
+
+  // 订阅 game_records 的 DELETE 事件
+  _supabaseChannel.on(
+    'postgres_changes',
+    { event: 'DELETE', schema: 'public', table: 'game_records' },
+    function(payload) {
+      console.log('[Realtime] game_record deleted:', payload.old.id);
+      try {
+        var deletedId = payload.old.id;
+        var localHistory = loadHistory();
+        var found = -1;
+        for (var i = 0; i < localHistory.length; i++) {
+          if (localHistory[i]._supabaseId === deletedId) { found = i; break; }
+        }
+        if (found >= 0) {
+          localHistory.splice(found, 1);
+          saveHistory(localHistory);
+          console.log('[Realtime] removed deleted record, total:', localHistory.length);
+          if (state._currentPage === 'stats') renderStats();
+        }
+      } catch(e) {
+        console.warn('[Realtime] failed to process game_record delete:', e);
       }
     }
   );
