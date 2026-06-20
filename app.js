@@ -3939,9 +3939,9 @@ function pullInitialData(sb) {
       localHistory = localHistory.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
       console.log('[InitPull] filtered out', (localDeletedKeys.length), 'deleted records');
     }
-    var merged = mergeHistories(localHistory, cloudRecords);
-    saveHistory(merged);
-    console.log('[InitPull] merged game_records, local:', localHistory.length, 'cloud:', cloudRecords.length, 'merged:', merged.length);
+    // 以云端为唯一数据源，直接覆盖本地（不再与本地数据合并）
+    saveHistory(cloudRecords);
+    console.log('[InitPull] cloud records saved:', cloudRecords.length);
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
 
@@ -4003,9 +4003,19 @@ function setupRealtimeSubscriptions() {
         var dk = loadDeletedKeys();
         if (dk.indexOf(makeRecordKey(newRecord)) !== -1) { console.log('[Realtime] skipped deleted record'); return; }
         var localHistory = loadHistory();
-        var merged = mergeHistories(localHistory, [newRecord]);
-        saveHistory(merged);
-        console.log('[Realtime] merged new record, total:', merged.length);
+        // 检查是否已存在（避免重复）
+        var newKey = makeRecordKey(newRecord);
+        var exists = false;
+        for (var i = 0; i < localHistory.length; i++) {
+          if (makeRecordKey(localHistory[i]) === newKey) { exists = true; break; }
+        }
+        if (!exists) {
+          localHistory.push(newRecord);
+          saveHistory(localHistory);
+          console.log('[Realtime] added new record, total:', localHistory.length);
+        } else {
+          console.log('[Realtime] skipped duplicate record');
+        }
         // 当前在 stats 页面则刷新
         if (state._currentPage === 'stats') {
           renderStats();
