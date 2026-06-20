@@ -3473,6 +3473,11 @@ function showGameDetail(idx) {
   }
 
   h += '<h3 style="margin-top:10px">任务记录</h3>';
+  // Build index-to-name mapping for vote display
+  var nameByIndex = {};
+  for (var ii = 0; ii < rec.identities.length; ii++) {
+    nameByIndex[rec.identities[ii].index] = rec.identities[ii].name;
+  }
   var hasAssassin = (rec.assassinTarget && rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined);
   var assassinCutoff = hasAssassin ? rec.assassinAfterRound : rec.missions.length;
   var totalRounds = hasAssassin ? Math.max(rec.missions.length, assassinCutoff + 1) : rec.missions.length;
@@ -3514,8 +3519,10 @@ function showGameDetail(idx) {
           // Per-player vote details
           var approveNames = [], rejectNames = [];
           for (var vk in att.votes) {
-            if (att.votes[vk] === 'approve') approveNames.push(vk);
-            else rejectNames.push(vk);
+            var vn = nameByIndex[parseInt(vk)];
+            if (!vn) vn = '玩家' + (parseInt(vk) + 1);
+            if (att.votes[vk] === 'approve') approveNames.push(vn);
+            else rejectNames.push(vn);
           }
           if (approveNames.length || rejectNames.length) {
             h += '<div style="margin-top:2px;font-size:11px;color:var(--text-dim)">';
@@ -3543,6 +3550,24 @@ function showGameDetail(idx) {
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
         h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败') + '</span>';
         h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
+        // Vote details for legacy data
+        if (m.votes) {
+          var lgc = 0, lbc = 0;
+          for (var lvk in m.votes) {
+            if (m.votes[lvk] === 'approve') lgc++; else lbc++;
+          }
+          h += ' | 投票 ' + lgc + ':' + lbc;
+          var lgn = [], lbn = [];
+          for (var lvk in m.votes) {
+            var ln = nameByIndex[parseInt(lvk)];
+            if (!ln) ln = '玩家' + (parseInt(lvk) + 1);
+            if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
+          }
+          h += '<div style="margin-top:2px;font-size:11px;color:var(--text-dim)">';
+          if (lgn.length) h += '<span style="color:var(--green-bright)">同意：' + lgn.join('、') + '</span> ';
+          if (lbn.length) h += '<span style="color:var(--red-bright)">反对：' + lbn.join('、') + '</span>';
+          h += '</div>';
+        }
         h += '</div>';
       }
     }
