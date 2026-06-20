@@ -43,7 +43,7 @@ var state = {
   _historyPage: 0,
   _historyPageSize: 5,
   _visitorPage: 0,
-  _visitorPageSize: 10,
+  _visitorPageSize: 5,
   _assassinTimerRemaining: 0,
   _assassinTimerInterval: null,
   ladyOfLakeEnabled: false,
@@ -136,6 +136,12 @@ function loadHistory() {
 }
 function saveHistory(data) {
   localStorage.setItem('avalon_history_v2', JSON.stringify(data));
+}
+function loadDeletedKeys() {
+  try { return JSON.parse(localStorage.getItem('avalon_deleted_keys') || '[]'); } catch(e) { return []; }
+}
+function saveDeletedKeys(data) {
+  localStorage.setItem('avalon_deleted_keys', JSON.stringify(data));
 }
 function saveLastGame() {
   var cfg = {
@@ -292,6 +298,7 @@ function renderVisitorList(visitors) {
         }
       }
       ph += '<button class="page-btn" onclick="goVisitorPage(' + (state._visitorPage + 1) + ')"' + (state._visitorPage >= totalPages - 1 ? ' disabled' : '') + '>›</button>';
+      ph += '<span style="color:var(--text-dim);font-size:13px;margin-left:8px">第' + (state._visitorPage + 1) + '/' + totalPages + '页</span>';
       ph += '</div>';
       pageArea.innerHTML = ph;
     }
@@ -372,7 +379,7 @@ function showPage(page) {
     renderGame();
     if (_isViewer) applyViewerMode();
   }
-  if (page === 'setup') renderSetup();
+  if (page === 'setup') { renderSetup(); renderVisitorLog(); }
   if (page === 'tend') { renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend(); renderIdentitySimGrid(); renderDeduction(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
@@ -409,6 +416,7 @@ function renderSetup() {
       h += '<option value="' + curName + '" selected>' + curName + '</option>';
     }
     h += '</select>';
+    h += '<button class="btn small" onclick="addNameFromSetup()" title="新增玩家" style="min-width:36px;font-size:18px;padding:6px 8px">+</button>';
     h += '</div>';
   }
   $('player-names').innerHTML = h;
@@ -481,11 +489,9 @@ function toggleRole(role) {
   renderSetup();
 }
 
-function addNameToPool() {
-  var input = $('add-name-input');
-  var name = input.value.trim();
-  if (!name) { toast('请输入名字', 'warn'); return; }
-  if (namePool.indexOf(name) !== -1) { toast('名字已存在', 'warn'); return; }
+function _addNameCore(name) {
+  if (!name) { toast('请输入名字', 'warn'); return false; }
+  if (namePool.indexOf(name) !== -1) { toast('名字已存在', 'warn'); return false; }
   namePool.push(name);
   saveNamePool();
   // Sync to Supabase
@@ -495,10 +501,24 @@ function addNameToPool() {
       if (res.error) console.warn('[Supabase] add name_pool failed:', res.error);
     });
   }
-  input.value = '';
   renderSetup();
   renderNamePoolList();
   toast('已添加「' + name + '」');
+  return true;
+}
+
+function addNameToPool() {
+  var input = $('add-name-input');
+  var name = input.value.trim();
+  if (_addNameCore(name)) input.value = '';
+}
+
+function addNameFromSetup() {
+  var name = prompt('输入新玩家姓名（不超过10个字符）：');
+  if (!name) return;
+  name = name.trim();
+  if (name.length > 10) { toast('名字不能超过10个字符', 'warn'); return; }
+  _addNameCore(name);
 }
 
 function deleteNameFromPool(name) {
@@ -3254,23 +3274,6 @@ function renderStats() {
     if (leaderboardCard) leaderboardCard.style.display = '';
   }
   $('win-rate-leaderboard').innerHTML = lh;
-
-  // Visitor log card
-  var vc = document.getElementById('visitor-card');
-  if (!vc) {
-    vc = document.createElement('div');
-    vc.className = 'card';
-    vc.id = 'visitor-card';
-    vc.innerHTML = '<h2>访客记录 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（每次打开页面自动记录）</span></h2>'
-      + '<div class="visitor-list" id="visitor-list"></div>'
-      + '<div id="visitor-pagination-area"></div>'
-      + '<div style="text-align:center;margin-top:8px">'
-      + '<button class="btn small" onclick="state._visitorPage=0;renderVisitorLog()">刷新</button></div>';
-    $('page-stats').appendChild(vc);
-    renderVisitorLog();
-  } else {
-    renderVisitorLog();
-  }
   renderNamePoolList();
 }
 
@@ -3707,6 +3710,14 @@ function confirmDeleteGame(idx) {
   if (idx < 0 || idx >= history.length) return;
   var record = history[idx];
 
+  // 兜底黑名单：防止 Supabase 删除失败时 pullInitialData 拉回
+  var key = makeRecordKey(record);
+  var deletedKeys = loadDeletedKeys();
+  if (key && deletedKeys.indexOf(key) === -1) {
+    deletedKeys.push(key);
+    saveDeletedKeys(deletedKeys);
+  }
+
   // 同步删除 Supabase 中的记录，防止 pullInitialData 拉回
   var sb = getSupabase();
   if (sb) {
@@ -3846,6 +3857,14 @@ function pullInitialData(sb) {
     for (var i = 0; i < res.data.length; i++) {
       if (res.data[i].game_data) cloudRecords.push(res.data[i].game_data);
     }
+    // 过滤删除黑名单
+    var deletedKeys = loadDeletedKeys();
+    if (deletedKeys.length > 0) {
+      var dkSet = {};
+      for (var d = 0; d < deletedKeys.length; d++) { dkSet[deletedKeys[d]] = true; }
+      cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
+      console.log('[InitPull] filtered out', (deletedKeys.length), 'deleted records from cloud');
+    }
     var localHistory = loadHistory();
     var merged = mergeHistories(localHistory, cloudRecords);
     saveHistory(merged);
@@ -3906,6 +3925,9 @@ function setupRealtimeSubscriptions() {
       try {
         var newRecord = payload.new.game_data;
         if (!newRecord) return;
+        // 检查删除黑名单
+        var dk = loadDeletedKeys();
+        if (dk.indexOf(makeRecordKey(newRecord)) !== -1) { console.log('[Realtime] skipped deleted record'); return; }
         var localHistory = loadHistory();
         var merged = mergeHistories(localHistory, [newRecord]);
         saveHistory(merged);
