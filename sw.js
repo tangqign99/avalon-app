@@ -1,6 +1,6 @@
-/* ==================== Service Worker v62 ==================== */
-// sw.js - v62
-var CACHE_NAME = 'avalon-pwa-v62';
+/* ==================== Service Worker v63 ==================== */
+// sw.js - v63
+var CACHE_NAME = 'avalon-pwa-v63';
 var ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,13 @@ self.addEventListener('activate', function(e) {
     })
   );
   self.clients.claim();
+});
+
+// 允许页面主动触发 skipWaiting，新 SW 激活后立即接管
+self.addEventListener('message', function(e) {
+  if (e.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
 
 // Network-First 策略：确保始终获取最新文件，网络不可用时才回退缓存

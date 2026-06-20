@@ -271,15 +271,46 @@
 
 <script>
 if('serviceWorker' in navigator){
+  var SW_VERSION = 'v63';
+  // 新SW接管后自动刷新页面
+  var _swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if (_swRefreshing) return;
+    _swRefreshing = true;
+    console.log('SW controller changed, reloading…');
+    window.location.reload();
+  });
+
   // 先强制注销所有旧SW，再注册新版本
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=62',{scope:'./'});
-  }).then(function(r){
-    console.log('SW v62 registered:',r.scope);
+    return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
+  }).then(function(reg){
+    console.log('SW ' + SW_VERSION + ' registered:', reg.scope);
+    // 如果新SW在等待激活，主动触发skipWaiting
+    if (reg.waiting) {
+      reg.waiting.postMessage('skipWaiting');
+    } else if (reg.installing) {
+      reg.installing.addEventListener('statechange', function(e){
+        if (e.target.state === 'installed') {
+          reg.waiting && reg.waiting.postMessage('skipWaiting');
+        }
+      });
+    }
+    reg.addEventListener('updatefound', function(){
+      var newWorker = reg.installing;
+      if (newWorker) {
+        newWorker.addEventListener('statechange', function(){
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            console.log('New SW waiting, triggering skipWaiting');
+            newWorker.postMessage('skipWaiting');
+          }
+        });
+      }
+    });
   }).catch(function(e){
-    console.warn('SW registration failed:',e);
+    console.warn('SW registration failed:', e);
   });
 }
 </script>
