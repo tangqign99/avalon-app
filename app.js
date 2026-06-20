@@ -3071,6 +3071,7 @@ function renderStats() {
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
     h += '<div class="hci-right">';
     h += '<span class="hci-result" style="color:' + winnerColor + '">' + winnerLabel + '</span>';
+    h += '<button class="btn small danger hci-delete-btn" onclick="event.stopPropagation();deleteGameRecord(' + i + ')" title="删除此记录">&#10005;</button>';
     h += '<span class="hci-toggle">&#9654;</span>';
     h += '</div></div>';
     h += '<div class="hci-body">';
@@ -3112,7 +3113,6 @@ function renderStats() {
     }
     h += '<div class="hci-actions">';
     h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
-    h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')">删除</button>';
     h += '</div></div></div>';
   }
   cl.innerHTML = h;
@@ -3730,39 +3730,57 @@ function confirmDeleteGame(idx) {
   var history = loadHistory();
   if (idx < 0 || idx >= history.length) return;
   var record = history[idx];
-
-  // 兜底黑名单：防止 Supabase 删除失败时 pullInitialData 拉回
   var key = makeRecordKey(record);
-  var deletedKeys = loadDeletedKeys();
-  if (key && deletedKeys.indexOf(key) === -1) {
-    deletedKeys.push(key);
-    saveDeletedKeys(deletedKeys);
-  }
-
-  // 同步删除 Supabase 中的记录，防止 pullInitialData 拉回
   var sb = getSupabase();
-  if (sb) {
-    if (record._supabaseId) {
-      sb.from('game_records').delete().eq('id', record._supabaseId).then(function(res) {
-        if (res.error) console.warn('[Supabase] deleteGameRecord by id failed:', res.error);
-        else console.log('[Supabase] deleteGameRecord by id success');
-      });
+
+  // 先删除 Supabase，确保云端同步后再更新本地
+  function doLocalDelete() {
+    // 兜底黑名单
+    var deletedKeys = loadDeletedKeys();
+    if (key && deletedKeys.indexOf(key) === -1) {
+      deletedKeys.push(key);
+      saveDeletedKeys(deletedKeys);
     }
-    // 兜底：按 record_key 删除（覆盖旧记录无 _supabaseId 的情况）
-    var key = makeRecordKey(record);
-    if (key) {
-      sb.from('game_records').delete().eq('record_key', key).then(function(res) {
-        if (res.error) console.warn('[Supabase] deleteGameRecord by key failed:', res.error);
-        else console.log('[Supabase] deleteGameRecord by key success');
-      });
-    }
+    history.splice(idx, 1);
+    saveHistory(history);
+    toast('已删除该对局记录');
+    renderStats();
   }
 
-  history.splice(idx, 1);
-  saveHistory(history);
-
-  toast('已删除该对局记录');
-  renderStats();
+  if (sb) {
+    // 构建 Promise 数组：按 _supabaseId 和 record_key 双重删除
+    var promises = [];
+    if (record._supabaseId) {
+      promises.push(sb.from('game_records').delete().eq('id', record._supabaseId));
+    }
+    if (key) {
+      promises.push(sb.from('game_records').delete().eq('record_key', key));
+    }
+    if (promises.length === 0) {
+      // 无 Supabase 数据可删，直接本地删除
+      doLocalDelete();
+    } else {
+      Promise.allSettled(promises).then(function(results) {
+        var anyOk = false;
+        for (var r = 0; r < results.length; r++) {
+          if (results[r].status === 'fulfilled' && !results[r].value.error) {
+            anyOk = true;
+            console.log('[Supabase] deleteGameRecord success');
+          } else {
+            console.warn('[Supabase] deleteGameRecord failed:', results[r].reason || results[r].value?.error);
+          }
+        }
+        if (anyOk) {
+          doLocalDelete();
+        } else {
+          toast('云端删除失败，记录将在刷新后恢复。请重试或手动清理。');
+        }
+      });
+    }
+  } else {
+    // 无 Supabase 连接，仅本地删除
+    doLocalDelete();
+  }
 }
 
 /* ==================== MODAL ==================== */
