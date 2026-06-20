@@ -521,6 +521,13 @@ function addNameFromSetup() {
   _addNameCore(name);
 }
 
+function statsAddName() {
+  var input = document.getElementById('stats-add-name-input');
+  if (!input) return;
+  var name = input.value.trim();
+  if (_addNameCore(name)) input.value = '';
+}
+
 function deleteNameFromPool(name) {
   var idx = namePool.indexOf(name);
   if (idx === -1) return;

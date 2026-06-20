@@ -240,6 +240,10 @@
     <div id="player-stat-detail"></div>
   </div>
   <div class="card" style="text-align:center">
+    <div class="add-name-row" style="margin-bottom:8px">
+      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10">
+      <button class="btn" onclick="statsAddName()" style="min-width:80px">新增玩家</button>
+    </div>
     <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
   </div>
   <div style="text-align:center">
@@ -268,9 +272,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=47',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=48',{scope:'./'});
   }).then(function(r){
-    console.log('SW v47 registered:',r.scope);
+    console.log('SW v48 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
