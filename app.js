@@ -3525,9 +3525,9 @@ function showGameDetail(idx) {
             else rejectNames.push(vn);
           }
           if (approveNames.length || rejectNames.length) {
-            h += '<div style="margin-top:2px;font-size:11px;color:var(--text-dim)">';
-            if (approveNames.length) h += '<span style="color:var(--green-bright)">同意：' + approveNames.join('、') + '</span> ';
-            if (rejectNames.length) h += '<span style="color:var(--red-bright)">反对：' + rejectNames.join('、') + '</span>';
+            h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
+            if (approveNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意</span><span style="color:var(--text-dim);margin-left:6px">' + approveNames.join(' / ') + '</span></div>';
+            if (rejectNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对</span><span style="color:var(--text-dim);margin-left:6px">' + rejectNames.join(' / ') + '</span></div>';
             h += '</div>';
           }
           h += '</div>';
@@ -3563,9 +3563,9 @@ function showGameDetail(idx) {
             if (!ln) ln = '玩家' + (parseInt(lvk) + 1);
             if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
           }
-          h += '<div style="margin-top:2px;font-size:11px;color:var(--text-dim)">';
-          if (lgn.length) h += '<span style="color:var(--green-bright)">同意：' + lgn.join('、') + '</span> ';
-          if (lbn.length) h += '<span style="color:var(--red-bright)">反对：' + lbn.join('、') + '</span>';
+          h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
+          if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意</span><span style="color:var(--text-dim);margin-left:6px">' + lgn.join(' / ') + '</span></div>';
+          if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对</span><span style="color:var(--text-dim);margin-left:6px">' + lbn.join(' / ') + '</span></div>';
           h += '</div>';
         }
         h += '</div>';
