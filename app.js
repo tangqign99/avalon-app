@@ -3564,6 +3564,16 @@ function showGameDetail(idx) {
           h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
           if (m.votes && (lgc + lbc > 0)) {
             h += ' | 投票 ' + lgc + ':' + lbc;
+            var ltotal = lgc + lbc;
+            var lall = (lbc === 0);
+            h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
+            if (lall) {
+              h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
+            } else {
+              if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lgn.join(' / ') + '</span></div>';
+              if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lbn.join(' / ') + '</span></div>';
+            }
+            h += '</div>';
           }
           h += '</div>';
         }
