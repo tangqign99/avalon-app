@@ -233,8 +233,8 @@
   </div>
   <div class="card" style="text-align:center">
     <div class="add-name-row" style="margin-bottom:8px">
-      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:10px;padding:2px 5px;min-height:22px">
-      <button class="btn" onclick="statsAddName()" style="font-size:10px;padding:2px 6px;min-width:38px">新增玩家</button>
+      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:12px;padding:4px 8px;width:55px">
+      <button class="btn" onclick="statsAddName()" style="font-size:12px;padding:4px 8px;min-width:18px">新增玩家</button>
     </div>
     <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
   </div>
@@ -272,9 +272,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=50',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=51',{scope:'./'});
   }).then(function(r){
-    console.log('SW v50 registered:',r.scope);
+    console.log('SW v51 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });
