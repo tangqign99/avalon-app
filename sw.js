@@ -1,6 +1,6 @@
-/* ==================== Service Worker v72 ==================== */
-// sw.js - v72
-var CACHE_NAME = 'avalon-pwa-v72';
+/* ==================== Service Worker v73 ==================== */
+// sw.js - v73
+var CACHE_NAME = 'avalon-pwa-v73';
 var ASSETS = [
   './',
   './index.html',
@@ -15,7 +15,7 @@ self.addEventListener('install', function(e) {
       return cache.addAll(ASSETS);
     })
   );
-  self.skipWaiting();
+  // 不在 install 里自动 skipWaiting，由页面检测到新版本时主动触发
 });
 
 self.addEventListener('activate', function(e) {
@@ -27,7 +27,8 @@ self.addEventListener('activate', function(e) {
       );
     })
   );
-  self.clients.claim();
+  // clients.claim() 在每次 skipWaiting 后立即接管所有页面，
+  // 移动端可能导致 controllerchange 反复触发。改为由下一次刷新自然接管。
 });
 
 // 允许页面主动触发 skipWaiting，新 SW 激活后立即接管
