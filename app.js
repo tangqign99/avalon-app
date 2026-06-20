@@ -3112,7 +3112,7 @@ function renderStats() {
     }
     h += '<div class="hci-actions">';
     h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
-    h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')">删除</button>';
+    h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')" style="margin-left:auto">删除</button>';
     h += '</div></div></div>';
   }
   cl.innerHTML = h;
