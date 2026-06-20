@@ -4020,9 +4020,14 @@ function pullInitialData(sb) {
       cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
       console.log('[InitPull] filtered out', cloudDeletedKeys.length, 'deleted records');
     }
-    // 以云端为唯一数据源，直接覆盖本地
-    saveHistory(cloudRecords);
-    console.log('[InitPull] cloud records saved:', cloudRecords.length);
+    // 以云端为唯一数据源，直接覆盖本地（云端为空时保留本地，避免离线记录被清空）
+    var localHistory = loadHistory();
+    if (cloudRecords.length > 0 || localHistory.length === 0) {
+      saveHistory(cloudRecords);
+      console.log('[InitPull] cloud records saved:', cloudRecords.length);
+    } else {
+      console.log('[InitPull] cloud empty, keeping local:', localHistory.length);
+    }
     // 当前在 stats 页面则刷新
     if (state._currentPage === 'stats') renderStats();
   });
