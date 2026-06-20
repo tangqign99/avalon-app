@@ -4619,6 +4619,7 @@ function applyViewerMode() {
   }
   showPage('setup');
 
+})();
 
 /* ==================== NEW TENDENCY SYSTEM ==================== */
 
@@ -5141,5 +5142,3 @@ function renderGameTendSummary() {
   h += '</div>';
   el.innerHTML = h;
 }
-
-})();
