@@ -1052,3 +1052,44 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   min-height: 32px;
 }
 
+/* ========== Name Pool Collapse ========== */
+.name-pool-card {
+  padding: 0;
+  overflow: hidden;
+}
+.np-collapse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+  border-bottom: 1px solid transparent;
+}
+.np-collapse-header:hover {
+  background: rgba(201, 168, 76, 0.06);
+}
+.np-collapse-arrow {
+  font-size: 14px;
+  color: var(--gold-light);
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+.np-collapse-arrow.open {
+  transform: rotate(90deg);
+}
+.np-collapse-body {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 18px;
+  transition: max-height 0.35s ease, padding 0.35s ease;
+}
+.np-collapse-body.open {
+  max-height: 600px !important;
+  padding: 12px 18px 16px;
+}
+.np-collapse-body .add-name-row {
+  margin-top: 0;
+}
+

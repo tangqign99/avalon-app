@@ -117,6 +117,7 @@ var _isViewer = false;
 var _deviceId = null;
 var _gameSessionId = null;
 var _gameSessionChannel = null;
+var _gameSessionPollInterval = null;
 
 /* ==================== PLAYER LABEL ==================== */
 function playerLabel(idx) {
@@ -571,6 +572,17 @@ function renderNamePoolList() {
     h += '</div>';
   }
   el.innerHTML = h;
+}
+
+function showNamePoolModal() {
+  renderNamePoolList();
+  var overlay = document.getElementById('name-pool-modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+function closeNamePoolModal(event) {
+  if (event && event.target !== document.getElementById('name-pool-modal-overlay')) return;
+  var overlay = document.getElementById('name-pool-modal-overlay');
+  if (overlay) overlay.classList.remove('active');
 }
 
 function toggleLadyOfLake() {
@@ -2185,8 +2197,11 @@ function selectLeader(idx) {
   m.votes = {};
   m.result = null;
   m.failCount = 0;
-  m.launchFailures = 0;
-  m.launchAttempts = [];
+  // 仅在首次选队长（无发车尝试记录）时重置计数器，避免丢失已记录的发车失败历史
+  if (m.launchAttempts.length === 0) {
+    m.launchFailures = 0;
+    m.launchAttempts = [];
+  }
   state._firstLeaderPicked = true;
   state._lastLeaderIdx = idx;
   renderStepPanel();
@@ -2937,11 +2952,19 @@ function saveGameRecord() {
   // Supabase: 静默保存对局记录到云端（实时订阅会自动通知其他设备）
   var sb = getSupabase();
   if (sb) {
-    sb.from('game_records').insert({ game_data: record }).then(function(res) {
-      if (res.error) console.warn('[Supabase] saveGameRecord failed:', res.error);
+    var recordKey = makeRecordKey(record);
+    sb.from('game_records').insert({ game_data: record, record_key: recordKey }).select('id').single().then(function(res) {
+      if (res.error) {
+        console.warn('[Supabase] saveGameRecord failed:', res.error);
+      } else if (res.data && res.data.id) {
+        // 回写 Supabase 记录 ID 到本地，供后续删除时使用
+        record._supabaseId = res.data.id;
+        history[history.length - 1]._supabaseId = res.data.id;
+        saveHistory(history);
+      }
     });
     // 同步 name_pool 到云端
-    sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+    sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(function(res) {
       if (res.error) console.warn('[Supabase] save name_pool failed:', res.error);
     });
   }
@@ -3682,6 +3705,27 @@ function confirmDeleteGame(idx) {
   closeModal();
   var history = loadHistory();
   if (idx < 0 || idx >= history.length) return;
+  var record = history[idx];
+
+  // 同步删除 Supabase 中的记录，防止 pullInitialData 拉回
+  var sb = getSupabase();
+  if (sb) {
+    if (record._supabaseId) {
+      sb.from('game_records').delete().eq('id', record._supabaseId).then(function(res) {
+        if (res.error) console.warn('[Supabase] deleteGameRecord by id failed:', res.error);
+        else console.log('[Supabase] deleteGameRecord by id success');
+      });
+    }
+    // 兜底：按 record_key 删除（覆盖旧记录无 _supabaseId 的情况）
+    var key = makeRecordKey(record);
+    if (key) {
+      sb.from('game_records').delete().eq('record_key', key).then(function(res) {
+        if (res.error) console.warn('[Supabase] deleteGameRecord by key failed:', res.error);
+        else console.log('[Supabase] deleteGameRecord by key success');
+      });
+    }
+  }
+
   history.splice(idx, 1);
   saveHistory(history);
 
@@ -4037,6 +4081,7 @@ function deserializeGameState(gs) {
 
 // 初始化游戏房间：检查是否有活跃房间，没有则创建（成为host），有则加入（成为viewer）
 function initGameSession(sb, callback) {
+  console.log('[Multiplayer] initGameSession 开始, deviceId=' + generateDeviceId());
   _deviceId = generateDeviceId();
 
   sb.from('game_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1).then(function(res) {
@@ -4044,43 +4089,71 @@ function initGameSession(sb, callback) {
       console.warn('[Multiplayer] check session failed:', res.error);
       _isHost = true;
       _isViewer = false;
+      console.log('[Multiplayer] initGameSession 结束 → host (查询失败回退)');
       callback('host');
       return;
     }
 
     if (!res.data || res.data.length === 0) {
-      // 无活跃房间 → 创建新房间，成为房主
-      _isHost = true;
-      _isViewer = false;
-      var initState = serializeGameState();
-      sb.from('game_sessions').insert({
-        host_id: _deviceId,
-        game_state: initState,
-        status: 'waiting'
-      }).select('id').single().then(function(r2) {
-        if (r2.error) {
-          console.warn('[Multiplayer] create session failed:', r2.error);
-          toast('创建房间失败，使用单机模式', 'warn');
-        } else {
-          _gameSessionId = r2.data.id;
-          toast('你是房主 — 创建了新房间', 'success');
-        }
-        callback('host');
-      });
-    } else {
-      // 已有活跃房间 → 成为围观者
-      _isHost = false;
-      _isViewer = true;
-      _gameSessionId = res.data[0].id;
-      var gs = res.data[0].game_state;
-      if (gs && gs.playerCount) {
-        deserializeGameState(gs);
-      }
-      toast('已加入房间，当前为围观模式', 'success');
-      watchGameSession(sb);
-      showPage('game');
-      callback('viewer');
+      console.log('[Multiplayer] 无活跃房间，创建新房间');
+      createNewSession(sb, callback);
+      return;
     }
+
+    var session = res.data[0];
+    var updatedAt = session.updated_at;
+    var TIMEOUT_MS = 5 * 60 * 1000;
+    if (updatedAt) {
+      var age = Date.now() - new Date(updatedAt).getTime();
+      if (age > TIMEOUT_MS) {
+        console.log('[Multiplayer] session timed out (age=' + age + 'ms), deleting old session and creating new');
+        sb.from('game_sessions').delete().eq('id', session.id).then(function(delRes) {
+          if (delRes.error) {
+            console.warn('[Multiplayer] delete timed-out session failed:', delRes.error);
+          }
+          createNewSession(sb, callback);
+        });
+        return;
+      }
+    }
+
+    _isHost = false;
+    _isViewer = true;
+    _gameSessionId = session.id;
+    console.log('[Multiplayer] 加入已有房间, sessionId=' + _gameSessionId);
+    var gs = session.game_state;
+    if (gs && gs.playerCount) {
+      deserializeGameState(gs);
+    }
+    console.log('[Multiplayer] initGameSession 结束 → viewer');
+    toast('已加入房间，当前为围观模式', 'success');
+    watchGameSession(sb);
+    showPage('game');
+    callback('viewer');
+  });
+}
+
+// 创建新游戏房间（房主）
+function createNewSession(sb, callback) {
+  console.log('[Multiplayer] createNewSession 开始');
+  _isHost = true;
+  _isViewer = false;
+  var initState = serializeGameState();
+  sb.from('game_sessions').insert({
+    host_id: _deviceId,
+    game_state: initState,
+    status: 'active',
+    updated_at: new Date().toISOString()
+  }).select('id').single().then(function(r2) {
+    if (r2.error) {
+      console.warn('[Multiplayer] create session failed:', r2.error);
+      toast('创建房间失败，使用单机模式', 'warn');
+    } else {
+      _gameSessionId = r2.data.id;
+      console.log('[Multiplayer] session 创建成功, sessionId=' + _gameSessionId);
+      toast('你是房主 — 创建了新房间', 'success');
+    }
+    callback('host');
   });
 }
 
@@ -4089,6 +4162,7 @@ function syncGameState() {
   if (!_isHost || !_gameSessionId) return;
   var sb = getSupabase();
   if (!sb) return;
+  console.log('[Multiplayer] syncGameState 调用, sessionId=' + _gameSessionId);
   var gs = serializeGameState();
   sb.from('game_sessions').update({
     game_state: gs,
@@ -4096,7 +4170,40 @@ function syncGameState() {
     updated_at: new Date().toISOString()
   }).eq('id', _gameSessionId).then(function(r) {
     if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
+    else console.log('[Multiplayer] sync 成功');
   });
+}
+
+// 清除围观者状态，恢复操作权限
+function clearViewerState(msg) {
+  _isViewer = false;
+  _isHost = false;
+  _gameSessionId = null;
+  if (_gameSessionChannel) {
+    _gameSessionChannel.unsubscribe();
+    _gameSessionChannel = null;
+  }
+  if (_gameSessionPollInterval) {
+    clearInterval(_gameSessionPollInterval);
+    _gameSessionPollInterval = null;
+  }
+  // 恢复 UI 控件
+  restoreViewerControls();
+  toast(msg, 'warn');
+}
+
+// 恢复被围观模式禁用的控件
+function restoreViewerControls() {
+  var pages = ['page-game', 'page-tend', 'page-end'];
+  for (var p = 0; p < pages.length; p++) {
+    var page = document.getElementById(pages[p]);
+    if (!page) continue;
+    var disabledEls = page.querySelectorAll('.viewer-disabled');
+    for (var i = 0; i < disabledEls.length; i++) {
+      disabledEls[i].disabled = false;
+      disabledEls[i].classList.remove('viewer-disabled');
+    }
+  }
 }
 
 // 围观者：订阅 Supabase Realtime 更新
@@ -4108,17 +4215,21 @@ function watchGameSession(sb) {
     'postgres_changes',
     { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
     function(payload) {
+      console.log('[Multiplayer] watchGameSession 收到推送, sessionId=' + _gameSessionId + ', status=' + payload.new.status);
       var gs = payload.new.game_state;
-      if (!gs) return;
       // 检查房间是否被强制重启（status变为waiting且game_state清空）
-      if (payload.new.status === 'waiting' && (!gs.playerCount || gs.playerCount === 0)) {
-        _isViewer = false;
-        _isHost = false;
-        _gameSessionId = null;
-        toast('房间已被房主重置，请重新进入', 'warn');
+      if (payload.new.status === 'waiting' && (!gs || !gs.playerCount || gs.playerCount === 0)) {
+        clearViewerState('房间已被房主重置，请重新进入');
         showPage('setup');
         return;
       }
+      // 检查房间是否已结束（房主离开 / 超时释放 / 游戏完成）
+      if (payload.new.status === 'finished' || payload.new.status === 'ended') {
+        clearViewerState('房主已离开，你可以成为新房主');
+        showPage('setup');
+        return;
+      }
+      if (!gs) return;
       deserializeGameState(gs);
       // 重新渲染当前页面
       if (state._currentPage === 'game') {
@@ -4135,15 +4246,12 @@ function watchGameSession(sb) {
     }
   );
 
-  // 订阅 DELETE 事件（房间被强制重启）
+  // 订阅 DELETE 事件（房间被关闭/删除）
   _gameSessionChannel.on(
     'postgres_changes',
     { event: 'DELETE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
     function() {
-      _isViewer = false;
-      _isHost = false;
-      _gameSessionId = null;
-      toast('房间已关闭', 'warn');
+      clearViewerState('房主已离开，你可以成为新房主');
       showPage('setup');
     }
   );
@@ -4151,6 +4259,50 @@ function watchGameSession(sb) {
   _gameSessionChannel.subscribe(function(status) {
     console.log('[Multiplayer] channel status:', status);
   });
+
+  // 轮询兜底：每 2 秒查询 Supabase，防止 Realtime 推送丢失
+  if (_gameSessionPollInterval) clearInterval(_gameSessionPollInterval);
+  _gameSessionPollInterval = setInterval(function() {
+    if (!_isViewer || !_gameSessionId) {
+      clearInterval(_gameSessionPollInterval);
+      _gameSessionPollInterval = null;
+      return;
+    }
+    var sbPoll = getSupabase();
+    if (!sbPoll) return;
+    sbPoll.from('game_sessions').select('game_state,status').eq('id', _gameSessionId).single().then(function(res) {
+      if (res.error || !res.data) return;
+      var gs = res.data.game_state;
+      // 检查房间状态
+      if (res.data.status === 'finished' || res.data.status === 'ended') {
+        clearInterval(_gameSessionPollInterval);
+        _gameSessionPollInterval = null;
+        clearViewerState('房主已离开，你可以成为新房主');
+        showPage('setup');
+        return;
+      }
+      if (res.data.status === 'waiting' && (!gs || !gs.playerCount || gs.playerCount === 0)) {
+        clearInterval(_gameSessionPollInterval);
+        _gameSessionPollInterval = null;
+        clearViewerState('房间已被房主重置，请重新进入');
+        showPage('setup');
+        return;
+      }
+      if (!gs) return;
+      deserializeGameState(gs);
+      if (state._currentPage === 'game') {
+        renderGame();
+        applyViewerMode();
+      } else if (state._currentPage === 'end') {
+        renderEnd();
+      } else if (state._currentPage === 'tend') {
+        renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend();
+        renderIdentitySimGrid(); renderDeduction();
+      } else if (state._currentPage === 'stats') {
+        renderStats();
+      }
+    });
+  }, 2000);
 }
 
 // iPad 强制重启：清除房间

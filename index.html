@@ -223,7 +223,7 @@
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
   <div class="card">
-    <h2>今日胜率排行榜</h2>
+    <h2>今日胜率</h2>
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
   </div>
   <div class="card" style="display:none">
@@ -231,13 +231,8 @@
     <div class="btn-row" id="player-stat-btns"></div>
     <div id="player-stat-detail"></div>
   </div>
-  <div class="card">
-    <h2>玩家姓名管理</h2>
-    <div class="add-name-row">
-      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
-      <button class="btn" onclick="addNameToPool()" style="min-width:80px">新增</button>
-    </div>
-    <div id="name-pool-list" style="margin-top:10px"></div>
+  <div class="card" style="text-align:center">
+    <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
   </div>
   <div style="text-align:center">
     <button class="btn danger small" onclick="clearStats()">清除所有统计</button>
@@ -252,15 +247,26 @@
   <div class="identity-card" id="identity-card"></div>
 </div>
 
+<div class="modal-overlay" id="name-pool-modal-overlay" onclick="closeNamePoolModal(event)">
+  <div class="modal name-pool-modal">
+    <h2>玩家姓名管理</h2>
+    <div class="add-name-row">
+      <input class="add-name-input" id="add-name-input" placeholder="输入新名字…" maxlength="10">
+      <button class="btn" onclick="addNameToPool()" style="min-width:80px">新增</button>
+    </div>
+    <div id="name-pool-list" style="margin-top:10px"></div>
+  </div>
+</div>
+
 <script>
 if('serviceWorker' in navigator){
   // 先强制注销所有旧SW，再注册新版本
   navigator.serviceWorker.getRegistrations().then(function(regs){
     regs.forEach(function(r){ r.unregister(); });
   }).then(function(){
-    return navigator.serviceWorker.register('./sw.js?v=42',{scope:'./'});
+    return navigator.serviceWorker.register('./sw.js?v=46',{scope:'./'});
   }).then(function(r){
-    console.log('SW v42 registered:',r.scope);
+    console.log('SW v46 registered:',r.scope);
   }).catch(function(e){
     console.warn('SW registration failed:',e);
   });

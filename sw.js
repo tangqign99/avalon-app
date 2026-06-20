@@ -1,5 +1,5 @@
-/* ==================== Service Worker v42 ==================== */
-var CACHE_NAME = 'avalon-pwa-v42';
+/* ==================== Service Worker v46 ==================== */
+var CACHE_NAME = 'avalon-pwa-v46';
 var ASSETS = [
   './',
   './index.html',
@@ -29,19 +29,19 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
+// Network-First 策略：确保始终获取最新文件，网络不可用时才回退缓存
 self.addEventListener('fetch', function(e) {
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      var fetchPromise = fetch(e.request).then(function(networkResponse) {
-        if (networkResponse && networkResponse.status === 200) {
-          var responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(e.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      });
-      return cached || fetchPromise;
+    fetch(e.request).then(function(networkResponse) {
+      if (networkResponse && networkResponse.status === 200) {
+        var responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(e.request, responseToCache);
+        });
+      }
+      return networkResponse;
+    }).catch(function() {
+      return caches.match(e.request);
     })
   );
 });
