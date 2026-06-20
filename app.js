@@ -388,7 +388,7 @@ function showPage(page) {
 /* ==================== SETUP RENDER ==================== */
 function renderSetup() {
   var h = '';
-  for (var i = 5; i <= 10; i++) {
+  for (var i = 6; i <= 10; i++) {
     h += '<div class="count-btn' + (state.playerCount === i ? ' selected' : '') + '" onclick="setPlayerCount(' + i + ')">' + i + '</div>';
   }
   $('count-grid').innerHTML = h;
@@ -3502,9 +3502,23 @@ function showGameDetail(idx) {
           h += '</div>';
         }
       } else {
-        // Fallback: no launchAttempts saved (e.g. legacy data), show simple result line
-        h += '<div style="margin-bottom:4px">第' + (i + 1) + '轮 (需' + m.size + '人)：队长 ' + m.leader + ' | 队伍 ' + m.team.join('、') + ' | 结果 ' + (m.result === 'success' ? '成功' : '失败' + (m.failCount ? '(' + m.failCount + '票)' : ''));
-        if (m.launchFailures) h += ' | 发车失败 ' + m.launchFailures + '次';
+        // Legacy data: no launchAttempts, render from mission data with same style
+        var lf = m.launchFailures || 0;
+        var isSuccess = m.result === 'success';
+        for (var f = 0; f < lf; f++) {
+          h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:13px">';
+          h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
+          h += '<span style="font-weight:700;color:var(--red-bright)">发车失败</span>';
+          h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
+          h += '</div>';
+        }
+        var bg2 = isSuccess ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
+        var border2 = isSuccess ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
+        var color2 = isSuccess ? 'var(--green-bright)' : 'var(--red-bright)';
+        h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:13px">';
+        h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
+        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '发车成功' : '发车失败（最终）') + '</span>';
+        h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
         h += '</div>';
       }
     }
