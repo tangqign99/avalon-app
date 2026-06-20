@@ -394,27 +394,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .edit-player-row .edit-flip{font-size:11px;color:var(--text-dim);white-space:nowrap;display:flex;align-items:center;gap:3px}
 .edit-player-row .edit-flip input{accent-color:var(--orange);width:14px;height:14px;cursor:pointer}
 .all-approve-row{text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid rgba(201,168,76,0.15)}
-.identity-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:250;display:none;align-items:center;justify-content:center}
-.identity-overlay.active{display:flex}
-.identity-card{
-  background:linear-gradient(175deg,var(--parchment-light) 0%,var(--parchment) 100%);
-  border:2px solid var(--gold);border-radius:var(--radius);padding:24px 20px;
-  max-width:480px;width:90%;text-align:center;
-  box-shadow:0 8px 64px rgba(0,0,0,0.8),0 0 80px rgba(201,168,76,0.08);
-  position:relative;
-}
-.identity-card::before{
-  content:'';position:absolute;top:4px;left:4px;width:20px;height:20px;
-  border-left:2px solid rgba(201,168,76,0.3);border-top:2px solid rgba(201,168,76,0.3);
-  border-radius:4px 0 0 0;pointer-events:none;
-}
-.identity-card::after{
-  content:'';position:absolute;bottom:4px;right:4px;width:20px;height:20px;
-  border-right:2px solid rgba(201,168,76,0.3);border-bottom:2px solid rgba(201,168,76,0.3);
-  border-radius:0 0 4px 0;pointer-events:none;
-}
-.identity-card h2{color:var(--gold-light);font-size:20px;margin-bottom:6px;font-family:var(--font-display)}
-.identity-card .sub{color:var(--text-dim);font-size:13px;margin-bottom:14px}
 .identity-role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .identity-role-btn{
   padding:12px 10px;border-radius:var(--radius-sm);font-size:15px;font-weight:600;
@@ -1103,7 +1082,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   body::after{background-image:none;height:40px}
   main{will-change:scroll-position;transform:translateZ(0);-webkit-overflow-scrolling:touch}
   .card{contain:layout style}
-  .card,.btn,.round-dot,.mission-btn,.identity-card,.modal{box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+  .card,.btn,.round-dot,.mission-btn,.modal{box-shadow:0 1px 4px rgba(0,0,0,0.3)}
   .launch-first{animation:none}
   .lancelot-flip-dot.flipped{animation:none}
   .viewer-hint{animation:none}

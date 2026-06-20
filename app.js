@@ -382,7 +382,7 @@ function showPage(page) {
     if (_isViewer) applyViewerMode();
   }
   if (page === 'setup') { renderSetup(); renderVisitorLog(); }
-  if (page === 'tend') { renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult(); }
+  if (page === 'tend') { renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
@@ -666,41 +666,17 @@ function startGame() {
   if (sb) {
     initGameSession(sb, function(role) {
       if (role === 'host') {
-        showIdentityModal();
+        doStartGame();
       }
       // viewer: initGameSession 内部已设置_isViewer=true并订阅，直接切到游戏页
     });
   } else {
     // Supabase不可用，回退单机模式
-    showIdentityModal();
+    doStartGame();
   }
 }
 
-function showIdentityModal() {
-  var h = '<h2>我的身份是？</h2>';
-  h += '<p class="sub">选定后将用于倾向值分析（权重翻倍），仅自己可见</p>';
-  h += '<div class="identity-role-grid">';
-  for (var j = 0; j < ALL_ROLES.length; j++) {
-    var r = ALL_ROLES[j];
-    h += '<button class="identity-role-btn" onclick="setMyRole(\'' + r + '\')">' + r + '</button>';
-  }
-  h += '</div>';
-  h += '<div style="margin-top:12px"><button class="btn" onclick="skipIdentity()" style="color:var(--text-dim);font-size:13px">跳过，不记录自己身份</button></div>';
-  $('identity-card').innerHTML = h;
-  $('identity-overlay').classList.add('active');
-}
 
-function setMyRole(role) {
-  state.myRole = role;
-  $('identity-overlay').classList.remove('active');
-  doStartGame();
-}
-
-function skipIdentity() {
-  state.myRole = null;
-  $('identity-overlay').classList.remove('active');
-  doStartGame();
-}
 
 function doStartGame() {
   state.missions = MISSION_COUNTS[state.playerCount].map(function(size, i) {
@@ -818,7 +794,7 @@ function renderGame() {
   renderReviewEntry();
   renderAssassinButton();
   $('launch-fail-area').innerHTML = '';
-  renderGameTendSummary();
+ ;
 }
 
 /* ==================== ASSASSIN MODE (in-game) ==================== */
@@ -4664,6 +4640,49 @@ function getRoleOptions() {
   ];
 }
 
+/* ------- Tend Role Selector ------- */
+function setTendRole(role) {
+  state.myRole = role;
+  renderTendRoleSelector();
+  renderTendPerspective();
+  renderKnownIdentityGrid();
+  renderTendResult();
+}
+function clearTendRole() {
+  state.myRole = null;
+  renderTendRoleSelector();
+  renderTendPerspective();
+  renderKnownIdentityGrid();
+  renderTendResult();
+}
+function renderTendRoleSelector() {
+  var grid = document.getElementById('tend-role-grid');
+  var card = document.getElementById('tend-role-card');
+  if (!grid || !card) return;
+  var h = '';
+  var names = [];
+  for (var i = 0; i < state.playerCount; i++) {
+    names.push(state.playerNames[i]);
+  }
+  if (state.myRole) {
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    h += '<span style="font-size:14px;font-weight:600;color:var(--gold-light)">当前身份：' + escapeHtml(state.myRole) + '</span>';
+    h += '<button class="btn tiny" onclick="clearTendRole()">清除</button>';
+    h += '</div>';
+    h += '<p style="font-size:11px;color:var(--text-dim)">切换身份将重新计算倾向值</p>';
+  } else {
+    h += '<p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">选择你的角色后，该角色评分权重翻倍</p>';
+  }
+  h += '<div class="identity-role-grid">';
+  for (var j = 0; j < ALL_ROLES.length; j++) {
+    var r = ALL_ROLES[j];
+    var sel = state.myRole === r ? ' selected' : '';
+    h += '<button class="identity-role-btn' + sel + '" onclick="setTendRole(\'' + r + '\')">' + r + '</button>';
+  }
+  h += '</div>';
+  grid.innerHTML = h;
+}
+
 /* ------- Perspective header ------- */
 function renderTendPerspective() {
   var persp = getPerspective();
@@ -4672,7 +4691,7 @@ function renderTendPerspective() {
 
   if (!state.myRole) {
     titleEl.textContent = '倾向分析';
-    descEl.textContent = '请先在游戏设置中选择你的角色';
+    descEl.textContent = '请在上方「我的身份」卡片中选择你的角色';
     return;
   }
 
@@ -5009,7 +5028,7 @@ function renderTendResult() {
   if (!state.myRole) {
     titleEl.textContent = '分析结果';
     descEl.textContent = '';
-    listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">请先在游戏设置中选择你的角色</p>';
+    listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">请在上方「我的身份」卡片中选择你的角色</p>';
     return;
   }
 
@@ -5104,41 +5123,3 @@ function toggleEvidence(idx) {
 }
 
 /* ------- Game page inline summary ------- */
-function renderGameTendSummary() {
-  var card = document.getElementById('game-tend-summary-card');
-  var el = document.getElementById('game-tend-summary');
-  if (!card || !el) return;
-
-  if (!state.myRole) {
-    card.style.display = 'none';
-    return;
-  }
-
-  card.style.display = 'block';
-  var persp = getPerspective();
-  var list = computeSuspectScores();
-
-  var h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">';
-
-  // Show top 3
-  var shown = 0;
-  for (var i = 0; i < list.length && shown < 3; i++) {
-    var item = list[i];
-    if (item.score === 0 || item.score === 100) continue; // known identities, skip
-    var cls = item.score >= 65 ? 'suspect' : (item.score >= 40 ? 'neutral' : 'trust');
-    var label = persp === 'good' ? '反方嫌疑' : '梅林概率';
-    h += '<div style="flex:1;min-width:100px;background:var(--parchment);border-radius:var(--radius-sm);padding:6px 8px;text-align:center;border:1px solid rgba(201,168,76,0.08)">';
-    h += '<div style="font-size:13px;font-weight:600;color:var(--text-bright);margin-bottom:2px">' + escapeHtml(state.playerNames[item.idx]) + '</div>';
-    h += '<span class="tend-score ' + cls + '" style="font-size:18px">' + item.score + '</span>';
-    h += '<div style="font-size:10px;color:var(--text-dim)">' + label + '</div>';
-    h += '</div>';
-    shown++;
-  }
-
-  if (shown === 0) {
-    h += '<p style="color:var(--text-dim);text-align:center;width:100%;padding:8px">随任务推进，倾向分析将在此显示</p>';
-  }
-
-  h += '</div>';
-  el.innerHTML = h;
-}
