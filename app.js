@@ -4660,26 +4660,20 @@ function renderTendRoleSelector() {
   var card = document.getElementById('tend-role-card');
   if (!grid || !card) return;
   var h = '';
-  var names = [];
-  for (var i = 0; i < state.playerCount; i++) {
-    names.push(state.playerNames[i]);
-  }
   if (state.myRole) {
-    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    h += '<div style="display:flex;align-items:center;gap:8px">';
     h += '<span style="font-size:14px;font-weight:600;color:var(--gold-light)">当前身份：' + escapeHtml(state.myRole) + '</span>';
     h += '<button class="btn tiny" onclick="clearTendRole()">清除</button>';
     h += '</div>';
-    h += '<p style="font-size:11px;color:var(--text-dim)">切换身份将重新计算倾向值</p>';
-  } else {
-    h += '<p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">选择你的角色后，该角色评分权重翻倍</p>';
   }
-  h += '<div class="identity-role-grid">';
+  h += '<select onchange="setTendRole(this.value)" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.25);background:var(--parchment);color:var(--text);font-size:15px;cursor:pointer;min-height:44px;margin-top:6px">';
+  h += '<option value="">-- 选择身份 --</option>';
   for (var j = 0; j < ALL_ROLES.length; j++) {
     var r = ALL_ROLES[j];
     var sel = state.myRole === r ? ' selected' : '';
-    h += '<button class="identity-role-btn' + sel + '" onclick="setTendRole(\'' + r + '\')">' + r + '</button>';
+    h += '<option value="' + r + '"' + sel + '>' + r + '</option>';
   }
-  h += '</div>';
+  h += '</select>';
   grid.innerHTML = h;
 }
 
