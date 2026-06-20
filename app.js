@@ -818,6 +818,7 @@ function renderGame() {
   renderReviewEntry();
   renderAssassinButton();
   $('launch-fail-area').innerHTML = '';
+  renderGameTendSummary();
 }
 
 /* ==================== ASSASSIN MODE (in-game) ==================== */
@@ -5099,6 +5100,46 @@ function toggleEvidence(idx) {
   var el = document.getElementById('ev-' + idx);
   if (!el) return;
   el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+}
+
+/* ------- Game page inline summary ------- */
+function renderGameTendSummary() {
+  var card = document.getElementById('game-tend-summary-card');
+  var el = document.getElementById('game-tend-summary');
+  if (!card || !el) return;
+
+  if (!state.myRole) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = 'block';
+  var persp = getPerspective();
+  var list = computeSuspectScores();
+
+  var h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">';
+
+  // Show top 3
+  var shown = 0;
+  for (var i = 0; i < list.length && shown < 3; i++) {
+    var item = list[i];
+    if (item.score === 0 || item.score === 100) continue; // known identities, skip
+    var cls = item.score >= 65 ? 'suspect' : (item.score >= 40 ? 'neutral' : 'trust');
+    var label = persp === 'good' ? '反方嫌疑' : '梅林概率';
+    h += '<div style="flex:1;min-width:100px;background:var(--parchment);border-radius:var(--radius-sm);padding:6px 8px;text-align:center;border:1px solid rgba(201,168,76,0.08)">';
+    h += '<div style="font-size:13px;font-weight:600;color:var(--text-bright);margin-bottom:2px">' + escapeHtml(state.playerNames[item.idx]) + '</div>';
+    h += '<span class="tend-score ' + cls + '" style="font-size:18px">' + item.score + '</span>';
+    h += '<div style="font-size:10px;color:var(--text-dim)">' + label + '</div>';
+    h += '</div>';
+    shown++;
+  }
+
+  if (shown === 0) {
+    h += '<p style="color:var(--text-dim);text-align:center;width:100%;padding:8px">随任务推进，倾向分析将在此显示</p>';
+  }
+
+  h += '</div>';
+  el.innerHTML = h;
 }
 
 })();
