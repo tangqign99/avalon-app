@@ -4496,9 +4496,17 @@ function initGameSession(sb, callback) {
   sb.from('game_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1).then(function(res) {
     if (res.error) {
       console.warn('[Multiplayer] check session failed:', res.error);
-      _isHost = true;
+      // 检测是否为表不存在错误（Supabase 返回 code: 'PGRST205' 或 HTTP 404）
+      var errMsg = (res.error && (res.error.message || res.error.details || '')) + '';
+      var isTableMissing = (res.error.code === 'PGRST205') || (errMsg.indexOf('Could not find the table') !== -1) || (errMsg.indexOf('relation') !== -1 && errMsg.indexOf('does not exist') !== -1);
+      if (isTableMissing) {
+        console.error('[Multiplayer] game_sessions 表不存在！需要在 Supabase SQL Editor 中执行 supabase_setup.sql 来创建该表。');
+        toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。详见 supabase_setup.sql', 'warn');
+      } else {
+        toast('多人协同不可用（Supabase 查询失败），使用单机模式', 'warn');
+      }
+      _isHost = false;
       _isViewer = false;
-      console.log('[Multiplayer] initGameSession 结束 → host (查询失败回退)');
       callback('host');
       return;
     }
@@ -4560,9 +4568,15 @@ function createNewSession(sb, callback) {
   }).select('id').single().then(function(r2) {
     if (r2.error) {
       console.warn('[Multiplayer] create session failed:', r2.error);
+      var errMsg2 = (r2.error && (r2.error.message || r2.error.details || '')) + '';
+      var isTableMissing2 = (r2.error.code === 'PGRST205') || (errMsg2.indexOf('Could not find the table') !== -1) || (errMsg2.indexOf('relation') !== -1 && errMsg2.indexOf('does not exist') !== -1);
       _isHost = false;
       _isViewer = false;
-      toast('创建房间失败，使用单机模式', 'warn');
+      if (isTableMissing2) {
+        toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。请执行 supabase_setup.sql', 'warn');
+      } else {
+        toast('创建房间失败，使用单机模式', 'warn');
+      }
     } else {
       _gameSessionId = r2.data.id;
       console.log('[Multiplayer] session 创建成功, sessionId=' + _gameSessionId);
