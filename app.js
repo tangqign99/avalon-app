@@ -6,7 +6,7 @@ var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德',
 var MULTI_ROLES = ['忠臣','爪牙'];
 var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
-var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'];
+var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
 
 /* ==================== SUPABASE ==================== */
 var SUPABASE_URL = 'https://nzbpopxrxniixnhnqktw.supabase.co';
@@ -18,13 +18,15 @@ function getSupabase() {
   if (!_supabase && typeof supabase !== 'undefined') {
     try {
       _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      console.log('[Supabase] client created successfully, URL:', SUPABASE_URL);
+      console.log('[Supabase] client created successfully, URL:', SUPABASE_URL, ', _supabase key count:', Object.keys(_supabase).length);
     } catch(e) {
-      console.error('[Supabase] createClient failed:', e);
+      console.error('[Supabase] createClient failed:', e, '| typeof supabase:', typeof supabase);
       _supabase = null;
     }
   } else if (!_supabase && typeof supabase === 'undefined') {
     console.warn('[Supabase] SDK not loaded (typeof supabase === undefined), running in offline mode');
+  } else if (_supabase) {
+    // client already created, silent
   }
   return _supabase;
 }
@@ -54,7 +56,7 @@ var state = {
   _visitorPageSize: 5,
   _assassinTimerRemaining: 0,
   _assassinTimerInterval: null,
-  ladyOfLakeEnabled: false,
+  ladyOfLakeEnabled: true,
   ladyLakeHolder: -1,
   ladyLakeChecks: [],
   timerMode: 'all',
@@ -78,7 +80,7 @@ function initState(n) {
   for (var i = 0; i < n; i++) state.playerNames[i] = '玩家' + (i + 1);
   state.selfIndex = -1;
   state.myRole = null;
-  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客'] : DEFAULT_ACTIVE_ROLES.slice();
   state.missions = [];
   state.currentRound = 0;
   state.tendencies = {};
@@ -99,7 +101,7 @@ function initState(n) {
   state._visitorPage = 0;
   state._assassinTimerRemaining = 0;
   state._assassinTimerInterval = null;
-  state.ladyOfLakeEnabled = false;
+  state.ladyOfLakeEnabled = true;
   state.ladyLakeHolder = -1;
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
@@ -292,20 +294,34 @@ function recordVisitor() {
       os_version: info.osVersion,
       fingerprint: info.fingerprint
     }]).then(function(r) {
-      if (r.error) console.warn('Supabase visitor insert:', r.error.message);
+      if (r.error) {
+        console.warn('[Visitors] Supabase insert failed — code:', r.error.code, '| message:', r.error.message, '| details:', r.error.details);
+      } else {
+        console.log('[Visitors] Supabase insert OK, fingerprint=' + info.fingerprint);
+      }
+    }).catch(function(e) {
+      console.error('[Visitors] Supabase insert exception:', e);
     });
+  } else {
+    console.log('[Visitors] Supabase not available, visitor logged locally only');
   }
 }
 
 function renderVisitorLog() {
   // 先从 localStorage 快速渲染，然后合并 Supabase 数据
   var localVisitors = loadVisitors().slice().reverse();
+  console.log('[Visitors] local visitors count:', localVisitors.length);
   renderVisitorList(localVisitors);
 
   var sb = getSupabase();
   if (sb) {
+    console.log('[Visitors] fetching from Supabase...');
     sb.from('visitors').select('*').order('created_at', { ascending: false }).limit(200).then(function(r) {
-      if (r.error) return;
+      if (r.error) {
+        console.warn('[Visitors] Supabase query failed — code:', r.error.code, '| message:', r.error.message);
+        return;
+      }
+      console.log('[Visitors] Supabase returned', r.data.length, 'records');
       // 合并去重
       var merged = {};
       for (var i = 0; i < localVisitors.length; i++) {
@@ -328,8 +344,13 @@ function renderVisitorLog() {
       }
       var all = remoteVisitors.concat(localVisitors);
       all.sort(function(a, b) { return b.time.localeCompare(a.time); });
+      console.log('[Visitors] merged total:', all.length, '(remote only:', remoteVisitors.length + ')');
       renderVisitorList(all);
+    }).catch(function(e) {
+      console.error('[Visitors] Supabase query exception:', e);
     });
+  } else {
+    console.log('[Visitors] Supabase not available, showing local visitors only');
   }
 }
 
@@ -622,7 +643,7 @@ function setPlayerCount(n) {
   var oldNames = state.playerNames;
   var oldSelf = state.selfIndex;
   state.playerCount = n;
-  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
+  state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客'] : DEFAULT_ACTIVE_ROLES.slice();
   state.playerNames = [];
   for (var i = 0; i < n; i++) {
     state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
@@ -4516,11 +4537,13 @@ function deserializeGameState(gs) {
 // 初始化游戏房间：检查是否有活跃房间，没有则创建（成为host），有则加入（成为viewer）
 function initGameSession(sb, callback) {
   console.log('[Multiplayer] initGameSession 开始, deviceId=' + generateDeviceId());
+  console.log('[Multiplayer] getSupabase() 返回:', sb ? 'client 对象存在 (connected=' + _supabaseConnected + ')' : 'null — SDK 未加载或 createClient 失败');
   _deviceId = generateDeviceId();
 
   sb.from('game_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1).then(function(res) {
     if (res.error) {
-      console.warn('[Multiplayer] check session failed:', res.error);
+      console.error('[Multiplayer] check session FAILED — 完整错误对象:', JSON.stringify(res.error, null, 2));
+      console.error('[Multiplayer] 错误 code:', res.error.code, '| message:', res.error.message, '| details:', res.error.details, '| hint:', res.error.hint);
       // 检测是否为表不存在错误（Supabase 返回 code: 'PGRST205' 或 HTTP 404）
       var errMsg = (res.error && (res.error.message || res.error.details || '')) + '';
       var isTableMissing = (res.error.code === 'PGRST205') || (errMsg.indexOf('Could not find the table') !== -1) || (errMsg.indexOf('relation') !== -1 && errMsg.indexOf('does not exist') !== -1);
@@ -4528,7 +4551,8 @@ function initGameSession(sb, callback) {
         console.error('[Multiplayer] game_sessions 表不存在！需要在 Supabase SQL Editor 中执行 supabase_setup.sql 来创建该表。');
         toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。详见 supabase_setup.sql', 'warn');
       } else {
-        toast('多人协同不可用（Supabase 查询失败），使用单机模式', 'warn');
+        console.error('[Multiplayer] 非 PGRST205 错误，错误码=' + res.error.code + '，需要排查 Supabase 项目配置');
+        toast('多人协同不可用（Supabase 查询失败，错误码=' + (res.error.code || 'unknown') + '），使用单机模式', 'warn');
       }
       _isHost = true;
       _isViewer = false;
@@ -4537,6 +4561,8 @@ function initGameSession(sb, callback) {
       return;
     }
 
+    console.log('[Multiplayer] game_sessions 查询成功, 返回行数=' + (res.data ? res.data.length : 0));
+
     if (!res.data || res.data.length === 0) {
       console.log('[Multiplayer] 无活跃房间，创建新房间');
       createNewSession(sb, callback);
@@ -4544,15 +4570,20 @@ function initGameSession(sb, callback) {
     }
 
     var session = res.data[0];
+    console.log('[Multiplayer] 找到活跃房间, id=' + session.id + ', status=' + session.status + ', host_id=' + session.host_id);
+
     var updatedAt = session.updated_at;
     var TIMEOUT_MS = 5 * 60 * 1000;
     if (updatedAt) {
       var age = Date.now() - new Date(updatedAt).getTime();
+      console.log('[Multiplayer] 房间年龄=' + Math.round(age / 1000) + 's, 超时阈值=' + (TIMEOUT_MS / 1000) + 's');
       if (age > TIMEOUT_MS) {
         console.log('[Multiplayer] session timed out (age=' + age + 'ms), deleting old session and creating new');
         sb.from('game_sessions').delete().eq('id', session.id).then(function(delRes) {
           if (delRes.error) {
             console.warn('[Multiplayer] delete timed-out session failed:', delRes.error);
+          } else {
+            console.log('[Multiplayer] 超时房间已删除');
           }
           createNewSession(sb, callback);
         });
@@ -4567,7 +4598,10 @@ function initGameSession(sb, callback) {
     console.log('[Multiplayer] 加入已有房间, sessionId=' + _gameSessionId);
     var gs = session.game_state;
     if (gs && gs.playerCount) {
+      console.log('[Multiplayer] 反序列化 game_state, playerCount=' + gs.playerCount);
       deserializeGameState(gs);
+    } else {
+      console.log('[Multiplayer] game_state 无有效数据, gs=' + JSON.stringify(gs));
     }
     // 注册为观众
     registerViewer(sb);
@@ -4576,18 +4610,27 @@ function initGameSession(sb, callback) {
     watchGameSession(sb);
     showPage('game');
     callback('viewer');
+  }).catch(function(err) {
+    console.error('[Multiplayer] game_sessions 查询抛出异常 (catch):', err);
+    console.error('[Multiplayer] 异常类型:', typeof err, '| message:', err && err.message);
+    _isHost = true;
+    _isViewer = false;
+    _offlineMode = true;
+    toast('多人协同网络异常，使用单机模式', 'warn');
+    callback('host');
   });
 }
 
 // 创建新游戏房间（房主）
 function createNewSession(sb, callback) {
-  console.log('[Multiplayer] createNewSession 开始');
+  console.log('[Multiplayer] createNewSession 开始, deviceId=' + _deviceId);
   _isHost = true;
   _isViewer = false;
   _offlineMode = false;
   var initState = serializeGameState();
   initState._viewers = [];
   initState._hostFingerprint = generateDeviceId().slice(-6).toUpperCase();
+  console.log('[Multiplayer] 即将插入 game_sessions, host_id=' + _deviceId + ', hostFingerprint=' + initState._hostFingerprint);
   sb.from('game_sessions').insert({
     host_id: _deviceId,
     game_state: initState,
@@ -4595,7 +4638,8 @@ function createNewSession(sb, callback) {
     updated_at: new Date().toISOString()
   }).select('id').single().then(function(r2) {
     if (r2.error) {
-      console.warn('[Multiplayer] create session failed:', r2.error);
+      console.error('[Multiplayer] create session FAILED — 完整错误:', JSON.stringify(r2.error, null, 2));
+      console.error('[Multiplayer] create error code:', r2.error.code, '| message:', r2.error.message, '| details:', r2.error.details);
       var errMsg2 = (r2.error && (r2.error.message || r2.error.details || '')) + '';
       var isTableMissing2 = (r2.error.code === 'PGRST205') || (errMsg2.indexOf('Could not find the table') !== -1) || (errMsg2.indexOf('relation') !== -1 && errMsg2.indexOf('does not exist') !== -1);
       _isHost = true;
@@ -4604,7 +4648,8 @@ function createNewSession(sb, callback) {
       if (isTableMissing2) {
         toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。请执行 supabase_setup.sql', 'warn');
       } else {
-        toast('创建房间失败，使用单机模式', 'warn');
+        console.error('[Multiplayer] 非 PGRST205 错误，创建房间失败，错误码=' + r2.error.code);
+        toast('创建房间失败（错误码=' + (r2.error.code || 'unknown') + '），使用单机模式', 'warn');
       }
     } else {
       _gameSessionId = r2.data.id;
@@ -4615,6 +4660,13 @@ function createNewSession(sb, callback) {
       // 房主订阅 Realtime：实时感知观众加入/离开
       watchSessionAsHost(sb);
     }
+    callback('host');
+  }).catch(function(err) {
+    console.error('[Multiplayer] createNewSession 插入抛出异常 (catch):', err);
+    _isHost = true;
+    _isViewer = false;
+    _offlineMode = true;
+    toast('创建房间网络异常，使用单机模式', 'warn');
     callback('host');
   });
 }
@@ -5003,20 +5055,34 @@ function updateMultiplayerStatusBar() {
         h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:auto">强制重启</button>';
       }
     }
-    // 尝试从 Supabase 读取观众数量
-    fetchViewerCount(function(count) {
+    // 尝试从 Supabase 读取观众列表（含指纹）
+    fetchViewerList(function(viewers) {
       if (version !== _mpStatusBarVersion) return; // 忽略过期回调
       var countEl = bar.querySelector('.mp-viewer-count');
-      if (count >= 0) {
-        if (countEl) {
-          countEl.textContent = count > 0 ? '围观者: ' + count + '人' : '暂无围观者';
-        } else {
-          var span = document.createElement('span');
-          span.className = 'mp-viewer-count';
-          span.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
-          span.textContent = count > 0 ? '围观者: ' + count + '人' : '暂无围观者';
-          bar.appendChild(span);
+      if (countEl) bar.removeChild(countEl);
+      var viewerBadgesEl = bar.querySelector('.mp-viewer-badges');
+      if (viewerBadgesEl) bar.removeChild(viewerBadgesEl);
+      if (viewers && viewers.length > 0) {
+        var span = document.createElement('span');
+        span.className = 'mp-viewer-count';
+        span.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
+        span.textContent = '围观者: ' + viewers.length + '人';
+        bar.appendChild(span);
+        var badges = document.createElement('span');
+        badges.className = 'mp-viewer-badges';
+        badges.style.cssText = 'margin-left:8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap';
+        for (var vi = 0; vi < viewers.length; vi++) {
+          var fp = (viewers[vi].fingerprint || '').slice(0, 6);
+          var hue = hashStrToHue(fp);
+          badges.innerHTML += '<span style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%);padding:1px 6px;border-radius:8px;font-size:11px;font-family:monospace">#' + fp + '</span>';
         }
+        bar.appendChild(badges);
+      } else if (viewers) {
+        var span2 = document.createElement('span');
+        span2.className = 'mp-viewer-count';
+        span2.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
+        span2.textContent = '暂无围观者';
+        bar.appendChild(span2);
       }
     });
   } else if (_isViewer) {
@@ -5044,13 +5110,13 @@ function updateMultiplayerStatusBar() {
   bar.style.display = (_isHost || _isViewer) ? 'flex' : 'none';
 }
 
-// 从 Supabase 读取观众数量
-function fetchViewerCount(callback) {
-  if (!_gameSessionId || !_isHost) { callback(-1); return; }
+// 从 Supabase 读取围观者列表（含指纹标识）
+function fetchViewerList(callback) {
+  if (!_gameSessionId || !_isHost) { callback(null); return; }
   var sb = getSupabase();
-  if (!sb) { callback(-1); return; }
+  if (!sb) { callback(null); return; }
   sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data || !res.data.game_state) { callback(-1); return; }
+    if (res.error || !res.data || !res.data.game_state) { callback(null); return; }
     var gs = res.data.game_state;
     var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
     // 过滤掉超过2分钟未心跳的观众
@@ -5062,8 +5128,8 @@ function fetchViewerCount(callback) {
         if (age < 120000) active.push(viewers[i]);
       }
     }
-    callback(active.length);
-  }).catch(function() { callback(-1); });
+    callback(active);
+  }).catch(function() { callback(null); });
 }
 
 // 从 Supabase 读取房主指纹
