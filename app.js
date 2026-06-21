@@ -49,8 +49,8 @@ var state = {
   ladyOfLakeEnabled: false,
   ladyLakeHolder: -1,
   ladyLakeChecks: [],
-  timerMode: 'per',
-  timerSeconds: 60,
+  timerMode: 'all',
+  timerSeconds: 300,
   timerInterval: null,
   timerRemaining: 0,
   lancelotFlipped: false,
@@ -96,8 +96,8 @@ function initState(n) {
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
   state.knownIdentities = {};
-  state.timerMode = 'per';
-  state.timerSeconds = 60;
+  state.timerMode = 'all';
+  state.timerSeconds = 300;
   state.timerInterval = null;
   state.timerRemaining = 0;
   state.roundTendencies = [];
@@ -785,12 +785,16 @@ function toggleLadyOfLake() {
 
 function setTimerMode(mode) {
   state.timerMode = mode;
-  var optRow = document.getElementById('timer-options');
-  optRow.style.display = (mode === 'per') ? 'flex' : 'none';
+  var allOptRow = document.getElementById('timer-all-options');
+  var perOptRow = document.getElementById('timer-per-options');
+  if (allOptRow) allOptRow.style.display = (mode === 'all') ? 'flex' : 'none';
+  if (perOptRow) perOptRow.style.display = (mode === 'per') ? 'flex' : 'none';
   ['off','all','per'].forEach(function(m) {
     var btn = document.getElementById('timer-mode-' + m);
     if (btn) btn.className = 'timer-mode-btn' + (m === mode ? ' selected' : '');
   });
+  if (mode === 'all') setAllTimerSeconds(300);
+  if (mode === 'per') setTimerSeconds(60);
 }
 
 function setTimerSecondsInput() {
@@ -801,7 +805,7 @@ function setTimerSecondsInput() {
   if (val > 300) { val = 300; input.value = 300; }
   state.timerSeconds = val;
   [45,60,75,90].forEach(function(s) {
-    var btn = document.getElementById('timer-opt-' + s);
+    var btn = document.getElementById('timer-per-opt-' + s);
     if (btn) btn.className = 'timer-opt-btn';
   });
 }
@@ -811,7 +815,15 @@ function setTimerSeconds(sec) {
   var input = document.getElementById('timer-seconds-input');
   if (input) input.value = sec;
   [45,60,75,90].forEach(function(s) {
-    var btn = document.getElementById('timer-opt-' + s);
+    var btn = document.getElementById('timer-per-opt-' + s);
+    if (btn) btn.className = 'timer-opt-btn' + (s === sec ? ' selected' : '');
+  });
+}
+
+function setAllTimerSeconds(sec) {
+  state.timerSeconds = sec;
+  [180,240,300].forEach(function(s) {
+    var btn = document.getElementById('timer-all-opt-' + s);
     if (btn) btn.className = 'timer-opt-btn' + (s === sec ? ' selected' : '');
   });
 }
@@ -4455,7 +4467,7 @@ function deserializeGameState(gs) {
   state.lancelotDrawResults = gs.lancelotDrawResults || [];
   state.lancelotFlipCount = gs.lancelotFlipCount || 0;
   state.lancelotRoundFlips = gs.lancelotRoundFlips || [];
-  state.timerMode = gs.timerMode || 'per';
+  state.timerMode = gs.timerMode || 'all';
   state.timerSeconds = gs.timerDuration || 60;
   state.timerRemaining = gs.timerRemaining || 0;
   state._firstLeaderPicked = gs._firstLeaderPicked || false;

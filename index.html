@@ -46,15 +46,21 @@
       <h3>计时模式</h3>
       <div class="timer-mode-row">
         <button class="timer-mode-btn" id="timer-mode-off" onclick="setTimerMode('off')">关闭计时</button>
-        <button class="timer-mode-btn" id="timer-mode-all" onclick="setTimerMode('all')">全体发言 5 分钟</button>
-        <button class="timer-mode-btn selected" id="timer-mode-per" onclick="setTimerMode('per')">每人发言 X 秒</button>
+        <button class="timer-mode-btn selected" id="timer-mode-all" onclick="setTimerMode('all')">全体发言</button>
+        <button class="timer-mode-btn" id="timer-mode-per" onclick="setTimerMode('per')">轮流发言</button>
       </div>
-      <div class="timer-options-row" id="timer-options">
+      <div class="timer-options-row" id="timer-all-options">
+        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">时长</span>
+        <button class="timer-opt-btn" id="timer-all-opt-180" onclick="setAllTimerSeconds(180)">3分钟</button>
+        <button class="timer-opt-btn" id="timer-all-opt-240" onclick="setAllTimerSeconds(240)">4分钟</button>
+        <button class="timer-opt-btn selected" id="timer-all-opt-300" onclick="setAllTimerSeconds(300)">5分钟</button>
+      </div>
+      <div class="timer-options-row" id="timer-per-options" style="display:none">
         <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">每人</span>
-        <button class="timer-opt-btn" id="timer-opt-45" onclick="setTimerSeconds(45)">45s</button>
-        <button class="timer-opt-btn selected" id="timer-opt-60" onclick="setTimerSeconds(60)">60s</button>
-        <button class="timer-opt-btn" id="timer-opt-75" onclick="setTimerSeconds(75)">75s</button>
-        <button class="timer-opt-btn" id="timer-opt-90" onclick="setTimerSeconds(90)">90s</button>
+        <button class="timer-opt-btn" id="timer-per-opt-45" onclick="setTimerSeconds(45)">45s</button>
+        <button class="timer-opt-btn selected" id="timer-per-opt-60" onclick="setTimerSeconds(60)">60s</button>
+        <button class="timer-opt-btn" id="timer-per-opt-75" onclick="setTimerSeconds(75)">75s</button>
+        <button class="timer-opt-btn" id="timer-per-opt-90" onclick="setTimerSeconds(90)">90s</button>
         <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
           style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
           onchange="setTimerSecondsInput()" onfocus="this.select()">
