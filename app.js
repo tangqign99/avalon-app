@@ -418,6 +418,7 @@ function renderSetup() {
       h += '<option value="' + curName + '" selected>' + curName + '</option>';
     }
     h += '</select>';
+    h += '<button class="btn small swap-seat-btn" id="swap-seat-' + i + '" onclick="toggleSwapSeat(' + i + ')" title="换座">⇄</button>';
     h += '<button class="btn small" onclick="addNameFromSetup()" title="新增玩家" style="min-width:36px;font-size:18px;padding:6px 8px">+</button>';
     h += '</div>';
   }
@@ -462,6 +463,7 @@ function setPlayerCount(n) {
     state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
   }
   state.selfIndex = oldSelf < n ? oldSelf : -1;
+  _swapSeatFirst = null;
   state.tendencies = {};
   state.consecutiveRejects = {};
   state.roundTendencies = [];
@@ -521,6 +523,32 @@ function addNameFromSetup() {
   name = name.trim();
   if (name.length > 10) { toast('名字不能超过10个字符', 'warn'); return; }
   _addNameCore(name);
+}
+
+var _swapSeatFirst = null;
+
+function toggleSwapSeat(idx) {
+  if (_swapSeatFirst === null) {
+    _swapSeatFirst = idx;
+    var btn = document.getElementById('swap-seat-' + idx);
+    if (btn) { btn.classList.add('swapping'); btn.textContent = '⇄'; }
+    toast('已选中 ' + (idx + 1) + ' 号，再点另一位的换座按钮完成互换');
+  } else if (_swapSeatFirst === idx) {
+    _swapSeatFirst = null;
+    var btn = document.getElementById('swap-seat-' + idx);
+    if (btn) { btn.classList.remove('swapping'); btn.textContent = '⇄'; }
+    toast('已取消');
+  } else {
+    var a = _swapSeatFirst;
+    var b = idx;
+    // Swap names
+    var tmp = state.playerNames[a];
+    state.playerNames[a] = state.playerNames[b];
+    state.playerNames[b] = tmp;
+    _swapSeatFirst = null;
+    renderSetup();
+    toast((a + 1) + ' 号与 ' + (b + 1) + ' 号已互换');
+  }
 }
 
 function statsAddName() {
@@ -703,6 +731,7 @@ function doStartGame() {
   state.ladyCheckHistory = [];
   state.ladyLakeHolder = -1;
   state._ladyCheckTriggeredThisRound = false;
+  _swapSeatFirst = null;
   state.roundTendencies = [];
   state.identityMarks = [];
   state.playerPredictions = {};

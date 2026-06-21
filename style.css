@@ -174,6 +174,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23c9a84c'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
 }
+.swap-seat-btn{min-width:32px;font-size:16px;padding:6px;color:var(--text-dim);border-color:transparent;transition:all 0.2s}
+.swap-seat-btn:hover{color:var(--gold);border-color:rgba(201,168,76,0.4)}
+.swap-seat-btn.swapping{color:#ff9;background:rgba(201,168,76,0.25);border-color:var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.4);animation:pulse-swap 0.8s infinite}
+@keyframes pulse-swap{0%,100%{box-shadow:0 0 8px rgba(201,168,76,0.4)}50%{box-shadow:0 0 16px rgba(201,168,76,0.7)}}
 .add-name-row{display:flex;gap:8px;align-items:center;margin-top:4px;padding:4px 0}
 .add-name-input{
   flex:1;padding:9px 12px;border-radius:var(--radius-sm);
