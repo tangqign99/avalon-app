@@ -847,7 +847,7 @@ function startGame() {
       // viewer: initGameSession 内部已设置_isViewer=true并订阅，直接切到游戏页
     });
   } else {
-    // Supabase不可用，回退单机模式
+    toast('多人协同不可用（网络受限），使用单机模式', 'warn');
     doStartGame();
   }
 }
