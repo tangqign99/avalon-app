@@ -5325,15 +5325,37 @@ function updateMultiplayerStatusBar() {
     bar.innerHTML =
       '<div class="mp-status-row">' +
         '<span class="mp-badge viewer" title="你正在围观">围观中</span>' +
-        '<span style="color:var(--text-dim);font-size:13px">等待房主操作...</span>' +
         '<span class="mp-room-id" style="color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + roomsId + '</span>' +
-        '<span class="mp-host-info" style="margin-left:auto;color:var(--gold);font-size:13px"></span>' +
+      '</div>' +
+      '<div class="mp-status-row">' +
+        '<span class="mp-host-info" style="color:var(--gold);font-size:13px"></span>' +
+        '<span style="color:var(--text-dim);font-size:12px">等待房主操作...</span>' +
+      '</div>' +
+      '<div class="mp-status-row" id="mp-viewer-list-row">' +
+        '<span style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
       '</div>';
     // 异步读取房主指纹
     fetchHostFingerprint(function(fp) {
       if (version !== _mpStatusBarVersion) return;
       var hostEl = bar.querySelector('.mp-host-info');
       if (hostEl && fp) hostEl.textContent = '房主: ' + fp;
+    });
+    // 异步加载围观者列表
+    fetchViewerListForViewer(function(viewers) {
+      if (version !== _mpStatusBarVersion) return;
+      var listRow = document.getElementById('mp-viewer-list-row');
+      if (!listRow) return;
+      if (viewers && viewers.length > 0) {
+        var html = '<span style="color:var(--text-dim);font-size:12px">围观者: ' + viewers.length + '人</span>';
+        for (var vi = 0; vi < viewers.length; vi++) {
+          var fp = (viewers[vi].fingerprint || '').slice(0, 6);
+          var hue = hashStrToHue(fp);
+          html += '<span style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%);padding:1px 6px;border-radius:8px;font-size:11px;font-family:monospace;margin-left:4px">#' + fp + '</span>';
+        }
+        listRow.innerHTML = html;
+      } else {
+        listRow.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无围观者</span>';
+      }
     });
   }
   bar.style.display = (_isHost || _isViewer) ? 'flex' : 'none';
@@ -5349,6 +5371,27 @@ function fetchViewerList(callback) {
     var gs = res.data.game_state;
     var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
     // 过滤掉超过2分钟未心跳的观众
+    var now = Date.now();
+    var active = [];
+    for (var i = 0; i < viewers.length; i++) {
+      if (viewers[i].lastSeen) {
+        var age = now - new Date(viewers[i].lastSeen).getTime();
+        if (age < 120000) active.push(viewers[i]);
+      }
+    }
+    callback(active);
+  }).catch(function() { callback(null); });
+}
+
+// 围观者视角读取围观者列表（无 _isHost 限制）
+function fetchViewerListForViewer(callback) {
+  if (!_gameSessionId || !_isViewer) { callback(null); return; }
+  var sb = getSupabase();
+  if (!sb) { callback(null); return; }
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
+    if (res.error || !res.data || !res.data.game_state) { callback(null); return; }
+    var gs = res.data.game_state;
+    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
     var now = Date.now();
     var active = [];
     for (var i = 0; i < viewers.length; i++) {
