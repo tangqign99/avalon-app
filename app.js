@@ -2815,8 +2815,14 @@ function getTakenUniqueRoles(exceptIdx) {
   var taken = {};
   for (var i = 0; i < state.playerCount; i++) {
     if (i === exceptIdx) continue;
-    var sel = document.getElementById('end-role-' + i);
-    var role = sel ? sel.value : '';
+    var role;
+    // 互换身份进行中时，用交换后的值
+    if (state._swapEndRole && (i in state._swapEndRole)) {
+      role = state._swapEndRole[i];
+    } else {
+      var sel = document.getElementById('end-role-' + i);
+      role = sel ? sel.value : '';
+    }
     if (role && UNIQUE_ROLES.indexOf(role) !== -1) {
       taken[role] = true;
     }
