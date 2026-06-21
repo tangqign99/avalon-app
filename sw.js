@@ -1,6 +1,6 @@
-/* ==================== Service Worker v82 ==================== */
-// sw.js - v82
-var CACHE_NAME = 'avalon-pwa-v82';
+/* ==================== Service Worker v83 ==================== */
+// sw.js - v83
+var CACHE_NAME = 'avalon-pwa-v83';
 var ASSETS = [
   './',
   './index.html',
