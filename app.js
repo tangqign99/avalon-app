@@ -151,10 +151,97 @@ function saveNamePool() {
   localStorage.setItem('avalon_name_pool', JSON.stringify(namePool));
 }
 function loadHistory() {
-  try { return JSON.parse(localStorage.getItem('avalon_history_v2') || '[]'); } catch(e) { return []; }
+  try {
+    var raw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
+    var migrated = false;
+    for (var i = 0; i < raw.length; i++) {
+      if (!isRecordV2(raw[i])) {
+        raw[i] = toRecordV2(raw[i]);
+        migrated = true;
+      }
+    }
+    if (migrated) localStorage.setItem('avalon_history_v2', JSON.stringify(raw));
+    return raw;
+  } catch(e) { return []; }
 }
 function saveHistory(data) {
   localStorage.setItem('avalon_history_v2', JSON.stringify(data));
+}
+
+// 将旧格式记录转为 v2 短字段格式
+function toRecordV2(record) {
+  var v2 = {};
+  if (record.date !== undefined) v2.d = record.date;
+  if (record.playerCount !== undefined) v2.pc = record.playerCount;
+  if (record.winner !== undefined) v2.w = record.winner;
+  if (record.identities) v2.ids = record.identities.map(function(id) { return { n: id.name, r: id.role, i: id.index }; });
+  if (record.lancelotFlips) v2.lf = record.lancelotFlips;
+  if (record.activeRoles) v2.ar = record.activeRoles;
+  if (record.roundTendencies) v2.rt = record.roundTendencies;
+  if (record.assassinTarget !== undefined) v2.at = record.assassinTarget;
+  if (record.assassinSuccess !== undefined) v2.as = record.assassinSuccess;
+  if (record.assassinAfterRound != null) v2.aar = record.assassinAfterRound;
+  if (record.currentRound !== undefined) v2.cr = record.currentRound;
+  if (record.identityMarks) v2.im = record.identityMarks.map(function(m) { return { t: m.target, tn: m.targetName, l: m.level, ts: m.timestamp }; });
+  if (record.missions) v2.ms = record.missions.map(function(m) {
+    var vm = { r: m.round, s: m.size, ld: m.leader, t: m.team, res: m.result, fc: m.failCount };
+    if (m.launchFailures !== undefined) vm.lf2 = m.launchFailures;
+    if (m.launchAttempts) vm.la = m.launchAttempts.map(function(att) {
+      return { t: att.team, v: att.votes, ld: att.leader };
+    });
+    if (m.votes) vm.v = m.votes;
+    return vm;
+  });
+  if (record.ladyCheckHistory) v2.lch = record.ladyCheckHistory.map(function(h) {
+    return { r: h.round, h: h.holder, hn: h.holderName, t: h.target, tn: h.targetName, res: h.result };
+  });
+  if (record.forceEnded) v2.fe = record.forceEnded;
+  if (record.forceEndReason) v2.fer = record.forceEndReason;
+  if (record.forceEndTime) v2.fet = record.forceEndTime;
+  if (record._supabaseId) v2._sid = record._supabaseId;
+  return v2;
+}
+
+// 将 v2 短字段格式转回旧格式（供渲染等消费端使用）
+function fromRecordV2(v2) {
+  var rec = {};
+  rec.date = v2.d || '';
+  rec.playerCount = v2.pc || 0;
+  rec.winner = v2.w || '';
+  rec.identities = (v2.ids || []).map(function(id) { return { name: id.n, role: id.r, index: id.i }; });
+  rec.lancelotFlips = v2.lf || {};
+  rec.activeRoles = v2.ar || [];
+  rec.roundTendencies = v2.rt || [];
+  rec.assassinTarget = v2.at || null;
+  rec.assassinSuccess = v2.as || false;
+  rec.assassinAfterRound = v2.aar != null ? v2.aar : null;
+  rec.currentRound = v2.cr != null ? v2.cr : 0;
+  rec.identityMarks = (v2.im || []).map(function(m) { return { target: m.t, targetName: m.tn, level: m.l, timestamp: m.ts }; });
+  rec.missions = (v2.ms || []).map(function(m) {
+    var rm = { round: m.r, size: m.s, leader: m.ld, team: m.t || [], result: m.res, failCount: m.fc || 0 };
+    if (m.lf2 !== undefined) rm.launchFailures = m.lf2;
+    if (m.la) rm.launchAttempts = m.la.map(function(att) { return { team: att.t || [], votes: att.v || {}, leader: att.ld }; });
+    if (m.v) rm.votes = m.v;
+    return rm;
+  });
+  rec.ladyCheckHistory = (v2.lch || []).map(function(h) { return { round: h.r, holder: h.h, holderName: h.hn, target: h.t, targetName: h.tn, result: h.res }; });
+  rec.forceEnded = v2.fe || false;
+  rec.forceEndReason = v2.fer || '';
+  rec.forceEndTime = v2.fet || '';
+  rec._supabaseId = v2._sid || '';
+  return rec;
+}
+
+// 判断记录是否为 v2 格式
+function isRecordV2(record) {
+  return record && record.d !== undefined && record.w !== undefined;
+}
+
+// 将 v2 记录标准化为消费端可用格式（带旧字段名）
+function normalizeRecord(record) {
+  if (!record) return null;
+  if (isRecordV2(record)) return fromRecordV2(record);
+  return record; // 兼容未迁移的旧格式
 }
 function loadDeletedKeys() {
   try { return JSON.parse(localStorage.getItem('avalon_deleted_keys') || '[]'); } catch(e) { return []; }
@@ -1404,7 +1491,8 @@ function computeMerlinProbability() {
   }
 
   // --- Historical analysis: check past games where each player was Merlin ---
-  var history = loadHistory();
+  var raw = loadHistory();
+  var history = raw.map(function(r) { return normalizeRecord(r); });
   if (history.length > 0) {
     for (var i = 0; i < pc; i++) {
       if (i === state.selfIndex) continue;
@@ -3307,7 +3395,8 @@ function saveGameRecord() {
       };
     })
   };
-  history.push(record);
+  var recordV2 = toRecordV2(record);
+  history.push(recordV2);
   saveHistory(history);
 
   // Supabase: 等待插入完成再跳转，防止刷新丢失
@@ -3330,13 +3419,13 @@ function saveGameRecord() {
   }
   if (sb) {
     var recordKey = makeRecordKey(record);
-    sb.from('game_records').insert({ game_data: record }).select('id').single().then(function(res) {
+    sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
         toast('保存失败：' + res.error.message, 'warn');
       } else if (res.data && res.data.id) {
-        record._supabaseId = res.data.id;
-        history[history.length - 1]._supabaseId = res.data.id;
+        recordV2._sid = res.data.id;
+        history[history.length - 1]._sid = res.data.id;
         saveHistory(history);
       }
       finishSave();
@@ -3355,7 +3444,8 @@ function saveGameRecord() {
 /* ==================== STATS PANEL ==================== */
 function renderStats() {
   renderConnectionStatus();
-  var history = loadHistory();
+  var raw = loadHistory();
+  var history = raw.map(function(r) { return normalizeRecord(r); });
   var total = history.length;
   var goodWins = history.filter(function(h) { return h.winner === 'good'; }).length;
   var evilWins = history.filter(function(h) { return h.winner === 'evil'; }).length;
@@ -3783,7 +3873,7 @@ function togglePlayerStat(name) {
 /* ==================== GAME DETAIL & EDIT ==================== */
 function showGameDetail(idx) {
   var history = loadHistory();
-  var rec = history[idx];
+  var rec = normalizeRecord(history[idx]);
   if (!rec) return;
 
   var h = '<h2>对局详情</h2>';
@@ -4014,7 +4104,7 @@ function showGameDetail(idx) {
 function showEditGameRecord(idx) {
   closeModal();
   var history = loadHistory();
-  var rec = history[idx];
+  var rec = normalizeRecord(history[idx]);
   if (!rec) return;
 
   var h = '<h2>编辑对局</h2>';
@@ -4149,7 +4239,7 @@ function saveEditGameRecord(idx) {
     else rec.assassinSuccess = false;
   }
 
-  history[idx] = rec;
+  history[idx] = toRecordV2(rec);
   saveHistory(history);
   closeModal();
   toast('对局记录已更新');
@@ -4170,8 +4260,9 @@ function confirmDeleteGame(idx) {
   closeModal();
   var history = loadHistory();
   if (idx < 0 || idx >= history.length) return;
-  var record = history[idx];
-  var key = makeRecordKey(record);
+  var recRaw = history[idx];
+  var record = normalizeRecord(recRaw);
+  var key = makeRecordKey(recRaw);
   var sb = getSupabase();
 
   // 先删除 Supabase，确保云端同步后再更新本地
@@ -4263,6 +4354,7 @@ function clearStats() {
 function confirmClearStats() {
   closeModal();
   localStorage.removeItem('avalon_history_v2');
+  localStorage.removeItem('avalon_last_sync');
   toast('已清除所有统计');
   renderStats();
 }
@@ -4276,6 +4368,10 @@ function exportData() {
     if (val !== null) {
       try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
     }
+  }
+  // 导出时把 v2 格式转回旧格式（可读）
+  if (data['avalon_history_v2'] && Array.isArray(data['avalon_history_v2'])) {
+    data['avalon_history_v2'] = data['avalon_history_v2'].map(function(r) { return normalizeRecord(r); });
   }
   var json = JSON.stringify(data);
 
@@ -4340,32 +4436,66 @@ function doImport() {
 // Supabase Realtime 订阅：跨设备实时同步
 // 页面加载时从 Supabase 拉取历史数据合并到本地（补充实时推送之前的记录）
 function pullInitialData(sb) {
-  sb.from('game_records').select('game_data').then(function(gameRes) {
-    if (gameRes.error || !gameRes.data) {
+  var lastSync = localStorage.getItem('avalon_last_sync');
+  var query = sb.from('game_records').select('id, game_data, game_data_v2, created_at').order('created_at', { ascending: true });
+
+  if (lastSync) {
+    query = query.gt('created_at', lastSync);
+  }
+
+  query.then(function(gameRes) {
+    if (gameRes.error) {
       console.warn('[InitPull] game_records fetch failed:', gameRes.error);
       return;
     }
-    var cloudRecords = [];
+    if (!gameRes.data || gameRes.data.length === 0) {
+      if (!lastSync) console.log('[InitPull] no records in cloud');
+      return;
+    }
+
+    var localHistory = loadHistory();
+    var localDeletedKeys = loadDeletedKeys();
+    var newSyncTime = gameRes.data[gameRes.data.length - 1].created_at;
+    var hasNew = false;
+
     for (var i = 0; i < gameRes.data.length; i++) {
-      if (gameRes.data[i].game_data) {
-        gameRes.data[i].game_data._supabaseId = gameRes.data[i].id;
-        cloudRecords.push(gameRes.data[i].game_data);
+      var row = gameRes.data[i];
+      var recordV2 = row.game_data_v2 ? row.game_data_v2 : (row.game_data ? toRecordV2(row.game_data) : null);
+      if (!recordV2) continue;
+      recordV2._sid = row.id;
+
+      // 检查删除黑名单
+      var key = makeRecordKey(recordV2);
+      if (localDeletedKeys.indexOf(key) !== -1) {
+        console.log('[InitPull] skipped deleted:', key);
+        continue;
+      }
+
+      // 合并去重：按 key 查找本地是否已存在
+      var exists = false;
+      for (var j = 0; j < localHistory.length; j++) {
+        if (makeRecordKey(localHistory[j]) === key) { exists = true; break; }
+      }
+      if (!exists) {
+        localHistory.push(recordV2);
+        hasNew = true;
       }
     }
-    // 用本地删除黑名单过滤云端记录（删成功的记录云端已不存在，此处兜底离线删除场景）
-    var localDeletedKeys = loadDeletedKeys();
-    if (localDeletedKeys.length > 0) {
-      var dkSet = {};
-      for (var d = 0; d < localDeletedKeys.length; d++) { dkSet[localDeletedKeys[d]] = true; }
-      cloudRecords = cloudRecords.filter(function(r) { return !dkSet[makeRecordKey(r)]; });
+
+    if (hasNew) {
+      localHistory.sort(function(a, b) {
+        var da = (a.d || a.date || '');
+        var db = (b.d || b.date || '');
+        if (da < db) return -1;
+        if (da > db) return 1;
+        return 0;
+      });
+      saveHistory(localHistory);
+      console.log('[InitPull] merged ' + gameRes.data.length + ' cloud records, total:', localHistory.length);
     }
-    // 云端有数据时覆盖本地；云端为空时保留本地（避免离线记录被清空）
-    var localHistory = loadHistory();
-    if (cloudRecords.length > 0 || localHistory.length === 0) {
-      saveHistory(cloudRecords);
-    } else {
-      console.log('[InitPull] cloud empty, keeping local');
-    }
+
+    if (newSyncTime) localStorage.setItem('avalon_last_sync', newSyncTime);
+
     if (state._currentPage === 'stats') renderStats();
   });
 
@@ -4398,8 +4528,12 @@ function setupRealtimeSubscriptions() {
     function(payload) {
       console.log('[Realtime] new game_record inserted:', payload.new.id);
       try {
-        var newRecord = payload.new.game_data;
+        var newRecord = payload.new.game_data_v2 || payload.new.game_data;
         if (!newRecord) return;
+        if (!isRecordV2(newRecord) && newRecord.date) {
+          newRecord = toRecordV2(newRecord);
+        }
+        newRecord._sid = payload.new.id;
         // 检查删除黑名单
         var dk = loadDeletedKeys();
         if (dk.indexOf(makeRecordKey(newRecord)) !== -1) { console.log('[Realtime] skipped deleted record'); return; }
@@ -4457,7 +4591,7 @@ function setupRealtimeSubscriptions() {
         var localHistory = loadHistory();
         var found = -1;
         for (var i = 0; i < localHistory.length; i++) {
-          if (localHistory[i]._supabaseId === deletedId) { found = i; break; }
+          if (localHistory[i]._sid === deletedId || localHistory[i]._supabaseId === deletedId) { found = i; break; }
         }
         if (found >= 0) {
           localHistory.splice(found, 1);
@@ -4526,9 +4660,10 @@ function mergeHistories(local, cloud) {
 }
 
 function makeRecordKey(record) {
-  if (!record || !record.identities) return '';
-  var identityStr = record.identities.map(function(id) { return (id.name || '') + '|' + (id.role || ''); }).sort().join(',');
-  return (record.date || '') + '|' + (record.playerCount || 0) + '|' + identityStr;
+  var rec = normalizeRecord(record);
+  if (!rec || !rec.identities) return '';
+  var identityStr = rec.identities.map(function(id) { return (id.name || '') + '|' + (id.role || ''); }).sort().join(',');
+  return (rec.date || '') + '|' + (rec.playerCount || 0) + '|' + identityStr;
 }
 
 /* ==================== MULTIPLAYER GAME SESSION ==================== */
@@ -5513,15 +5648,16 @@ function saveForceEndRecord() {
     forceEnded: true,
     forceEndReason: reason
   };
-  history.push(record);
+  var recordV2 = toRecordV2(record);
+  history.push(recordV2);
   saveHistory(history);
 
   // Supabase 同步
   var sb = getSupabase();
   if (sb) {
-    sb.from('game_records').insert({ game_data: record }).select('id').single().then(function(res) {
+    sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
       if (!res.error && res.data && res.data.id) {
-        history[history.length - 1]._supabaseId = res.data.id;
+        history[history.length - 1]._sid = res.data.id;
         saveHistory(history);
       }
     });
