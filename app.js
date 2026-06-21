@@ -134,6 +134,7 @@ var _deviceId = null;
 var _gameSessionId = null;
 var _gameSessionChannel = null;
 var _gameSessionPollInterval = null;
+var _hostIdleTimer = null;  // 房主 30 分钟无操作自动退出
 
 /* ==================== PLAYER LABEL ==================== */
 function playerLabel(idx) {
@@ -318,14 +319,14 @@ function renderVisitorLog() {
 
   var sb = getSupabase();
   if (sb) {
-    console.log('[Visitors] fetching from Supabase...');
-    sb.from('visitors').select('*').order('created_at', { ascending: false }).limit(200).then(function(r) {
+    console.log('[Visitors] fetching from Supabase (all devices)...');
+    sb.from('visitors').select('*').order('visit_time', { ascending: false }).limit(500).then(function(r) {
       if (r.error) {
         console.warn('[Visitors] Supabase query failed — code:', r.error.code, '| message:', r.error.message);
         return;
       }
       console.log('[Visitors] Supabase returned', r.data.length, 'records');
-      // 合并去重
+      // 合并去重：按时间+指纹联合键去重
       var merged = {};
       for (var i = 0; i < localVisitors.length; i++) {
         var key = localVisitors[i].time + '|' + (localVisitors[i].fingerprint || localVisitors[i].device);
@@ -334,10 +335,11 @@ function renderVisitorLog() {
       var remoteVisitors = [];
       for (var j = 0; j < r.data.length; j++) {
         var v = r.data[j];
-        var vkey = v.visit_time + '|' + (v.fingerprint || v.device);
+        var visitTime = v.visit_time || v.created_at || '';
+        var vkey = visitTime + '|' + (v.fingerprint || v.device);
         if (!merged[vkey]) {
           remoteVisitors.push({
-            time: v.visit_time,
+            time: visitTime,
             device: v.device,
             model: v.model || '',
             osVersion: v.os_version || '',
@@ -347,7 +349,7 @@ function renderVisitorLog() {
       }
       var all = remoteVisitors.concat(localVisitors);
       all.sort(function(a, b) { return b.time.localeCompare(a.time); });
-      console.log('[Visitors] merged total:', all.length, '(remote only:', remoteVisitors.length + ')');
+      console.log('[Visitors] merged total:', all.length, '(remote only:', remoteVisitors.length, ')');
       renderVisitorList(all);
     }).catch(function(e) {
       console.error('[Visitors] Supabase query exception:', e);
@@ -4662,6 +4664,8 @@ function createNewSession(sb, callback) {
       startHostHeartbeat(sb);
       // 房主订阅 Realtime：实时感知观众加入/离开
       watchSessionAsHost(sb);
+      // 启动 30 分钟空闲计时器
+      resetHostIdleTimer();
     }
     callback('host');
   }).catch(function(err) {
@@ -4830,6 +4834,56 @@ function clearViewerState(msg) {
   updateMultiplayerStatusBar();
   toast(msg, 'warn');
 }
+
+// 房主清理状态（强制结束/超时退出时调用）
+function clearHostState() {
+  if (_hostIdleTimer) {
+    clearTimeout(_hostIdleTimer);
+    _hostIdleTimer = null;
+  }
+  if (_hostHeartbeatInterval) {
+    clearInterval(_hostHeartbeatInterval);
+    _hostHeartbeatInterval = null;
+  }
+  if (_gameSessionChannel) {
+    _gameSessionChannel.unsubscribe();
+    _gameSessionChannel = null;
+  }
+  if (_gameSessionPollInterval) {
+    clearInterval(_gameSessionPollInterval);
+    _gameSessionPollInterval = null;
+  }
+  _isHost = false;
+  _isViewer = false;
+  _offlineMode = false;
+  _gameSessionId = null;
+  restoreViewerControls();
+  initState(state.playerCount || 7);
+}  
+
+// 房主空闲计时器：30 分钟无操作自动退出
+var HOST_IDLE_TIMEOUT = 1800000; // 30 分钟
+function resetHostIdleTimer() {
+  if (_hostIdleTimer) clearTimeout(_hostIdleTimer);
+  if (!_isHost || _offlineMode || !_gameSessionId) return;
+  _hostIdleTimer = setTimeout(function() {
+    console.log('[Multiplayer] 房主 30 分钟无操作，自动结束游戏');
+    var sb = getSupabase();
+    if (sb && _gameSessionId) {
+      sb.from('game_sessions').update({ status: 'finished' }).eq('id', _gameSessionId).then(function() {
+        sb.from('game_sessions').delete().eq('id', _gameSessionId);
+      });
+    }
+    toast('30 分钟无操作，游戏自动结束', 'warn');
+    clearHostState();
+    showPage('setup');
+  }, HOST_IDLE_TIMEOUT);
+}
+
+// 全局用户活动监听：重置房主空闲计时器
+document.addEventListener('click', function(e) { if (_isHost && !_offlineMode) resetHostIdleTimer(); });
+document.addEventListener('touchstart', function(e) { if (_isHost && !_offlineMode) resetHostIdleTimer(); });
+document.addEventListener('keydown', function(e) { if (_isHost && !_offlineMode) resetHostIdleTimer(); });
 
 // 恢复被围观模式禁用的控件
 function restoreViewerControls() {
@@ -5036,80 +5090,101 @@ function confirmForceRestart() {
   });
 }
 
+// 房主强制结束游戏（仅房主可见，红色按钮）
+function forceEndGame() {
+  if (!_isHost || _offlineMode) return;
+  showModal(
+    '<h2>强制结束游戏</h2>' +
+    '<p style="color:var(--red-bright)">确定要强制结束当前游戏吗？所有围观者将被断开，游戏记录将保存。</p>' +
+    '<div class="modal-actions">' +
+    '<button class="btn danger" onclick="confirmForceEnd()">确认结束</button>' +
+    '<button class="btn" onclick="closeModal()">取消</button>' +
+    '</div>'
+  );
+}
+
+function confirmForceEnd() {
+  closeModal();
+  var sb = getSupabase();
+  if (!sb || !_gameSessionId) { clearHostState(); return; }
+  // 先更新状态为 finished，然后删除记录
+  sb.from('game_sessions').update({
+    status: 'finished'
+  }).eq('id', _gameSessionId).then(function(r) {
+    if (r.error) console.warn('[Multiplayer] forceEnd: update failed:', r.error);
+  }).finally(function() {
+    sb.from('game_sessions').delete().eq('id', _gameSessionId).then(function(r2) {
+      if (r2.error) console.warn('[Multiplayer] forceEnd: delete failed:', r2.error);
+    }).finally(function() {
+      toast('游戏已强制结束', 'success');
+      clearHostState();
+      showPage('setup');
+    });
+  });
+}
+
 // 更新多人状态栏：显示host/viewer/iPad按钮
 var _mpStatusBarVersion = 0;
 function updateMultiplayerStatusBar() {
   var bar = document.getElementById('multiplayer-status-bar');
   if (!bar) return;
   var version = ++_mpStatusBarVersion;
-  var h = '';
-  // 获取观众信息（从当前 game_state 中读取）
-  var viewers = [];
   var hostFp = (_deviceId && _isHost) ? _deviceId.slice(-6).toUpperCase() : '';
+  var roomsId = (_gameSessionId || '').slice(0, 8);
 
   if (_isHost) {
     if (_offlineMode) {
-      h += '<span class="mp-badge host" title="多人协同未连接，使用单机模式" style="background:rgba(255,165,0,0.25);color:#ffb347;border:1px solid rgba(255,165,0,0.3)">单机模式</span>';
-      h += '<span style="margin-left:8px;color:var(--text-dim);font-size:12px">多人协同未连接</span>';
+      bar.innerHTML =
+        '<div class="mp-status-row">' +
+          '<span class="mp-badge host" title="多人协同未连接，使用单机模式" style="background:rgba(255,165,0,0.25);color:#ffb347;border:1px solid rgba(255,165,0,0.3)">单机模式</span>' +
+          '<span style="color:var(--text-dim);font-size:12px">多人协同未连接</span>' +
+        '</div>';
     } else {
-      h += '<span class="mp-badge host" title="你是房主">房主 ' + hostFp + '</span>';
-      h += '<span class="mp-room-id" style="margin-left:8px;color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + (_gameSessionId || '').slice(0, 8) + '</span>';
-      if (isIPad()) {
-        h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:auto">强制重启</button>';
-      }
-    }
-    // 尝试从 Supabase 读取观众列表（含指纹）
-    fetchViewerList(function(viewers) {
-      if (version !== _mpStatusBarVersion) return; // 忽略过期回调
-      var countEl = bar.querySelector('.mp-viewer-count');
-      if (countEl) bar.removeChild(countEl);
-      var viewerBadgesEl = bar.querySelector('.mp-viewer-badges');
-      if (viewerBadgesEl) bar.removeChild(viewerBadgesEl);
-      if (viewers && viewers.length > 0) {
-        var span = document.createElement('span');
-        span.className = 'mp-viewer-count';
-        span.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
-        span.textContent = '围观者: ' + viewers.length + '人';
-        bar.appendChild(span);
-        var badges = document.createElement('span');
-        badges.className = 'mp-viewer-badges';
-        badges.style.cssText = 'margin-left:8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap';
-        for (var vi = 0; vi < viewers.length; vi++) {
-          var fp = (viewers[vi].fingerprint || '').slice(0, 6);
-          var hue = hashStrToHue(fp);
-          badges.innerHTML += '<span style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%);padding:1px 6px;border-radius:8px;font-size:11px;font-family:monospace">#' + fp + '</span>';
-        }
-        bar.appendChild(badges);
-      } else if (viewers) {
-        var span2 = document.createElement('span');
-        span2.className = 'mp-viewer-count';
-        span2.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
-        span2.textContent = '暂无围观者';
-        bar.appendChild(span2);
-      }
-    });
-  } else if (_isViewer) {
-    h += '<span class="mp-badge viewer" title="你正在围观">围观中</span>';
-    h += '<span style="margin-left:8px;color:var(--text-dim);font-size:13px">等待房主操作...</span>';
-    h += '<span class="mp-room-id" style="margin-left:8px;color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + (_gameSessionId || '').slice(0, 8) + '</span>';
-    // 读取房主指纹
-    fetchHostFingerprint(function(fp) {
-      if (version !== _mpStatusBarVersion) return; // 忽略过期回调
-      var hostEl = bar.querySelector('.mp-host-info');
-      if (fp) {
-        if (hostEl) {
-          hostEl.textContent = '房主: ' + fp;
+      bar.innerHTML =
+        '<div class="mp-status-row">' +
+          '<span class="mp-badge host" title="你是房主">房主 ' + hostFp + '</span>' +
+          '<span class="mp-room-id" style="color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + roomsId + '</span>' +
+        '</div>' +
+        '<div class="mp-status-row" id="mp-viewer-row">' +
+          '<span class="mp-viewer-placeholder" style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
+        '</div>' +
+        '<div class="mp-status-row" style="justify-content:flex-end">' +
+          '<button class="btn small" style="background:linear-gradient(135deg,#8b1a1a,#c0392b);color:#fff;border:1px solid #ff6b6b;font-size:12px;padding:3px 12px" onclick="forceEndGame()">强制结束</button>' +
+          (isIPad() ? '<button class="btn small danger" onclick="forceRestartSession()">强制重启</button>' : '') +
+        '</div>';
+      // 异步加载围观者列表
+      fetchViewerList(function(viewers) {
+        if (version !== _mpStatusBarVersion) return;
+        var viewerRow = document.getElementById('mp-viewer-row');
+        if (!viewerRow) return;
+        if (viewers && viewers.length > 0) {
+          var html = '<span style="color:var(--text-dim);font-size:12px">围观者: ' + viewers.length + '人</span>';
+          for (var vi = 0; vi < viewers.length; vi++) {
+            var fp = (viewers[vi].fingerprint || '').slice(0, 6);
+            var hue = hashStrToHue(fp);
+            html += '<span style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%);padding:1px 6px;border-radius:8px;font-size:11px;font-family:monospace;margin-left:4px">#' + fp + '</span>';
+          }
+          viewerRow.innerHTML = html;
         } else {
-          var span = document.createElement('span');
-          span.className = 'mp-host-info';
-          span.style.cssText = 'margin-left:8px;color:var(--gold);font-size:13px';
-          span.textContent = '房主: ' + fp;
-          bar.appendChild(span);
+          viewerRow.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无围观者</span>';
         }
-      }
+      });
+    }
+  } else if (_isViewer) {
+    bar.innerHTML =
+      '<div class="mp-status-row">' +
+        '<span class="mp-badge viewer" title="你正在围观">围观中</span>' +
+        '<span style="color:var(--text-dim);font-size:13px">等待房主操作...</span>' +
+        '<span class="mp-room-id" style="color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + roomsId + '</span>' +
+        '<span class="mp-host-info" style="margin-left:auto;color:var(--gold);font-size:13px"></span>' +
+      '</div>';
+    // 异步读取房主指纹
+    fetchHostFingerprint(function(fp) {
+      if (version !== _mpStatusBarVersion) return;
+      var hostEl = bar.querySelector('.mp-host-info');
+      if (hostEl && fp) hostEl.textContent = '房主: ' + fp;
     });
   }
-  bar.innerHTML = h;
   bar.style.display = (_isHost || _isViewer) ? 'flex' : 'none';
 }
 

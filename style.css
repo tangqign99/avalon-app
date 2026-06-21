@@ -1,4 +1,4 @@
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+﻿*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg-dark:#0d0b08;--bg-panel:#1a1610;--bg-card:#231e15;
   --gold:#c9a84c;--gold-light:#e8d48b;--gold-dark:#8b7320;
@@ -127,7 +127,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .btn.small{padding:7px 12px;font-size:13px;min-height:36px}
 .btn:disabled{opacity:0.4;cursor:default;pointer-events:none}
 .btn.warn{padding:6px 10px;font-size:12px;border-color:rgba(200,80,80,0.4);color:#ff9999;background:linear-gradient(180deg,#2a1a1a,#1a1010)}
-/* 队长标志 */
+/* 闃熼暱鏍囧織 */
 .leader-badge{
   display:inline-block;padding:6px 20px;border:3px solid var(--gold);border-radius:50px;
   background:linear-gradient(180deg,rgba(201,168,76,0.3),rgba(139,115,32,0.4));
@@ -136,7 +136,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   letter-spacing:2px;text-shadow:0 0 8px rgba(232,212,139,0.5);
   font-family:var(--font-display);
 }
-/* 队伍成员高亮 */
+/* 闃熶紞鎴愬憳楂樹寒 */
 .team-member-highlight{
   border-color:var(--gold) !important;
   box-shadow:0 0 8px rgba(201,168,76,0.35) !important;
@@ -210,7 +210,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .faction-label.good{background:rgba(102,153,255,0.2);color:#99bbff}
 .faction-label.evil{background:rgba(255,102,102,0.15);color:#ff9999}
 .good-section,.evil-section{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
-/* 兰斯洛特反转圆圈 */
+/* 鍏版柉娲涚壒鍙嶈浆鍦嗗湀 */
 .lancelot-flip-tracker{display:flex;gap:14px;justify-content:center;padding:2px 0 6px;align-items:flex-start;flex-wrap:wrap}
 .lancelot-flip-col{display:flex;flex-direction:column;align-items:center;gap:4px}
 .lancelot-flip-dot{
@@ -446,7 +446,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 }
 .import-textarea:focus{border-color:var(--gold)}
 
-/* 梅林概率�?*/
+/* 姊呮灄姒傜巼鏍?*/
 .merlin-predict-section{margin-top:12px;padding-top:10px;border-top:1px solid rgba(201,168,76,0.15)}
 .merlin-predict-section h3{font-size:14px;color:var(--gold);margin-bottom:6px;font-family:var(--font-display)}
 .merlin-bar-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:var(--radius-sm);background:var(--parchment);margin-bottom:3px}
@@ -456,7 +456,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .merlin-bar-row .m-pct{font-size:13px;font-weight:700;color:var(--gold-light);min-width:38px;text-align:right}
 .merlin-pct-col{font-size:13px;font-weight:700;color:var(--gold-light);min-width:44px;text-align:right}
 
-/* 湖中女神 */
+/* 婀栦腑濂崇 */
 .lady-toggle-btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
   padding:16px 20px;border-radius:var(--radius);
@@ -483,7 +483,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .lady-check-result.good{background:rgba(102,153,255,0.2);color:#99bbff}
 .lady-check-result.evil{background:rgba(255,102,102,0.15);color:#ff9999}
 .lady-check-result.uncertain{background:rgba(255,165,0,0.15);color:#ffaa44}
-/* 湖中女神发言内联 */
+/* 婀栦腑濂崇鍙戣█鍐呰仈 */
 .lady-speech-section{border:2px solid var(--gold);border-radius:var(--radius);padding:14px;margin:10px 0;background:linear-gradient(135deg,rgba(201,168,76,0.08),rgba(201,168,76,0.02))}
 .lady-speech-section h3{font-size:15px;color:var(--gold-light);margin-bottom:4px;font-family:var(--font-display)}
 .lady-speech-section .lady-speech-hint{font-size:12px;color:var(--text-dim);margin-bottom:10px}
@@ -500,7 +500,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .lady-speech-done.evil-done{background:rgba(255,102,102,0.12);color:#ff9999}
 .lady-speech-done.uncertain-done{background:rgba(255,165,0,0.1);color:#ffaa44}
 
-/* 计时 */
+/* 璁℃椂 */
 .timer-setup{margin-top:12px;padding-top:10px;border-top:1px solid rgba(201,168,76,0.15)}
 .timer-setup h3{font-size:14px;color:var(--gold);margin-bottom:8px;text-align:center;font-family:var(--font-display)}
 .timer-mode-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;justify-content:center}
@@ -519,7 +519,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .timer-display .timer-label{font-size:12px;color:var(--text-dim)}
 @keyframes timer-flash{0%,100%{opacity:1}50%{opacity:0.5}}
 
-/* 复盘 */
+/* 澶嶇洏 */
 .review-section{margin-top:8px;text-align:center}
 .review-section button{min-height:44px;font-size:15px}
 .review-card{border:1px solid rgba(201,168,76,0.18);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
@@ -560,7 +560,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 }
 
 
-/* ===== 五、统计显示优�?===== */
+/* ===== 浜斻€佺粺璁℃樉绀轰紭鍖?===== */
 .merlin-assassin-card{
   background:linear-gradient(135deg,rgba(180,50,50,0.15),rgba(80,30,30,0.3));
   border:1px solid rgba(200,80,80,0.35);border-radius:var(--radius);
@@ -605,7 +605,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .history-compact-item .hci-actions{display:flex;gap:6px;margin-top:8px}
 .hci-right{display:flex;align-items:center;gap:6px;margin-left:auto}
 
-/* ===== 六、身份预测标�?===== */
+/* ===== 鍏€佽韩浠介娴嬫爣璁?===== */
 .identity-predict-section{margin-top:10px;padding-top:10px;border-top:1px solid rgba(201,168,76,0.15)}
 .identity-predict-section h3{font-size:13px;color:var(--gold);margin-bottom:6px;font-family:var(--font-display)}
 .predict-form{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
@@ -615,7 +615,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .predict-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;flex-wrap:wrap}
 .predict-player-row .predict-pname{font-size:13px;font-weight:600;color:var(--text-bright);min-width:70px}
 
-/* ===== 倾向/统计/结束页背景骑士装�?===== */
+/* ===== 鍊惧悜/缁熻/缁撴潫椤佃儗鏅獞澹楗?===== */
 #page-stats,#page-end,#page-setup{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
 #page-end{
   background:
@@ -626,7 +626,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 @media(max-width:900px){
   #page-end{background:url('./images/knight-character.png') right 0 bottom 10px/100px 150px no-repeat;background-attachment:fixed}
 }
-/* ===== 倾向页左右留�?===== */
+/* ===== 鍊惧悜椤靛乏鍙崇暀鐧?===== */
 #page-tend{padding-left:20vw;padding-right:20vw;position:relative;z-index:1}
 #page-stats::before,#page-stats::after,
 #page-end::before,#page-end::after{
@@ -646,7 +646,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   #page-stats::before,#page-stats::after,
   #page-end::before,#page-end::after{width:4vw}
 }
-/* ===== 手机端适配 ===== */
+/* ===== 鎵嬫満绔€傞厤 ===== */
 @media(max-width:480px){
   .role-checkbox-grid{display:flex;flex-direction:column;gap:12px}
   .role-checkbox-grid label{font-size:14px;padding:8px 10px;min-height:38px;white-space:normal;min-width:70px}
@@ -659,7 +659,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .role-checkbox-grid label{font-size:16px;padding:10px 14px;min-height:48px;min-width:74px}
 }
 
-/* Deduction / 身份推演 */
+/* Deduction / 韬唤鎺ㄦ紨 */
 .deduction-player-card {
   background:linear-gradient(180deg,var(--parchment-light),var(--parchment));
   border: 1px solid rgba(201,168,76,0.18);
@@ -975,9 +975,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* ==================== MULTIPLAYER ==================== */
 #multiplayer-status-bar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 16px;
   background: rgba(201,168,76,0.08);
   border: 1px solid rgba(201,168,76,0.2);
   border-radius: var(--radius-sm);
@@ -985,6 +986,13 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   flex-wrap: wrap;
   font-size: 13px;
   margin-bottom: 4px;
+}
+.mp-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
 }
 
 .mp-badge {
