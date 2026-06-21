@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SDK Test</title>
+<script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
+</head>
+<body>
+<h1>Supabase SDK Load Test</h1>
+<pre id="result"></pre>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var r = document.getElementById('result');
+  r.textContent += 'typeof supabase: ' + typeof supabase + '\n';
+  if (typeof supabase !== 'undefined') {
+    r.textContent += 'typeof supabase.createClient: ' + typeof supabase.createClient + '\n';
+    r.textContent += 'supabase keys: ' + Object.keys(supabase).join(', ') + '\n';
+    r.textContent += 'OK - SDK loaded\n';
+  } else {
+    r.textContent += 'FAIL - SDK not loaded\n';
+    r.textContent += 'window.supabase: ' + typeof window.supabase + '\n';
+  }
+});
+</script>
+</body>
+</html>

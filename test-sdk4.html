@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head><body>
+<pre id="r">Loading...</pre>
+<script src="./vendor/supabase.min.js"></script>
+<script>
+document.getElementById('r').textContent = 'typeof supabase: ' + typeof supabase + '\n' +
+  (typeof supabase !== 'undefined' ?
+    'createClient: ' + typeof supabase.createClient :
+    'UNDEFINED');
+</script>
+</body></html>

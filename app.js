@@ -15,18 +15,21 @@ var _supabase = null;
 var _supabaseConnected = false;
 var _supabaseChannel = null;
 function getSupabase() {
-  if (!_supabase && typeof supabase !== 'undefined') {
-    try {
-      _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      console.log('[Supabase] client created successfully, URL:', SUPABASE_URL, ', _supabase key count:', Object.keys(_supabase).length);
-    } catch(e) {
-      console.error('[Supabase] createClient failed:', e, '| typeof supabase:', typeof supabase);
-      _supabase = null;
-    }
-  } else if (!_supabase && typeof supabase === 'undefined') {
-    console.warn('[Supabase] SDK not loaded (typeof supabase === undefined), running in offline mode');
-  } else if (_supabase) {
-    // client already created, silent
+  if (_supabase) {
+    return _supabase;
+  }
+  // 兼容多种全局变量名
+  var sdkGlobal = typeof supabase !== 'undefined' ? supabase : (typeof window.supabase !== 'undefined' ? window.supabase : null);
+  if (!sdkGlobal) {
+    console.warn('[Supabase] SDK not loaded (typeof supabase=' + typeof supabase + ', typeof window.supabase=' + typeof window.supabase + '), running in offline mode');
+    return null;
+  }
+  try {
+    _supabase = sdkGlobal.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('[Supabase] client created successfully, URL:', SUPABASE_URL, ', keys:', Object.keys(_supabase).length);
+  } catch(e) {
+    console.error('[Supabase] createClient failed:', e.message, '| sdkGlobal keys:', Object.keys(sdkGlobal).slice(0, 5));
+    _supabase = null;
   }
   return _supabase;
 }

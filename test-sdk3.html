@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>SDK Test v3</title></head><body>
+<h1>SDK Test v3</h1>
+<pre id="log"></pre>
+<script>
+var logEl = document.getElementById('log');
+function log(msg) {
+  logEl.textContent += msg + '\n';
+  console.log(msg);
+}
+
+// Capture all console methods
+['log','warn','error','info','debug'].forEach(function(m) {
+  var orig = console[m];
+  console[m] = function() {
+    var args = Array.prototype.slice.call(arguments);
+    log('console.' + m + ': ' + args.join(' '));
+    orig.apply(console, arguments);
+  };
+});
+
+window.onerror = function(msg, url, line, col, error) {
+  log('window.onerror: ' + msg + ' | ' + url + ':' + line + ':' + col);
+  if (error && error.stack) log('stack: ' + error.stack.split('\n').slice(0,3).join(' | '));
+  return false;
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+  log('unhandledrejection: ' + e.reason);
+});
+
+log('=== Step 1: Creating script element ===');
+var s = document.createElement('script');
+s.src = './vendor/supabase.min.js';
+
+s.addEventListener('load', function() {
+  log('=== Step 2: LOAD event fired ===');
+});
+s.addEventListener('error', function(evt) {
+  log('=== Step 2: ERROR event fired ===');
+  log('type: ' + evt.type);
+  log('message: ' + evt.message);
+});
+
+document.head.appendChild(s);
+log('Script appended to head, waiting...');
+
+setTimeout(function() {
+  log('\n=== Step 3: After 3s timeout ===');
+  log('typeof supabase: ' + typeof supabase);
+  log('window.supabase: ' + typeof window.supabase);
+  if (typeof supabase !== 'undefined') {
+    log('supabase version: ' + supabase);
+    log('Keys: ' + Object.keys(supabase).join(', '));
+  }
+}, 3000);
+</script>
+</body></html>

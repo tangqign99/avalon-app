@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>SDK Debug</title></head><body>
+<h1>SDK Debug</h1>
+<pre id="log"></pre>
+<script>
+var logEl = document.getElementById('log');
+function log(msg) {
+  logEl.textContent += msg + '\n';
+  console.log(msg);
+}
+
+log('=== Starting SDK Debug ===');
+
+// Create a script tag dynamically to catch load errors
+var s = document.createElement('script');
+s.src = './vendor/supabase.min.js';
+s.onload = function() {
+  log('ONLOAD: script loaded successfully');
+  log('typeof supabase: ' + typeof supabase);
+  log('window.supabase: ' + typeof window.supabase);
+  if (typeof supabase !== 'undefined') {
+    log('supabase keys: ' + Object.keys(supabase).slice(0,10).join(', '));
+  }
+};
+s.onerror = function(e) {
+  log('ONERROR: script failed to load!');
+  log('error: ' + JSON.stringify(e));
+};
+document.head.appendChild(s);
+
+// Also try to catch global errors
+window.onerror = function(msg, url, line, col, error) {
+  log('GLOBAL ERROR: ' + msg + ' at ' + url + ':' + line + ':' + col);
+  if (error) log('  stack: ' + error.stack);
+};
+
+// Check after a delay
+setTimeout(function() {
+  log('\n=== After 2s ===');
+  log('typeof supabase: ' + typeof supabase);
+}, 2000);
+</script>
+</body></html>

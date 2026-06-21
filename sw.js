@@ -1,6 +1,6 @@
-/* ==================== Service Worker v90 ==================== */
-// sw.js - v90
-var CACHE_NAME = 'avalon-pwa-v91';
+/* ==================== Service Worker v92 ==================== */
+// sw.js - v92
+var CACHE_NAME = 'avalon-pwa-v92';
 var ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,14 @@ var ASSETS = [
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(ASSETS);
+      // 逐个添加资源，单个失败不影响其他资源的缓存
+      return Promise.allSettled(
+        ASSETS.map(function(url) {
+          return cache.add(url).catch(function(err) {
+            console.warn('[SW] Failed to cache:', url, err.message || err);
+          });
+        })
+      );
     })
   );
   // 不在 install 里自动 skipWaiting，由页面检测到新版本时主动触发
