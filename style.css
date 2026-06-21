@@ -622,6 +622,12 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     url('./images/knight-character.png') right 3vw bottom 20px/160px 240px no-repeat;
   background-attachment:fixed;
 }
+#end-force-end-card{
+  text-align:center;
+}
+#end-force-end-card button{
+  display:inline-block;
+}
 #page-end::before{opacity: 0.10}
 @media(max-width:900px){
   #page-end{background:url('./images/knight-character.png') right 0 bottom 10px/100px 150px no-repeat;background-attachment:fixed}

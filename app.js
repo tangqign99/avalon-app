@@ -5147,6 +5147,11 @@ function confirmForceEnd() {
     }).finally(function() {
       toast('游戏已强制结束', 'success');
       clearHostState();
+      // 清理 viewer 特有的心跳定时器（clearHostState 不会清理此定时器）
+      if (_viewerHeartbeatInterval) {
+        clearInterval(_viewerHeartbeatInterval);
+        _viewerHeartbeatInterval = null;
+      }
       showPage('setup');
     });
   });
