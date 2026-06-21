@@ -553,7 +553,6 @@ function renderSetup() {
     }
     h += '</select>';
     h += '<button class="btn small swap-seat-btn" id="swap-seat-' + i + '" onclick="toggleSwapSeat(' + i + ')" title="换座">⇄</button>';
-    h += '<button class="btn small" onclick="addNameFromSetup()" title="新增玩家" style="min-width:36px;font-size:18px;padding:6px 8px">+</button>';
     h += '</div>';
   }
   $('player-names').innerHTML = h;
