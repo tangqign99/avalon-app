@@ -243,6 +243,25 @@ function normalizeRecord(record) {
   if (isRecordV2(record)) return fromRecordV2(record);
   return record; // 兼容未迁移的旧格式
 }
+function getSortedNamePool() {
+  var raw = loadHistory();
+  var counts = {};
+  for (var i = 0; i < raw.length; i++) {
+    var rec = normalizeRecord(raw[i]);
+    if (!rec.identities) continue;
+    for (var j = 0; j < rec.identities.length; j++) {
+      var name = rec.identities[j].name;
+      if (name) counts[name] = (counts[name] || 0) + 1;
+    }
+  }
+  var sorted = namePool.slice().sort(function(a, b) {
+    var ca = counts[a] || 0;
+    var cb = counts[b] || 0;
+    if (cb !== ca) return cb - ca;
+    return a.localeCompare(b);
+  });
+  return sorted;
+}
 function loadDeletedKeys() {
   try { return JSON.parse(localStorage.getItem('avalon_deleted_keys') || '[]'); } catch(e) { return []; }
 }
@@ -725,8 +744,9 @@ function renderSetup() {
     h += '<div class="player-setup-row">';
     h += '<span class="idx">' + (i + 1) + '号</span>';
     h += '<select onchange="setPlayerName(' + i + ',this.value)">';
-    for (var j = 0; j < namePool.length; j++) {
-      var nm = namePool[j];
+    var sortedPool = getSortedNamePool();
+    for (var j = 0; j < sortedPool.length; j++) {
+      var nm = sortedPool[j];
       if (takenNames[nm] && nm !== curName) continue;
       h += '<option value="' + nm + '"' + (nm === curName ? ' selected' : '') + '>' + nm + '</option>';
     }
@@ -4142,8 +4162,9 @@ function showEditGameRecord(idx) {
     h += '<div class="edit-player-row">';
     h += '<span class="ep-name">' + (id.index + 1) + '号</span>';
     h += '<select id="edit-name-' + i + '" style="flex:0;min-width:72px;padding:7px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:40px">';
-    for (var k = 0; k < namePool.length; k++) {
-      var nm = namePool[k];
+    var sortedEditPool = getSortedNamePool();
+    for (var k = 0; k < sortedEditPool.length; k++) {
+      var nm = sortedEditPool[k];
       if (takenEditNames[nm] && nm !== id.name) continue;
       h += '<option value="' + nm + '"' + (nm === id.name ? ' selected' : '') + '>' + nm + '</option>';
     }
