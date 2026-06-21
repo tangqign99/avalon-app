@@ -2134,11 +2134,7 @@ function renderTimerDisplay() {
 function startTimer() {
   stopTimer();
   if (state.timerMode === 'off') return;
-  if (state.timerMode === 'all') {
-    state.timerRemaining = 5 * 60;
-  } else {
-    state.timerRemaining = state.timerSeconds;
-  }
+  state.timerRemaining = state.timerSeconds;
   if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
     var btnRow = document.getElementById('timer-btns');
     if (btnRow) btnRow.hidden = false;
@@ -2217,7 +2213,7 @@ function endAllSpeak() {
 
 function resetTimer() {
   stopTimer();
-  state.timerRemaining = (state.timerMode === 'all') ? 5 * 60 : state.timerSeconds;
+  state.timerRemaining = state.timerSeconds;
   startTimer();
 }
 
@@ -3707,7 +3703,9 @@ function showGameDetail(idx) {
   for (var ii = 0; ii < rec.identities.length; ii++) {
     var idt = rec.identities[ii];
     nameByIndex[idt.index] = idt.name;
-    nameToFaction[idt.name] = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
+    var faction = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
+    nameToFaction[idt.name] = faction;
+    nameToFaction[(idt.index + 1) + '号 ' + idt.name] = faction;
   }
   var evilSpan = function(n) {
     if (nameToFaction[n] === 'evil') return '<span style="color:#66aaff;font-weight:700">' + n + '</span>';
