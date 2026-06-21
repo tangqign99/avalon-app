@@ -702,6 +702,7 @@ function doStartGame() {
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
   state.ladyLakeHolder = -1;
+  state._ladyCheckTriggeredThisRound = false;
   state.roundTendencies = [];
   state.identityMarks = [];
   state.playerPredictions = {};
@@ -984,11 +985,6 @@ function renderStepPanel() {
     h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
     h += '</div>';
-
-    // 湖中女神内联验人（第3轮起，发言环节中可用）
-    if (state.ladyOfLakeEnabled && state.currentRound >= 2) {
-      h += buildLadySpeechSection();
-    }
 
     c.innerHTML = h;
     return;
@@ -2255,6 +2251,13 @@ function confirmTeam() {
 
   // Start speech phase before voting
   state._teamConfirmedPending = true;
+
+  // 湖中女神验人弹出：第3轮起，每轮第一次确认组队后触发
+  if (state.ladyOfLakeEnabled && state.currentRound >= 2 && !state._ladyCheckTriggeredThisRound) {
+    state._ladyCheckTriggeredThisRound = true;
+    showLadyCheck();
+  }
+
   if (state.timerMode === 'per') {
     state.speakerOrder = [];
     state.speakTimes = {};
@@ -2549,6 +2552,7 @@ function checkGameEnd() {
 
   state.currentRound++;
   if (state.currentRound >= 5) state.currentRound = 4;
+  state._ladyCheckTriggeredThisRound = false;
 }
 
 /* ==================== ASSASSIN PHASE (inline on end page) ==================== */
