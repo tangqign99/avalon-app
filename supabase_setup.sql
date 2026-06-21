@@ -4,7 +4,10 @@ CREATE TABLE IF NOT EXISTS visitors (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   visit_time TEXT NOT NULL,
-  device TEXT NOT NULL
+  device TEXT NOT NULL,
+  model TEXT DEFAULT '',
+  os_version TEXT DEFAULT '',
+  fingerprint TEXT DEFAULT ''
 );
 
 -- 启用行级安全

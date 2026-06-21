@@ -554,6 +554,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* mobile: stack vote columns vertically */
 @media(max-width:480px){
   .vote-result-split{flex-direction:column}
+  .vote-row{width:100%!important}
+  .vote-row .voter-name{min-width:auto;font-size:13px}
 }
 
 
@@ -912,6 +914,14 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .visitor-item .v-time {
   color: var(--text);
   font-weight: 500;
+  flex-shrink: 0;
+}
+.visitor-item .v-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .visitor-item .v-device {
   color: var(--text-dim);
@@ -919,6 +929,14 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(201,168,76,0.06);
+}
+.visitor-item .v-fingerprint {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-family: 'SF Mono', 'Consolas', monospace;
 }
 .visitor-pagination {
   display: flex;
@@ -1090,6 +1108,9 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .launch-first{animation:none}
   .lancelot-flip-dot.flipped{animation:none}
   .viewer-hint{animation:none}
+  .vote-player-name{white-space:normal;word-break:keep-all;overflow-wrap:break-word}
+  .launch-item{overflow-wrap:break-word;font-size:14px}
+  .launch-item .launch-member{font-size:12px}
 }
 
 /* New tendency system */

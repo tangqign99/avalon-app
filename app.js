@@ -167,15 +167,70 @@ function loadLastGame() {
 loadNamePool();
 
 /* ==================== VISITOR LOG ==================== */
-function getDeviceType() {
+function getDeviceInfo() {
   var ua = navigator.userAgent;
-  if (/iPhone|iPod/.test(ua)) return 'iPhone';
-  if (/iPad/.test(ua)) return 'iPad';
-  if (/Android/.test(ua)) return 'Android';
-  if (/Mac/.test(ua)) return 'Mac';
-  if (/Windows/.test(ua)) return 'Windows';
-  if (/Linux/.test(ua)) return 'Linux';
-  return 'Unknown';
+  var w = screen.width;
+  var h = screen.height;
+  var result = { device: 'Unknown', model: '', osVersion: '', fingerprint: '' };
+
+  // Build fingerprint from device ID (first 6 chars)
+  var did = generateDeviceId();
+  result.fingerprint = did.slice(-6).toUpperCase();
+
+  // iPhone / iPod
+  if (/iPhone|iPod/.test(ua)) {
+    result.device = 'iPhone';
+    var iosMatch = ua.match(/OS (\d+)_(\d+)/);
+    result.osVersion = iosMatch ? 'iOS ' + iosMatch[1] + '.' + iosMatch[2] : '';
+
+    // iPhone model by resolution (logical pixels)
+    var r = w + 'x' + h;
+    var models = {
+      '320x568': 'SE/5s', '375x667': 'SE2/6/7/8', '414x736': '6+/7+/8+',
+      '375x812': 'X/XS/11 Pro', '414x896': 'XR/11/11 Pro Max',
+      '390x844': '12/13/14', '428x926': '12/13 Pro Max/14 Plus',
+      '393x852': '14 Pro/15/16', '430x932': '14 Pro Max/15 Plus/16 Plus',
+      '402x874': '15 Pro/16 Pro', '440x956': '15 Pro Max/16 Pro Max',
+    };
+    result.model = models[r] || 'Unknown';
+  }
+  // iPad
+  else if (/iPad/.test(ua)) {
+    result.device = 'iPad';
+    var iosM = ua.match(/OS (\d+)_(\d+)/);
+    result.osVersion = iosM ? 'iPadOS ' + iosM[1] + '.' + iosM[2] : '';
+    result.model = w + 'x' + h;
+  }
+  // Android
+  else if (/Android/.test(ua)) {
+    result.device = 'Android';
+    var andMatch = ua.match(/Android (\d+(\.\d+)?)/);
+    result.osVersion = andMatch ? 'Android ' + andMatch[1] : '';
+    // Try to extract model from UA
+    var modelMatch = ua.match(/; ([^;]+) Build/);
+    result.model = modelMatch ? modelMatch[1].trim() : (w + 'x' + h);
+  }
+  // Mac
+  else if (/Mac/.test(ua)) {
+    result.device = 'Mac';
+    var macMatch = ua.match(/Mac OS X (\d+[._]\d+)/);
+    result.osVersion = macMatch ? 'macOS ' + macMatch[1].replace('_', '.') : '';
+    result.model = w + 'x' + h;
+  }
+  // Windows
+  else if (/Windows/.test(ua)) {
+    result.device = 'Windows';
+    var winMatch = ua.match(/Windows NT (\d+\.\d+)/);
+    result.osVersion = winMatch ? 'Win' + ({'10.0':'10/11','6.3':'8.1','6.2':'8','6.1':'7'}[winMatch[1]]||winMatch[1]) : '';
+    result.model = w + 'x' + h;
+  }
+  // Linux
+  else if (/Linux/.test(ua)) {
+    result.device = 'Linux';
+    result.model = w + 'x' + h;
+  }
+
+  return result;
 }
 
 function generateDeviceId() {
@@ -189,6 +244,14 @@ function generateDeviceId() {
 
 function isIPad() {
   return /iPad/.test(navigator.userAgent);
+}
+
+function hashStrToHue(str) {
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 360;
 }
 
 function loadVisitors() {
@@ -205,15 +268,21 @@ function recordVisitor() {
   var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
   var timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' '
     + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-  var device = getDeviceType();
-  visitors.push({ time: timeStr, device: device });
+  var info = getDeviceInfo();
+  visitors.push({ time: timeStr, device: info.device, model: info.model, osVersion: info.osVersion, fingerprint: info.fingerprint });
   if (visitors.length > 500) visitors = visitors.slice(-500);
   saveVisitors(visitors);
 
   // 同步推送到 Supabase
   var sb = getSupabase();
   if (sb) {
-    sb.from('visitors').insert([{ visit_time: timeStr, device: device }]).then(function(r) {
+    sb.from('visitors').insert([{
+      visit_time: timeStr,
+      device: info.device,
+      model: info.model,
+      os_version: info.osVersion,
+      fingerprint: info.fingerprint
+    }]).then(function(r) {
       if (r.error) console.warn('Supabase visitor insert:', r.error.message);
     });
   }
@@ -231,15 +300,21 @@ function renderVisitorLog() {
       // 合并去重
       var merged = {};
       for (var i = 0; i < localVisitors.length; i++) {
-        var key = localVisitors[i].time + '|' + localVisitors[i].device;
+        var key = localVisitors[i].time + '|' + (localVisitors[i].fingerprint || localVisitors[i].device);
         merged[key] = true;
       }
       var remoteVisitors = [];
       for (var j = 0; j < r.data.length; j++) {
         var v = r.data[j];
-        var vkey = v.visit_time + '|' + v.device;
+        var vkey = v.visit_time + '|' + (v.fingerprint || v.device);
         if (!merged[vkey]) {
-          remoteVisitors.push({ time: v.visit_time, device: v.device });
+          remoteVisitors.push({
+            time: v.visit_time,
+            device: v.device,
+            model: v.model || '',
+            osVersion: v.os_version || '',
+            fingerprint: v.fingerprint || ''
+          });
         }
       }
       var all = remoteVisitors.concat(localVisitors);
@@ -262,7 +337,19 @@ function renderVisitorList(visitors) {
     var v = pageItems[i];
     h += '<div class="visitor-item">';
     h += '<span class="v-time">' + v.time + '</span>';
-    h += '<span class="v-device">' + v.device + '</span>';
+    h += '<span class="v-info">';
+    var model = v.model || '';
+    var osv = v.osVersion || '';
+    var display = model;
+    if (osv) display += (display ? ' (' + osv + ')' : osv);
+    if (!display) display = v.device;
+    h += '<span class="v-device">' + display + '</span>';
+    if (v.fingerprint) {
+      var hex = v.fingerprint.slice(0, 6);
+      var hue = hashStrToHue(hex);
+      h += '<span class="v-fingerprint" style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%)">#' + hex + '</span>';
+    }
+    h += '</span>';
     h += '</div>';
   }
   if (pageItems.length === 0) {
@@ -313,6 +400,53 @@ function goVisitorPage(p) {
   if (p < 0 || p >= totalPages) return;
   state._visitorPage = p;
   renderVisitorLog();
+}
+
+/* ==================== ONLINE PRESENCE ==================== */
+var _onlineTimer = null;
+var _onlineCountEl = null;
+
+function startOnlineTracking() {
+  _onlineCountEl = document.getElementById('online-count');
+  updateOnlineCount();
+  _onlineTimer = setInterval(updateOnlineCount, 20000);
+}
+
+function updateOnlineCount() {
+  var sb = getSupabase();
+  if (!sb) {
+    if (_onlineCountEl) _onlineCountEl.textContent = '--';
+    return;
+  }
+  // Send heartbeat to keep this visitor in the online window
+  var info = getDeviceInfo();
+  sb.from('visitors').insert([{
+    visit_time: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    device: info.device,
+    model: info.model,
+    os_version: info.osVersion,
+    fingerprint: info.fingerprint
+  }]).then(function() { /* heartbeat sent */ }).catch(function() {});
+  // Query recent unique fingerprints (last 40 seconds)
+  var cutoff = new Date(Date.now() - 40000).toISOString();
+  sb.from('visitors').select('fingerprint').gt('created_at', cutoff).then(function(r) {
+    if (r.error || !r.data) {
+      if (_onlineCountEl) _onlineCountEl.textContent = '--';
+      return;
+    }
+    var fps = {};
+    for (var i = 0; i < r.data.length; i++) {
+      var fp = r.data[i].fingerprint;
+      if (fp) fps[fp] = true;
+    }
+    var count = Object.keys(fps).length;
+    if (_onlineCountEl) {
+      _onlineCountEl.textContent = count;
+      _onlineCountEl.style.color = count > 0 ? 'var(--green-bright)' : 'var(--text-dim)';
+    }
+  }).catch(function() {
+    if (_onlineCountEl) _onlineCountEl.textContent = '--';
+  });
 }
 
 /* ==================== ASSASSIN COUNTDOWN ==================== */
@@ -526,6 +660,8 @@ function addNameFromSetup() {
 }
 
 var _swapSeatFirst = null;
+var _detailSwapRoleFirstIdx = null;
+var _endSwapRoleFirst = null;
 
 function toggleSwapSeat(idx) {
   if (_swapSeatFirst === null) {
@@ -548,6 +684,54 @@ function toggleSwapSeat(idx) {
     _swapSeatFirst = null;
     renderSetup();
     toast((a + 1) + ' 号与 ' + (b + 1) + ' 号已互换');
+  }
+}
+
+function detailSwapRole(idx, recIdx) {
+  if (_detailSwapRoleFirstIdx === null) {
+    _detailSwapRoleFirstIdx = idx;
+    var btn = document.getElementById('detail-swap-role-' + idx);
+    if (btn) { btn.classList.add('swapping'); btn.textContent = '⇄'; }
+    var history = loadHistory();
+    var rec = history[recIdx];
+    var roleName = '';
+    if (rec) {
+      for (var i = 0; i < rec.identities.length; i++) {
+        if (rec.identities[i].index === idx) { roleName = rec.identities[i].role; break; }
+      }
+    }
+    toast('已选中 ' + (idx + 1) + ' 号（' + (roleName || '?') + '），再点另一位的互换按钮完成互换');
+  } else if (_detailSwapRoleFirstIdx === idx) {
+    _detailSwapRoleFirstIdx = null;
+    var btn = document.getElementById('detail-swap-role-' + idx);
+    if (btn) { btn.classList.remove('swapping'); btn.textContent = '⇄'; }
+    toast('已取消');
+  } else {
+    var a = _detailSwapRoleFirstIdx;
+    var b = idx;
+    var history = loadHistory();
+    var rec = history[recIdx];
+    if (rec) {
+      var aIdent = null, bIdent = null;
+      for (var i = 0; i < rec.identities.length; i++) {
+        if (rec.identities[i].index === a) aIdent = rec.identities[i];
+        if (rec.identities[i].index === b) bIdent = rec.identities[i];
+      }
+      if (aIdent && bIdent) {
+        var tmpRole = aIdent.role;
+        aIdent.role = bIdent.role;
+        bIdent.role = tmpRole;
+        saveHistory(history);
+      }
+    }
+    // Reset buttons
+    var btnA = document.getElementById('detail-swap-role-' + a);
+    var btnB = document.getElementById('detail-swap-role-' + b);
+    if (btnA) { btnA.classList.remove('swapping'); btnA.textContent = '⇄'; }
+    if (btnB) { btnB.classList.remove('swapping'); btnB.textContent = '⇄'; }
+    _detailSwapRoleFirstIdx = null;
+    showGameDetail(recIdx);
+    toast((a + 1) + ' 号与 ' + (b + 1) + ' 号身份已互换');
   }
 }
 
@@ -1054,7 +1238,7 @@ function renderStepPanel() {
 
   if (votesConfirmed) {
     h += '<hr style="border-color:var(--border);margin-bottom:10px">';
-    h += '<div class="step-label">步骤C：全员投票 <span style="font-size:11px;color:var(--text-dim);font-weight:400">（默认反对，点击切换赞成）</span></div>';
+    h += '<div class="step-label">步骤C：全员投票 <span style="font-size:11px;color:var(--text-dim);font-weight:400">（默认赞成，点击切换反对）</span></div>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
     for (var i = 0; i < pc; i++) {
       var v = m.votes[i];
@@ -2315,7 +2499,7 @@ function transitionToVotes() {
   var m = state.missions[state.currentRound];
   m.votes = {};
   for (var i = 0; i < state.playerCount; i++) {
-    m.votes[i] = 'reject';
+    m.votes[i] = 'approve';
   }
   stopTimer();
   var el = $('timer-display');
@@ -2369,6 +2553,13 @@ function confirmVotes() {
     syncGameState();
   } else {
     m.launchFailures++;
+
+    // Save tendency snapshot for this failed launch attempt
+    var snap = {};
+    for (var i = 0; i < pc; i++) {
+      snap[i] = state.tendencies[i] || 50;
+    }
+    state.roundTendencies.push(snap);
 
     if (m.launchFailures >= 5) {
       m.result = 'fail';
@@ -2642,8 +2833,11 @@ function renderEndIdentityDropdowns() {
     var taken = getTakenUniqueRoles(i);
     var curSel = document.getElementById('end-role-' + i);
     var curVal = curSel ? curSel.value : '';
-    // 自动填入已知身份（如刺杀中确认的梅林）
-    if (!curVal && state.autoRoles && state.autoRoles[i]) {
+    // 互换身份时使用交换后的值
+    var isSwapped = state._swapEndRole && (i in state._swapEndRole);
+    if (isSwapped) { curVal = state._swapEndRole[i]; }
+    // 自动填入已知身份（如刺杀中确认的梅林），被互换的玩家跳过自动填入
+    if (!curVal && !isSwapped && state.autoRoles && state.autoRoles[i]) {
       curVal = state.autoRoles[i];
     }
 
@@ -2657,13 +2851,48 @@ function renderEndIdentityDropdowns() {
       h += '<option value="' + r + '"' + (r === curVal ? ' selected' : '') + '>' + r + '</option>';
     }
     h += '</select>';
+    h += '<button class="btn small swap-seat-btn" id="end-swap-role-' + i + '" onclick="swapEndRole(' + i + ')" title="互换身份">⇄</button>';
     h += '</div>';
   }
   grid.innerHTML = h;
   state._renderingIdentities = false;
 }
 
+function swapEndRole(idx) {
+  if (_endSwapRoleFirst === null) {
+    _endSwapRoleFirst = idx;
+    var btn = document.getElementById('end-swap-role-' + idx);
+    if (btn) { btn.classList.add('swapping'); btn.textContent = '⇄'; }
+    toast('已选中 ' + playerLabel(idx) + '，再点另一位的互换按钮完成互换');
+  } else if (_endSwapRoleFirst === idx) {
+    _endSwapRoleFirst = null;
+    var btn = document.getElementById('end-swap-role-' + idx);
+    if (btn) { btn.classList.remove('swapping'); btn.textContent = '⇄'; }
+    toast('已取消');
+  } else {
+    var a = _endSwapRoleFirst;
+    var b = idx;
+    var selA = document.getElementById('end-role-' + a);
+    var selB = document.getElementById('end-role-' + b);
+    var valA = selA ? selA.value : '';
+    var valB = selB ? selB.value : '';
+    _endSwapRoleFirst = null;
+    // 清除首次点击按钮的高亮
+    var prevBtn = document.getElementById('end-swap-role-' + a);
+    if (prevBtn) { prevBtn.classList.remove('swapping'); prevBtn.textContent = '⇄'; }
+    // 不能直接 sel.value = ...，因为目标值可能不在对方下拉框选项里（被 taken 过滤了）
+    // 用临时映射让 renderEndIdentityDropdowns 读取交换后的值来重建
+    state._swapEndRole = {};
+    state._swapEndRole[a] = valB;
+    state._swapEndRole[b] = valA;
+    renderEndIdentityDropdowns();
+    delete state._swapEndRole;
+    toast(playerLabel(a) + ' 与 ' + playerLabel(b) + ' 身份已互换');
+  }
+}
+
 function renderEnd() {
+  _endSwapRoleFirst = null;
   // Assassin phase
   if (state.assassinFromMission && !state.winner) {
     $('end-assassin-card').style.display = 'block';
@@ -3254,37 +3483,32 @@ function renderStats() {
   for (var nm in todayPlayerSet) {
     var items = todayPlayerSet[nm];
     var totalGames = items.length;
-    var goodWins = 0, evilWins = 0;
+    var goodCount = 0, evilCount = 0, wins = 0;
     for (var g = 0; g < items.length; g++) {
       var faction = getFinalFaction(items[g].role, items[g].flipped);
-      if (items[g].winner === faction) {
-        if (faction === 'good') goodWins++;
-        else evilWins++;
-      }
+      if (faction === 'good') goodCount++;
+      else evilCount++;
+      if (items[g].winner === faction) wins++;
     }
-    var wins = goodWins + evilWins;
     var rate = totalGames > 0 ? wins / totalGames : 0;
-    lb.push({ name: nm, total: totalGames, goodWins: goodWins, evilWins: evilWins, wins: wins, rate: rate });
+    lb.push({ name: nm, total: totalGames, goodWins: goodCount, evilWins: evilCount, rate: rate });
   }
-  lb.sort(function(a, b) {
-    if (b.rate !== a.rate) return b.rate - a.rate;
-    return b.total - a.total;
-  });
+  lb.sort(function(a, b) { return b.rate - a.rate || b.total - a.total; });
 
   var showAll = state._showAllLeaderboard || false;
   var maxShow = showAll ? lb.length : Math.min(10, lb.length);
   var lh = '';
   for (var r = 0; r < maxShow; r++) {
     var p = lb[r];
-    var rateColor = p.rate >= 0.6 ? 'var(--green-bright)' : p.rate >= 0.4 ? 'var(--gold-light)' : 'var(--red-bright)';
     var topClass = '';
     if (r === 0) topClass = ' top1';
     else if (r === 1) topClass = ' top2';
     else if (r === 2) topClass = ' top3';
     lh += '<div class="win-rate-card' + topClass + '">';
+    var rateColor = p.rate >= 0.6 ? '#4caf50' : p.rate >= 0.4 ? '#ff9800' : '#f44336';
     lh += '<span class="wc-rank">' + (r + 1) + '</span>';
     lh += '<span class="wc-name">' + p.name + '</span>';
-    lh += '<div><div class="wc-rate" style="color:' + rateColor + '">' + Math.round(p.rate * 100) + '%</div>';
+    lh += '<div><div class="wc-rate" style="font-size:24px;color:' + rateColor + ';font-weight:bold;">' + Math.round(p.rate * 100) + '%</div>';
     lh += '<div class="wc-sub">好人' + p.goodWins + ' / 反方' + p.evilWins + ' / 共' + p.total + '场</div></div>';
     lh += '</div>';
   }
@@ -3433,7 +3657,7 @@ function togglePlayerStat(name) {
 
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
     roleStats[role].total++;
-    if (d.winner === getFinalFaction(role, false)) roleStats[role].wins++;
+    if (d.winner === getFinalFaction(role, d.flipped)) roleStats[role].wins++;
   }
 
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
@@ -3465,6 +3689,7 @@ function togglePlayerStat(name) {
 
 /* ==================== GAME DETAIL & EDIT ==================== */
 function showGameDetail(idx) {
+  _detailSwapRoleFirstIdx = null;
   var history = loadHistory();
   var rec = history[idx];
   if (!rec) return;
@@ -3483,22 +3708,45 @@ function showGameDetail(idx) {
   }
 
   h += '<h3 style="margin-top:10px">身份分配</h3>';
-  for (var i = 0; i < rec.identities.length; i++) {
-    var id = rec.identities[i];
+  // Sort by faction (good first, then evil), then by index within each faction
+  var sortedIds = rec.identities.slice().map(function(id) {
     var final = getFinalFaction(id.role, rec.lancelotFlips && rec.lancelotFlips[id.index]);
+    return { id: id, faction: final };
+  });
+  sortedIds.sort(function(a, b) {
+    if (a.faction === b.faction) return a.id.index - b.id.index;
+    return a.faction === 'good' ? -1 : 1;
+  });
+  for (var i = 0; i < sortedIds.length; i++) {
+    var id = sortedIds[i].id;
+    var final = sortedIds[i].faction;
+    var evilStyle = '';
+    var factionBadge = '';
+    if (final === 'evil') {
+      evilStyle = ' style="background:rgba(255,80,80,0.08);padding:2px 8px;border-radius:4px;margin-bottom:2px"';
+      factionBadge = ' <span style="display:inline-block;padding:0 8px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);border-radius:10px;color:#ff6b6b;font-size:11px;font-weight:700">反方</span>';
+    }
     var flipNote = '';
     if (rec.lancelotFlips && rec.lancelotFlips[id.index]) {
       flipNote = ' <span style="color:var(--orange);font-size:11px">[反转→' + (final === 'good' ? '好人方' : '反方') + ']</span>';
     }
-    h += '<div>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + flipNote + '</div>';
+    h += '<div' + evilStyle + '>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + factionBadge + flipNote + ' <button class="btn small swap-seat-btn" id="detail-swap-role-' + id.index + '" onclick="detailSwapRole(' + id.index + ',' + idx + ')" title="互换身份">⇄</button></div>';
   }
 
   h += '<h3 style="margin-top:10px">任务记录</h3>';
-  // Build index-to-name mapping for vote display
+  // Build index-to-name mapping and faction lookup
   var nameByIndex = {};
+  var nameToFaction = {};
   for (var ii = 0; ii < rec.identities.length; ii++) {
-    nameByIndex[rec.identities[ii].index] = rec.identities[ii].name;
+    var idt = rec.identities[ii];
+    nameByIndex[idt.index] = idt.name;
+    nameToFaction[idt.name] = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
   }
+  var evilSpan = function(n) {
+    if (nameToFaction[n] === 'evil') return '<span style="color:#66aaff;font-weight:700">' + n + '</span>';
+    return n;
+  };
+  var namesToHtml = function(arr) { return arr.map(evilSpan).join(' / '); };
   var hasAssassin = (rec.assassinTarget && rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined);
   var assassinCutoff = hasAssassin ? rec.assassinAfterRound : rec.missions.length;
   var totalRounds = hasAssassin ? Math.max(rec.missions.length, assassinCutoff + 1) : rec.missions.length;
@@ -3528,14 +3776,14 @@ function showGameDetail(idx) {
           var isLastAttempt = (la === m.launchAttempts.length - 1);
           var isSucceeded = isLastAttempt && m.result === 'success';
           var isFailed = isLastAttempt && m.result === 'fail';
-          var label = isSucceeded ? '组队成功，任务执行成功' : (isFailed ? '组队成功，任务执行失败' : '组队未通过');
+          var label = isSucceeded ? '组队成功，任务执行成功' : (isFailed ? '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '') : '组队未通过');
           var bg = isSucceeded ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
           var borderColor = isSucceeded ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
           var labelColor = isSucceeded ? 'var(--green-bright)' : 'var(--red-bright)';
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);font-size:13px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
-          h += '| 队长 ' + att.leader + ' | 队伍 ' + att.team.join('、');
+          h += '| 队长 ' + evilSpan(att.leader) + ' | 队伍 ' + att.team.map(evilSpan).join('、');
           // Per-player vote details
           var approveNames = [], rejectNames = [];
           for (var vk in att.votes) {
@@ -3552,8 +3800,8 @@ function showGameDetail(idx) {
             if (allApprove) {
               h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + totalVotes + '人)</span></div>';
             } else {
-              if (approveNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + approveNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + approveNames.join(' / ') + '</span></div>';
-              if (rejectNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + rejectNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + rejectNames.join(' / ') + '</span></div>';
+              if (approveNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + approveNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(approveNames) + '</span></div>';
+              if (rejectNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + rejectNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(rejectNames) + '</span></div>';
             }
             h += '</div>';
           }
@@ -3581,7 +3829,7 @@ function showGameDetail(idx) {
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:13px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
-          h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
+          h += ' | 队长 ' + evilSpan(m.leader) + ' | 队伍 ' + m.team.map(evilSpan).join('、');
           if (m.votes && (lgc + lbc > 0)) {
             var ltotal = lgc + lbc;
             var lall = (lbc === 0);
@@ -3589,8 +3837,8 @@ function showGameDetail(idx) {
             if (lall) {
               h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
             } else {
-              if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lgn.join(' / ') + '</span></div>';
-              if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lbn.join(' / ') + '</span></div>';
+              if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lgn) + '</span></div>';
+              if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lbn) + '</span></div>';
             }
             h += '</div>';
           }
@@ -3601,8 +3849,8 @@ function showGameDetail(idx) {
         var color2 = isSuccess ? 'var(--green-bright)' : 'var(--red-bright)';
         h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:13px">';
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
-        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败') + '</span>';
-        h += ' | 队长 ' + m.leader + ' | 队伍 ' + m.team.join('、');
+        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '')) + '</span>';
+        h += ' | 队长 ' + evilSpan(m.leader) + ' | 队伍 ' + m.team.map(evilSpan).join('、');
         // Vote details for legacy data
         if (m.votes && (lgc + lbc > 0)) {
           h += ' | 投票 ' + lgc + ':' + lbc;
@@ -3612,8 +3860,8 @@ function showGameDetail(idx) {
           if (lall) {
             h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
           } else {
-            if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lgn.join(' / ') + '</span></div>';
-            if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + lbn.join(' / ') + '</span></div>';
+            if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lgn) + '</span></div>';
+            if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lbn) + '</span></div>';
           }
           h += '</div>';
         }
@@ -4600,6 +4848,7 @@ function applyViewerMode() {
 (function() {
   generateDeviceId();
   recordVisitor();
+  startOnlineTracking();
   // 建立 Supabase Realtime 订阅（跨设备实时同步）
   setupRealtimeSubscriptions();
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
@@ -4856,8 +5105,8 @@ function computeGoodScores(scores, pc) {
     for (var a = 0; a < attempts.length; a++) {
       var att = attempts[a];
       var teamSet = {};
-      for (var t = 0; t < (att.proposedTeam || []).length; t++) {
-        teamSet[att.proposedTeam[t]] = true;
+      for (var t = 0; t < (att.team || []).length; t++) {
+        teamSet[att.team[t]] = true;
       }
 
       // Count approves
@@ -4958,17 +5207,33 @@ function computeEvilScores(scores, pc) {
   // Evil perspective: find Merlin
   var missions = state.missions;
 
+  // Track consecutive rejections of evil-containing launch attempts per player
+  var consecutiveRejectEvil = {};
+
   for (var r = 0; r < missions.length; r++) {
     var m = missions[r];
     if (!m || !m.team || m.team.length === 0) continue;
 
     // Mission result analysis
     if (m.result === 'fail') {
-      // Failed mission: those who WEREN'T on the team but rejected → not Merlin (Merlin knows the evil team)
+      // Check if failed mission team contains any known evil
+      var hasEvilInTeam = false;
       for (var t = 0; t < m.team.length; t++) {
-        var pi = m.team[t];
-        if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
-        scores[pi].score -= 3;
+        var tl = getKnownLabel(m.team[t]);
+        if (tl && (isEvilRole(tl) || tl === '反方')) {
+          hasEvilInTeam = true;
+          break;
+        }
+      }
+      // Slightly penalize members of a failed mission team that contained known evils
+      // (Merlin should know who evils are and avoid joining such teams)
+      if (hasEvilInTeam) {
+        for (var t = 0; t < m.team.length; t++) {
+          var pi = m.team[t];
+          if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
+          scores[pi].score -= 2;
+          scores[pi].evidence.push('第' + (r + 1) + '轮失败任务队伍含反方（轻微减分）');
+        }
       }
     }
 
@@ -4977,8 +5242,8 @@ function computeEvilScores(scores, pc) {
     for (var a = 0; a < attempts.length; a++) {
       var att = attempts[a];
       var teamSet = {};
-      for (var t = 0; t < (att.proposedTeam || []).length; t++) {
-        teamSet[att.proposedTeam[t]] = true;
+      for (var t = 0; t < (att.team || []).length; t++) {
+        teamSet[att.team[t]] = true;
       }
 
       var hasSelf = teamSet[state.selfIndex];
@@ -4991,14 +5256,34 @@ function computeEvilScores(scores, pc) {
         }
       }
 
+      // Leader proposing a team with known evil → +6 (Merlin may test evil-containing teams)
+      if (hasKnownEvil && att.leader !== undefined && att.leader !== null && att.leader !== state.selfIndex) {
+        if (scores[att.leader] && scores[att.leader].score !== 0 && scores[att.leader].score !== 100) {
+          scores[att.leader].score += 6;
+          scores[att.leader].evidence.push('第' + (r + 1) + '轮提议含反方队伍（梅林试探）');
+        }
+      }
+
       // Merlin tends to avoid approving teams with known/knowable evils
       if (hasSelf || hasKnownEvil) {
         for (var k = 0; k < pc; k++) {
           if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
+
           if (att.votes[k] === 'reject') {
-            scores[k].score += 10;
+            scores[k].score += 12;
             scores[k].evidence.push('第' + (r + 1) + '轮拒绝含反方的队伍（梅林行为）');
+
+            // Track consecutive rejections of evil-containing teams
+            consecutiveRejectEvil[k] = (consecutiveRejectEvil[k] || 0) + 1;
+            if (consecutiveRejectEvil[k] >= 2) {
+              scores[k].score += 8;
+              scores[k].evidence.push('连续拒绝含反方队伍（强梅林信号）');
+              consecutiveRejectEvil[k] = 0;
+            }
+          } else {
+            consecutiveRejectEvil[k] = 0;
           }
+
           if (att.votes[k] === 'approve' && !teamSet[k]) {
             scores[k].score -= 3;
           }
@@ -5032,6 +5317,14 @@ function computeEvilScores(scores, pc) {
         if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
           scores[target].score -= 15;
           scores[target].evidence.push('已知反方' + state.playerNames[checker] + '检查过');
+        }
+      }
+
+      // Being checked as evil → strong signal of being targeted / suspected as Merlin
+      if (result && (result === 'evil' || result === '反方')) {
+        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
+          scores[target].score -= 20;
+          scores[target].evidence.push('被查验结果为反方（疑似梅林被锁定）');
         }
       }
     }
