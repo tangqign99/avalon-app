@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>SDK Test</title></head><body>
+<h1>SDK测试</h1>
+<p id="result">检测中...</p>
+<script>
+// 先不加载defer的SDK，改用非defer方式
+document.write('<script src="./vendor/supabase.min.js"><\/script>');
+</script>
+<script>
+var result = document.getElementById('result');
+var checks = [];
+
+checks.push('typeof supabase: ' + typeof supabase);
+checks.push('typeof window.supabase: ' + typeof window.supabase);
+
+if (typeof supabase !== 'undefined' && supabase && typeof supabase.createClient === 'function') {
+  checks.push('SUCCESS: supabase.createClient is a function!');
+  try {
+    var client = supabase.createClient(
+      'https://nzbpopxrxniixnhnqktw.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56YnBvcHhyeG5paXhuaG5xa3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODQ2MzQsImV4cCI6MjA5NzQ2MDYzNH0.wLk-FdQlKha8YObTvgINW2M_9QVSpJk8c91bKJeQO7Q'
+    );
+    checks.push('client created: ' + Object.keys(client).join(', '));
+  } catch(e) {
+    checks.push('createClient ERROR: ' + e.message);
+  }
+} else if (typeof supabase !== 'undefined') {
+  checks.push('supabase exists but no createClient. Keys: ' + Object.keys(supabase || {}).slice(0,5).join(', '));
+} else {
+  checks.push('FAIL: supabase is undefined');
+  checks.push('window.supabase: ' + typeof window.supabase);
+}
+
+result.innerHTML = checks.map(function(c) { return '<div>' + c + '</div>'; }).join('');
+</script>
+</body></html>

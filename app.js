@@ -556,6 +556,30 @@ function showPage(page) {
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
 
+// 游戏导航入口：围观者点击"游戏"按钮直接进入围观模式，无需走setup流程
+function goToGame() {
+  if (_isViewer || _isHost) {
+    showPage('game');
+    return;
+  }
+  var sb = getSupabase();
+  if (sb) {
+    initGameSession(sb, function(role) {
+      if (role === 'host') {
+        toast('请先在设置页面配置游戏参数', 'warn');
+        showPage('setup');
+      }
+      // viewer: initGameSession 内部已设置 _isViewer=true 并调用 showPage('game')
+    });
+  } else {
+    _offlineMode = true;
+    _isHost = true;
+    _isViewer = false;
+    toast('多人协同不可用，使用单机模式', 'warn');
+    showPage('game');
+  }
+}
+
 /* ==================== SETUP RENDER ==================== */
 
 // 在 setup 页面顶部显示多人协同可用性状态

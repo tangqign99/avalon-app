@@ -17,7 +17,7 @@
   <h1>阿瓦隆</h1>
   <div class="nav-btns">
     <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
-    <button id="nav-game" onclick="showPage('game')">游戏</button>
+    <button id="nav-game" onclick="goToGame()">游戏</button>
     <button id="nav-tend" onclick="showPage('tend')">倾向</button>
     <button id="nav-end" onclick="showPage('end')">结束</button>
     <button id="nav-stats" onclick="showPage('stats')">统计</button>
@@ -263,7 +263,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v92';
+  var SW_VERSION = 'v94';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
