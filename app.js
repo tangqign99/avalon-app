@@ -3738,7 +3738,7 @@ function showGameDetail(idx) {
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);font-size:13px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
-          h += '| 队长 ' + evilSpan(att.leader) + ' | 队伍 ' + att.team.map(evilSpan).join('、');
+          h += '| 队长 ' + evilSpan(nameByIndex[att.leader] || att.leader) + ' | 队伍 ' + att.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
           // Per-player vote details
           var approveNames = [], rejectNames = [];
           for (var vk in att.votes) {
@@ -3784,7 +3784,7 @@ function showGameDetail(idx) {
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:13px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
-          h += ' | 队长 ' + evilSpan(m.leader) + ' | 队伍 ' + m.team.map(evilSpan).join('、');
+          h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
           if (m.votes && (lgc + lbc > 0)) {
             var ltotal = lgc + lbc;
             var lall = (lbc === 0);
@@ -3805,7 +3805,7 @@ function showGameDetail(idx) {
         h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:13px">';
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
         h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '')) + '</span>';
-        h += ' | 队长 ' + evilSpan(m.leader) + ' | 队伍 ' + m.team.map(evilSpan).join('、');
+        h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
         // Vote details for legacy data
         if (m.votes && (lgc + lbc > 0)) {
           h += ' | 投票 ' + lgc + ':' + lbc;
