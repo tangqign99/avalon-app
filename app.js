@@ -659,7 +659,6 @@ function addNameFromSetup() {
 }
 
 var _swapSeatFirst = null;
-var _detailSwapRoleFirstIdx = null;
 var _endSwapRoleFirst = null;
 
 function toggleSwapSeat(idx) {
@@ -683,54 +682,6 @@ function toggleSwapSeat(idx) {
     _swapSeatFirst = null;
     renderSetup();
     toast((a + 1) + ' 号与 ' + (b + 1) + ' 号已互换');
-  }
-}
-
-function detailSwapRole(idx, recIdx) {
-  if (_detailSwapRoleFirstIdx === null) {
-    _detailSwapRoleFirstIdx = idx;
-    var btn = document.getElementById('detail-swap-role-' + idx);
-    if (btn) { btn.classList.add('swapping'); btn.textContent = '⇄'; }
-    var history = loadHistory();
-    var rec = history[recIdx];
-    var roleName = '';
-    if (rec) {
-      for (var i = 0; i < rec.identities.length; i++) {
-        if (rec.identities[i].index === idx) { roleName = rec.identities[i].role; break; }
-      }
-    }
-    toast('已选中 ' + (idx + 1) + ' 号（' + (roleName || '?') + '），再点另一位的互换按钮完成互换');
-  } else if (_detailSwapRoleFirstIdx === idx) {
-    _detailSwapRoleFirstIdx = null;
-    var btn = document.getElementById('detail-swap-role-' + idx);
-    if (btn) { btn.classList.remove('swapping'); btn.textContent = '⇄'; }
-    toast('已取消');
-  } else {
-    var a = _detailSwapRoleFirstIdx;
-    var b = idx;
-    var history = loadHistory();
-    var rec = history[recIdx];
-    if (rec) {
-      var aIdent = null, bIdent = null;
-      for (var i = 0; i < rec.identities.length; i++) {
-        if (rec.identities[i].index === a) aIdent = rec.identities[i];
-        if (rec.identities[i].index === b) bIdent = rec.identities[i];
-      }
-      if (aIdent && bIdent) {
-        var tmpRole = aIdent.role;
-        aIdent.role = bIdent.role;
-        bIdent.role = tmpRole;
-        saveHistory(history);
-      }
-    }
-    // Reset buttons
-    var btnA = document.getElementById('detail-swap-role-' + a);
-    var btnB = document.getElementById('detail-swap-role-' + b);
-    if (btnA) { btnA.classList.remove('swapping'); btnA.textContent = '⇄'; }
-    if (btnB) { btnB.classList.remove('swapping'); btnB.textContent = '⇄'; }
-    _detailSwapRoleFirstIdx = null;
-    showGameDetail(recIdx);
-    toast((a + 1) + ' 号与 ' + (b + 1) + ' 号身份已互换');
   }
 }
 
@@ -3694,7 +3645,6 @@ function togglePlayerStat(name) {
 
 /* ==================== GAME DETAIL & EDIT ==================== */
 function showGameDetail(idx) {
-  _detailSwapRoleFirstIdx = null;
   var history = loadHistory();
   var rec = history[idx];
   if (!rec) return;
@@ -3735,7 +3685,7 @@ function showGameDetail(idx) {
     if (rec.lancelotFlips && rec.lancelotFlips[id.index]) {
       flipNote = ' <span style="color:var(--orange);font-size:11px">[反转→' + (final === 'good' ? '好人方' : '反方') + ']</span>';
     }
-    h += '<div' + evilStyle + '>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + factionBadge + flipNote + ' <button class="btn small swap-seat-btn" id="detail-swap-role-' + id.index + '" onclick="detailSwapRole(' + id.index + ',' + idx + ')" title="互换身份">⇄</button></div>';
+    h += '<div' + evilStyle + '>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + factionBadge + flipNote + '</div>';
   }
 
   h += '<h3 style="margin-top:10px">任务记录</h3>';
