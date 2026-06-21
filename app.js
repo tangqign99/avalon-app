@@ -2355,6 +2355,14 @@ function renderReviewEntry() {
   var el = $('review-section');
   if (!el) return;
   el.style.display = 'block';
+  // 围观者：自动展开复盘内容（无需点击按钮，按钮已被禁用）
+  if (_isViewer) {
+    var panel = $('review-panel');
+    if (panel) {
+      panel.style.display = 'block';
+      panel.innerHTML = buildReviewHTML();
+    }
+  }
 }
 
 function toggleReview() {
@@ -2498,6 +2506,11 @@ function toggleTeamMember(idx) {
   if (pos !== -1) m.team.splice(pos, 1);
   else if (m.team.length < m.size) m.team.push(idx);
   renderStepPanel();
+  // 同步到 Supabase（防抖：500ms 内多次调用只执行最后一次）
+  if (_isHost && !_offlineMode) {
+    clearTimeout(_teamSyncDebounce);
+    _teamSyncDebounce = setTimeout(function() { syncGameState(); }, 500);
+  }
 }
 
 function confirmTeam() {
@@ -2540,6 +2553,8 @@ function confirmTeam() {
     startTimer();
   }
   renderStepPanel();
+  // 同步到 Supabase：组队确认后立即同步（围观者需要看到组队结果）
+  syncGameState();
 }
 
 function transitionToVotes() {
@@ -2553,12 +2568,19 @@ function transitionToVotes() {
   var el = $('timer-display');
   if (el) el.style.display = 'none';
   renderStepPanel();
+  // 同步到 Supabase：进入投票阶段立即同步
+  syncGameState();
 }
 
 function castVote(idx, type) {
   var m = state.missions[state.currentRound];
   m.votes[idx] = type;
   renderStepPanel();
+  // 同步到 Supabase（防抖：500ms 内多次投票只执行最后一次）
+  if (_isHost && !_offlineMode) {
+    clearTimeout(_voteSyncDebounce);
+    _voteSyncDebounce = setTimeout(function() { syncGameState(); }, 500);
+  }
 }
 
 function allApprove() {
@@ -2567,6 +2589,7 @@ function allApprove() {
     m.votes[i] = 'approve';
   }
   renderStepPanel();
+  syncGameState();
 }
 
 function allReject() {
@@ -2575,6 +2598,7 @@ function allReject() {
     m.votes[i] = 'reject';
   }
   renderStepPanel();
+  syncGameState();
 }
 
 function confirmVotes() {
@@ -5042,6 +5066,11 @@ function watchGameSession(sb) {
       }
       if (!gs) return;
       deserializeGameState(gs);
+      console.log('[Multiplayer] rt sync: round=' + state.currentRound +
+        ', missions=' + (state.missions ? state.missions.filter(Boolean).length : 0) +
+        ', teamSize=' + (state.missions[state.currentRound] ? state.missions[state.currentRound].team.length : '?') +
+        ', winner=' + (state.winner || 'none') +
+        ', page=' + state._currentPage);
       updateMultiplayerStatusBar();
       // 重新渲染当前页面
       if (state._currentPage === 'game') {
@@ -5113,6 +5142,12 @@ function watchGameSession(sb) {
       }
       if (!gs) return;
       deserializeGameState(gs);
+      // 诊断日志：输出当前同步到的 game_state 关键字段
+      console.log('[Multiplayer] poll sync: round=' + state.currentRound +
+        ', missions=' + (state.missions ? state.missions.filter(Boolean).length : 0) +
+        ', teamSize=' + (state.missions[state.currentRound] ? state.missions[state.currentRound].team.length : '?') +
+        ', winner=' + (state.winner || 'none') +
+        ', page=' + state._currentPage);
       updateMultiplayerStatusBar();
       if (state._currentPage === 'game') {
         renderGame();
@@ -5496,13 +5531,19 @@ function fetchHostFingerprint(callback) {
 // 围观模式下禁用所有操作控件
 function applyViewerMode() {
   if (!_isViewer) return;
-  // 禁用游戏页所有按钮（除了导航）
+  // 禁用游戏页所有按钮（除了导航和复盘区域）
   var gamePage = document.getElementById('page-game');
   if (!gamePage) return;
   var btns = gamePage.querySelectorAll('button:not(.nav-btn)');
   for (var i = 0; i < btns.length; i++) {
     btns[i].disabled = true;
     btns[i].classList.add('viewer-disabled');
+  }
+  // 恢复复盘区域按钮（围观者需要看复盘）
+  var reviewBtns = gamePage.querySelectorAll('.review-section button');
+  for (var ri = 0; ri < reviewBtns.length; ri++) {
+    reviewBtns[ri].disabled = false;
+    reviewBtns[ri].classList.remove('viewer-disabled');
   }
   // 禁用 select 和 input
   var inputs = gamePage.querySelectorAll('select, input');
