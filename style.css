@@ -993,6 +993,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   gap: 8px;
   flex-wrap: wrap;
   width: 100%;
+  padding: 4px 0;
+}
+.mp-status-row + .mp-status-row {
+  border-top: 1px solid rgba(201,168,76,0.15);
 }
 
 .mp-badge {

@@ -2981,10 +2981,10 @@ function renderEnd() {
   $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
 
   renderEndIdentityDropdowns();
-  // Show force-end card for host only
+  // Show force-end card for all players
   var forceEndCard = $('end-force-end-card');
   if (forceEndCard) {
-    forceEndCard.style.display = (_isHost && !_offlineMode) ? 'block' : 'none';
+    forceEndCard.style.display = (!_offlineMode) ? 'block' : 'none';
   }
 }
 
@@ -5121,7 +5121,7 @@ function confirmForceRestart() {
 
 // 房主强制结束游戏（仅房主可见，红色按钮）
 function forceEndGame() {
-  if (!_isHost || _offlineMode) return;
+  if (_offlineMode) return;
   showModal(
     '<h2>强制结束游戏</h2>' +
     '<p style="color:var(--red-bright)">确定要强制结束当前游戏吗？所有围观者将被断开，游戏记录将保存。</p>' +
@@ -5177,10 +5177,7 @@ function updateMultiplayerStatusBar() {
         '<div class="mp-status-row" id="mp-viewer-row">' +
           '<span class="mp-viewer-placeholder" style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
         '</div>' +
-        '<div class="mp-status-row" style="justify-content:flex-end">' +
-          
-          (isIPad() ? '<button class="btn small danger" onclick="forceRestartSession()">强制重启</button>' : '') +
-        '</div>';
+        (isIPad() ? '<div class="mp-status-row" style="justify-content:flex-end"><button class="btn small danger" onclick="forceRestartSession()">强制重启</button></div>' : '');
       // 异步加载围观者列表
       fetchViewerList(function(viewers) {
         if (version !== _mpStatusBarVersion) return;
