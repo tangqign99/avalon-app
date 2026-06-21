@@ -124,6 +124,7 @@ function initState(n) {
 /* ==================== MULTIPLAYER STATE ==================== */
 var _isHost = false;
 var _isViewer = false;
+var _offlineMode = false;  // true when multiplayer init failed, UI shows "单机模式"
 var _deviceId = null;
 var _gameSessionId = null;
 var _gameSessionChannel = null;
@@ -523,13 +524,34 @@ function showPage(page) {
     renderGame();
     if (_isViewer) applyViewerMode();
   }
-  if (page === 'setup') { renderSetup(); renderVisitorLog(); }
+  if (page === 'setup') { renderSetup(); renderVisitorLog(); renderMultiplayerIndicator(); }
   if (page === 'tend') { renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult(); }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
 
 /* ==================== SETUP RENDER ==================== */
+
+// 在 setup 页面顶部显示多人协同可用性状态
+function renderMultiplayerIndicator() {
+  var el = document.getElementById('multiplayer-indicator');
+  if (!el) return;
+  var sb = getSupabase();
+  if (sb) {
+    el.style.display = 'block';
+    el.style.background = 'rgba(74,144,217,0.1)';
+    el.style.border = '1px solid rgba(74,144,217,0.2)';
+    el.style.color = 'var(--blue-light, #99bbff)';
+    el.innerHTML = '多人协同已就绪 — 点击"开始游戏"后自动创建/加入房间';
+  } else {
+    el.style.display = 'block';
+    el.style.background = 'rgba(255,165,0,0.08)';
+    el.style.border = '1px solid rgba(255,165,0,0.2)';
+    el.style.color = '#ffb347';
+    el.innerHTML = '多人协同不可用（Supabase SDK 未加载），将使用单机模式';
+  }
+}
+
 function renderSetup() {
   var h = '';
   for (var i = 6; i <= 10; i++) {
@@ -855,6 +877,9 @@ function startGame() {
       // viewer: initGameSession 内部已设置_isViewer=true并订阅，直接切到游戏页
     });
   } else {
+    _offlineMode = true;
+    _isHost = true;
+    _isViewer = false;
     toast('多人协同不可用（网络受限），使用单机模式', 'warn');
     doStartGame();
   }
@@ -4505,8 +4530,9 @@ function initGameSession(sb, callback) {
       } else {
         toast('多人协同不可用（Supabase 查询失败），使用单机模式', 'warn');
       }
-      _isHost = false;
+      _isHost = true;
       _isViewer = false;
+      _offlineMode = true;
       callback('host');
       return;
     }
@@ -4536,6 +4562,7 @@ function initGameSession(sb, callback) {
 
     _isHost = false;
     _isViewer = true;
+    _offlineMode = false;
     _gameSessionId = session.id;
     console.log('[Multiplayer] 加入已有房间, sessionId=' + _gameSessionId);
     var gs = session.game_state;
@@ -4557,6 +4584,7 @@ function createNewSession(sb, callback) {
   console.log('[Multiplayer] createNewSession 开始');
   _isHost = true;
   _isViewer = false;
+  _offlineMode = false;
   var initState = serializeGameState();
   initState._viewers = [];
   initState._hostFingerprint = generateDeviceId().slice(-6).toUpperCase();
@@ -4570,8 +4598,9 @@ function createNewSession(sb, callback) {
       console.warn('[Multiplayer] create session failed:', r2.error);
       var errMsg2 = (r2.error && (r2.error.message || r2.error.details || '')) + '';
       var isTableMissing2 = (r2.error.code === 'PGRST205') || (errMsg2.indexOf('Could not find the table') !== -1) || (errMsg2.indexOf('relation') !== -1 && errMsg2.indexOf('does not exist') !== -1);
-      _isHost = false;
+      _isHost = true;
       _isViewer = false;
+      _offlineMode = true;
       if (isTableMissing2) {
         toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。请执行 supabase_setup.sql', 'warn');
       } else {
@@ -4583,6 +4612,8 @@ function createNewSession(sb, callback) {
       toast('你是房主 — 创建了新房间', 'success');
       // 房主心跳：定期更新 updated_at 保持房间活跃
       startHostHeartbeat(sb);
+      // 房主订阅 Realtime：实时感知观众加入/离开
+      watchSessionAsHost(sb);
     }
     callback('host');
   });
@@ -4721,6 +4752,7 @@ function clearViewerState(msg) {
   }
   _isViewer = false;
   _isHost = false;
+  _offlineMode = false;
   _gameSessionId = null;
   if (_gameSessionChannel) {
     _gameSessionChannel.unsubscribe();
@@ -4756,6 +4788,48 @@ function restoreViewerControls() {
       disabledEls[i].classList.remove('viewer-disabled');
     }
   }
+}
+
+// 房主：订阅 game_sessions Realtime 更新，实时感知观众加入/离开
+function watchSessionAsHost(sb) {
+  if (_gameSessionChannel) return;
+  _gameSessionChannel = sb.channel('game-session-host-' + _gameSessionId);
+  _gameSessionChannel.on(
+    'postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
+    function(payload) {
+      var gs = payload.new && payload.new.game_state;
+      if (!gs) return;
+      var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
+      var now = Date.now();
+      var activeCount = 0;
+      for (var i = 0; i < viewers.length; i++) {
+        if (viewers[i].lastSeen) {
+          if (now - new Date(viewers[i].lastSeen).getTime() < 120000) activeCount++;
+        } else {
+          activeCount++;
+        }
+      }
+      console.log('[Multiplayer] host realtime: viewers updated, active=' + activeCount);
+      // 更新状态栏中的观众数
+      var bar = document.getElementById('multiplayer-status-bar');
+      if (!bar) return;
+      var countEl = bar.querySelector('.mp-viewer-count');
+      var txt = activeCount > 0 ? '围观者: ' + activeCount + '人' : '暂无围观者';
+      if (countEl) {
+        countEl.textContent = txt;
+      } else {
+        var span = document.createElement('span');
+        span.className = 'mp-viewer-count';
+        span.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
+        span.textContent = txt;
+        bar.appendChild(span);
+      }
+    }
+  );
+  _gameSessionChannel.subscribe(function(status) {
+    console.log('[Multiplayer] host channel status:', status);
+  });
 }
 
 // 围观者：订阅 Supabase Realtime 更新
@@ -4919,10 +4993,15 @@ function updateMultiplayerStatusBar() {
   var hostFp = (_deviceId && _isHost) ? _deviceId.slice(-6).toUpperCase() : '';
 
   if (_isHost) {
-    h += '<span class="mp-badge host" title="你是房主">房主 ' + hostFp + '</span>';
-    h += '<span class="mp-room-id" style="margin-left:8px;color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + (_gameSessionId || '').slice(0, 8) + '</span>';
-    if (isIPad()) {
-      h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:auto">强制重启</button>';
+    if (_offlineMode) {
+      h += '<span class="mp-badge host" title="多人协同未连接，使用单机模式" style="background:rgba(255,165,0,0.25);color:#ffb347;border:1px solid rgba(255,165,0,0.3)">单机模式</span>';
+      h += '<span style="margin-left:8px;color:var(--text-dim);font-size:12px">多人协同未连接</span>';
+    } else {
+      h += '<span class="mp-badge host" title="你是房主">房主 ' + hostFp + '</span>';
+      h += '<span class="mp-room-id" style="margin-left:8px;color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + (_gameSessionId || '').slice(0, 8) + '</span>';
+      if (isIPad()) {
+        h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:auto">强制重启</button>';
+      }
     }
     // 尝试从 Supabase 读取观众数量
     fetchViewerCount(function(count) {
