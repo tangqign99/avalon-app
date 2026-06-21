@@ -5124,7 +5124,7 @@ function forceEndGame() {
   if (_offlineMode) return;
   showModal(
     '<h2>强制结束游戏</h2>' +
-    '<p style="color:var(--red-bright)">确定要强制结束当前游戏吗？所有围观者将被断开，游戏记录将保存。</p>' +
+    '<p style="color:var(--red-bright)">确定要强制结束当前游戏吗？所有围观者将被断开。</p>' +
     '<div class="modal-actions">' +
     '<button class="btn danger" onclick="confirmForceEnd()">确认结束</button>' +
     '<button class="btn" onclick="closeModal()">取消</button>' +
@@ -5135,7 +5135,11 @@ function forceEndGame() {
 function confirmForceEnd() {
   closeModal();
   var sb = getSupabase();
-  if (!sb || !_gameSessionId) { clearHostState(); return; }
+  if (!sb || !_gameSessionId) {
+    // 无 Supabase 连接时直接弹出保存选择框
+    showForceEndSaveDialog();
+    return;
+  }
   // 先更新状态为 finished，然后删除记录
   sb.from('game_sessions').update({
     status: 'finished'
@@ -5145,16 +5149,132 @@ function confirmForceEnd() {
     sb.from('game_sessions').delete().eq('id', _gameSessionId).then(function(r2) {
       if (r2.error) console.warn('[Multiplayer] forceEnd: delete failed:', r2.error);
     }).finally(function() {
-      toast('游戏已强制结束', 'success');
-      clearHostState();
-      // 清理 viewer 特有的心跳定时器（clearHostState 不会清理此定时器）
-      if (_viewerHeartbeatInterval) {
-        clearInterval(_viewerHeartbeatInterval);
-        _viewerHeartbeatInterval = null;
-      }
-      showPage('setup');
+      showForceEndSaveDialog();
     });
   });
+}
+
+// 强制结束后弹出"是否保存记录"选择框
+function showForceEndSaveDialog() {
+  showModal(
+    '<h2>是否保存本局记录？</h2>' +
+    '<div style="margin:12px 0">' +
+    '<label style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:6px">强制结束原因（可选）</label>' +
+    '<input id="force-end-reason" type="text" style="width:100%;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;box-sizing:border-box" placeholder="如：有人掉线、测试结束、房主离开...">' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn primary" onclick="saveForceEndRecord()">保存</button>' +
+    '<button class="btn" onclick="skipForceEndRecord()">不保存</button>' +
+    '</div>'
+  );
+}
+
+function saveForceEndRecord() {
+  var reason = (document.getElementById('force-end-reason') || {}).value || '';
+  closeModal();
+
+  var identities = [];
+  for (var i = 0; i < state.playerCount; i++) {
+    var sel = document.getElementById('end-role-' + i);
+    var role = sel ? sel.value : '';
+    identities.push({ name: state.playerNames[i], index: i, role: role });
+  }
+
+  var lancelotFlips = {};
+  for (var i = 0; i < state.playerCount; i++) {
+    var role = identities[i].role;
+    if (role === '兰斯洛特(蓝)' || role === '兰斯洛特(红)') {
+      lancelotFlips[i] = state.lancelotFlipped;
+    }
+  }
+
+  var history = loadHistory();
+  var record = {
+    date: new Date().toISOString().slice(0, 10),
+    forceEndTime: new Date().toISOString(),
+    playerCount: state.playerCount,
+    winner: state.winner,
+    identities: identities,
+    lancelotFlips: lancelotFlips,
+    activeRoles: state.activeRoles.slice(),
+    roundTendencies: state.roundTendencies || [],
+    assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
+    assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
+    assassinAfterRound: state._assassinAfterRound !== null ? state._assassinAfterRound : null,
+    currentRound: state._assassinAfterRound !== null ? state._assassinAfterRound : state.currentRound,
+    identityMarks: (state.identityMarks || []).map(function(m) {
+      return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
+    }),
+    missions: (state.missions || []).map(function(m) {
+      return {
+        round: m.round,
+        size: m.size,
+        leader: m.leader !== null ? playerLabel(m.leader) : '',
+        team: (m.team || []).map(function(ti) { return playerLabel(ti); }),
+        result: m.result,
+        failCount: m.failCount,
+        launchFailures: m.launchFailures,
+        launchAttempts: (m.launchAttempts || []).map(function(att) {
+          return {
+            team: (att.team || []).map(function(ti) { return playerLabel(ti); }),
+            votes: Object.keys(att.votes || {}).reduce(function(acc, k) {
+              acc[playerLabel(parseInt(k))] = att.votes[k];
+              return acc;
+            }, {}),
+            leader: playerLabel(att.leader)
+          };
+        }),
+        votes: Object.keys(m.votes || {}).reduce(function(acc, k) {
+          acc[playerLabel(parseInt(k))] = m.votes[k];
+          return acc;
+        }, {})
+      };
+    }),
+    ladyCheckHistory: (state.ladyCheckHistory || []).map(function(h) {
+      return {
+        round: h.round,
+        holder: h.holder,
+        holderName: playerLabel(h.holder),
+        target: h.target,
+        targetName: playerLabel(h.target),
+        result: h.result
+      };
+    }),
+    forceEnded: true,
+    forceEndReason: reason
+  };
+  history.push(record);
+  saveHistory(history);
+
+  // Supabase 同步
+  var sb = getSupabase();
+  if (sb) {
+    sb.from('game_records').insert({ game_data: record }).select('id').single().then(function(res) {
+      if (!res.error && res.data && res.data.id) {
+        history[history.length - 1]._supabaseId = res.data.id;
+        saveHistory(history);
+      }
+    });
+  }
+
+  toast('游戏已强制结束，记录已保存', 'success');
+  cleanupAfterForceEnd();
+}
+
+function skipForceEndRecord() {
+  closeModal();
+  toast('游戏已强制结束，未保存记录', 'success');
+  cleanupAfterForceEnd();
+}
+
+function cleanupAfterForceEnd() {
+  clearHostState();
+  // 清理 viewer 特有的心跳定时器（clearHostState 不会清理此定时器）
+  if (_viewerHeartbeatInterval) {
+    clearInterval(_viewerHeartbeatInterval);
+    _viewerHeartbeatInterval = null;
+  }
+  showPage('setup');
 }
 
 // 更新多人状态栏：显示host/viewer/iPad按钮
@@ -5281,11 +5401,12 @@ function applyViewerMode() {
       tendInputs[m].disabled = true;
     }
   }
-  // 结束页禁用操作
+  // 结束页禁用操作（保留强制结束按钮，让任何玩家都能使用）
   var endPage = document.getElementById('page-end');
   if (endPage) {
     var endBtns = endPage.querySelectorAll('button:not(.nav-btn)');
     for (var n = 0; n < endBtns.length; n++) {
+      if (endBtns[n].closest('#end-force-end-card')) continue;
       endBtns[n].disabled = true;
       endBtns[n].classList.add('viewer-disabled');
     }
