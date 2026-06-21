@@ -3706,6 +3706,7 @@ function showGameDetail(idx) {
     var faction = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
     nameToFaction[idt.name] = faction;
     nameToFaction[(idt.index + 1) + '号 ' + idt.name] = faction;
+    nameToFaction['玩家' + (idt.index + 1)] = faction;
   }
   var evilSpan = function(n) {
     if (nameToFaction[n] === 'evil') return '<span style="color:#66aaff;font-weight:700">' + n + '</span>';
