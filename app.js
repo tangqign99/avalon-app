@@ -129,6 +129,8 @@ function initState(n) {
 /* ==================== MULTIPLAYER STATE ==================== */
 var _isHost = false;
 var _isViewer = false;
+var _isOfflinePlayer = false;  // 线下玩家：有隐私角色，非纯围观者
+var _mySecretRole = null;       // 线下玩家的隐私角色（仅本地可见）
 var _offlineMode = false;  // true when multiplayer init failed, UI shows "单机模式"
 var _deviceId = null;
 var _gameSessionId = null;
@@ -549,6 +551,8 @@ function showPage(page) {
     updateMultiplayerStatusBar();
     renderGame();
     if (_isViewer) applyViewerMode();
+    // 线下玩家：渲染隐私角色卡片
+    if (_isOfflinePlayer && _mySecretRole) renderOfflinePlayerRoleCard();
     // 围观者：重新建立Supabase Realtime订阅（防止断线后无法恢复）
     if (_isViewer && _gameSessionId) {
       var sb = getSupabase();
@@ -556,7 +560,13 @@ function showPage(page) {
     }
   }
   if (page === 'setup') { renderSetup(); renderVisitorLog(); renderMultiplayerIndicator(); }
-  if (page === 'tend') { renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult(); }
+  if (page === 'tend') {
+    // 线下玩家：自动设置角色以启用倾向分析
+    if (_isOfflinePlayer && _mySecretRole && !state.myRole) {
+      state.myRole = _mySecretRole;
+    }
+    renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
+  }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
@@ -4681,11 +4691,10 @@ function initGameSession(sb, callback) {
       return;
     }
 
-    // 不是房主 → 围观模式
+    // 不是房主 → 检查是否有保存的线下玩家角色
     _isHost = false;
-    _isViewer = true;
     _offlineMode = false;
-    console.log('[Multiplayer] 加入已有房间作为围观者, sessionId=' + _gameSessionId);
+    console.log('[Multiplayer] 加入已有房间, sessionId=' + _gameSessionId);
     var gs = session.game_state;
     if (gs && gs.playerCount) {
       console.log('[Multiplayer] 反序列化 game_state, playerCount=' + gs.playerCount);
@@ -4693,12 +4702,25 @@ function initGameSession(sb, callback) {
     } else {
       console.log('[Multiplayer] game_state 无有效数据, gs=' + JSON.stringify(gs));
     }
-    registerViewer(sb);
-    console.log('[Multiplayer] initGameSession 结束 → viewer');
-    toast('已加入房间，当前为围观模式', 'info');
-    watchGameSession(sb);
-    showPage('game');
-    callback('viewer');
+    var savedRole = loadOfflinePlayerRole();
+    if (savedRole) {
+      // 已有保存的隐私角色 → 线下玩家模式
+      _isOfflinePlayer = true;
+      _isViewer = true;
+      _mySecretRole = savedRole;
+      state.myRole = savedRole;
+      console.log('[Multiplayer] 线下玩家模式, secretRole=' + savedRole);
+      registerOfflinePlayer(sb);
+      console.log('[Multiplayer] initGameSession 结束 → offlinePlayer');
+      toast('已加入房间，身份：' + savedRole + '（线下玩家）', 'info');
+      watchGameSession(sb);
+      showPage('game');
+      callback('offlinePlayer');
+    } else {
+      // 无保存角色 → 弹出角色选择模态框
+      console.log('[Multiplayer] 无保存角色，显示角色选择界面');
+      showOfflinePlayerRoleModal(sb, callback);
+    }
   }).catch(function(err) {
     console.error('[Multiplayer] game_sessions 查询抛出异常 (catch):', err);
     console.error('[Multiplayer] 异常类型:', typeof err, '| message:', err && err.message);
@@ -4851,6 +4873,131 @@ function unregisterViewer(sb) {
   });
 }
 
+// 线下玩家：角色 localStorage 存储
+function saveOfflinePlayerRole(role) {
+  localStorage.setItem('avalon_offline_player_role', role);
+}
+
+function loadOfflinePlayerRole() {
+  return localStorage.getItem('avalon_offline_player_role');
+}
+
+function clearOfflinePlayerRole() {
+  localStorage.removeItem('avalon_offline_player_role');
+}
+
+// 注册线下玩家（含角色声明，写入 game_sessions._claimedRoles）
+function registerOfflinePlayer(sb) {
+  if (!_isOfflinePlayer || !_gameSessionId) return;
+  var fp = _deviceId.slice(-6).toUpperCase();
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
+    if (res.error || !res.data) return;
+    var gs = res.data.game_state || {};
+    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
+    var claimedRoles = Array.isArray(gs._claimedRoles) ? gs._claimedRoles : [];
+    var found = false;
+    var now = new Date().toISOString();
+    for (var i = 0; i < viewers.length; i++) {
+      if (viewers[i].deviceId === _deviceId) {
+        viewers[i].lastSeen = now;
+        viewers[i].fingerprint = fp;
+        viewers[i].isOfflinePlayer = true;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      viewers.push({ deviceId: _deviceId, fingerprint: fp, joinedAt: now, lastSeen: now, isOfflinePlayer: true });
+    }
+    if (_mySecretRole && claimedRoles.indexOf(_mySecretRole) === -1) {
+      claimedRoles.push(_mySecretRole);
+    }
+    gs._viewers = viewers;
+    gs._claimedRoles = claimedRoles;
+    sb.from('game_sessions').update({ game_state: gs, updated_at: now }).eq('id', _gameSessionId).then(function(r2) {
+      if (r2.error) console.warn('[Multiplayer] registerOfflinePlayer failed:', r2.error);
+      else console.log('[Multiplayer] offline player registered, claimedRoles=' + JSON.stringify(claimedRoles));
+    });
+  });
+  startViewerHeartbeat(sb);
+}
+
+// 显示线下玩家角色选择模态框
+var _pendingOfflinePlayerCallback = null;
+var _pendingOfflinePlayerSb = null;
+function showOfflinePlayerRoleModal(sb, callback) {
+  _pendingOfflinePlayerCallback = callback;
+  _pendingOfflinePlayerSb = sb;
+  var overlay = document.createElement('div');
+  overlay.id = 'offline-role-overlay';
+  overlay.className = 'modal-overlay active';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center';
+  var h = '<div class="card" style="max-width:380px;width:90%;margin:auto;padding:24px;background:var(--bg-dark,#1a1a2e);border:2px solid var(--gold);border-radius:var(--radius);text-align:center">';
+  h += '<h2 style="margin:0 0 4px;color:var(--gold-light)">选择你的身份</h2>';
+  h += '<p style="color:var(--text-dim);font-size:13px;margin:0 0 16px">私下选择角色后进入游戏。<br>该角色仅自己可见，不会公开。</p>';
+  h += '<select id="offline-role-select" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.3);background:var(--parchment);color:var(--text);font-size:15px;cursor:pointer;min-height:44px;margin-bottom:16px">';
+  h += '<option value="">-- 选择角色 --</option>';
+  for (var j = 0; j < ALL_ROLES.length; j++) {
+    h += '<option value="' + ALL_ROLES[j] + '">' + ALL_ROLES[j] + '</option>';
+  }
+  h += '</select>';
+  h += '<div style="display:flex;gap:10px;justify-content:center">';
+  h += '<button class="btn primary" id="offline-role-confirm-btn" disabled onclick="confirmOfflinePlayerRole()" style="flex:1">确认加入</button>';
+  h += '<button class="btn" onclick="skipOfflinePlayerRole()" style="flex:1;background:rgba(255,255,255,0.08);color:var(--text-dim)">跳过，纯围观</button>';
+  h += '</div></div>';
+  overlay.innerHTML = h;
+  document.body.appendChild(overlay);
+  // 监听下拉框变化以启用确认按钮
+  setTimeout(function() {
+    var sel = document.getElementById('offline-role-select');
+    var btn = document.getElementById('offline-role-confirm-btn');
+    if (sel && btn) {
+      sel.addEventListener('change', function() {
+        btn.disabled = !sel.value;
+      });
+    }
+  }, 50);
+}
+
+function confirmOfflinePlayerRole() {
+  var sel = document.getElementById('offline-role-select');
+  if (!sel || !sel.value) return;
+  var role = sel.value;
+  _mySecretRole = role;
+  _isOfflinePlayer = true;
+  _isViewer = true;
+  saveOfflinePlayerRole(role);
+  state.myRole = role;
+  var overlay = document.getElementById('offline-role-overlay');
+  if (overlay) overlay.remove();
+  if (_pendingOfflinePlayerSb && _pendingOfflinePlayerCallback) {
+    registerOfflinePlayer(_pendingOfflinePlayerSb);
+    toast('已加入房间，身份：' + role + '（线下玩家）', 'info');
+    watchGameSession(_pendingOfflinePlayerSb);
+    showPage('game');
+    _pendingOfflinePlayerCallback('offlinePlayer');
+  }
+  _pendingOfflinePlayerCallback = null;
+  _pendingOfflinePlayerSb = null;
+}
+
+function skipOfflinePlayerRole() {
+  _isOfflinePlayer = false;
+  _isViewer = true;
+  _mySecretRole = null;
+  var overlay = document.getElementById('offline-role-overlay');
+  if (overlay) overlay.remove();
+  if (_pendingOfflinePlayerSb && _pendingOfflinePlayerCallback) {
+    registerViewer(_pendingOfflinePlayerSb);
+    toast('已加入房间，当前为围观模式', 'info');
+    watchGameSession(_pendingOfflinePlayerSb);
+    showPage('game');
+    _pendingOfflinePlayerCallback('viewer');
+  }
+  _pendingOfflinePlayerCallback = null;
+  _pendingOfflinePlayerSb = null;
+}
+
 // 房主：将完整 state 写入 Supabase（保留观众列表）
 function syncGameState() {
   if (!_isHost || !_gameSessionId) return;
@@ -4863,6 +5010,7 @@ function syncGameState() {
     if (readRes.data && readRes.data.game_state) {
       var currentGS = readRes.data.game_state;
       if (currentGS._viewers) gs._viewers = currentGS._viewers;
+      if (currentGS._claimedRoles) gs._claimedRoles = currentGS._claimedRoles;
       if (currentGS._hostFingerprint) gs._hostFingerprint = currentGS._hostFingerprint;
     }
     sb.from('game_sessions').update({
@@ -4895,6 +5043,8 @@ function clearViewerState(msg) {
   }
   _isViewer = false;
   _isHost = false;
+  _isOfflinePlayer = false;
+  _mySecretRole = null;
   _offlineMode = false;
   _gameSessionId = null;
   if (_gameSessionChannel) {
@@ -4915,6 +5065,9 @@ function clearViewerState(msg) {
   }
   // 恢复 UI 控件
   restoreViewerControls();
+  // 移除线下玩家角色卡片
+  var roleCard = document.getElementById('offline-player-role-card');
+  if (roleCard) roleCard.remove();
   updateMultiplayerStatusBar();
   toast(msg, 'warn');
 }
@@ -5076,9 +5229,11 @@ function watchGameSession(sb) {
       if (state._currentPage === 'game') {
         renderGame();
         applyViewerMode();
+        if (_isOfflinePlayer && _mySecretRole) renderOfflinePlayerRoleCard();
       } else if (state._currentPage === 'end') {
         renderEnd();
       } else if (state._currentPage === 'tend') {
+        if (_isOfflinePlayer && _mySecretRole && !state.myRole) state.myRole = _mySecretRole;
         renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend();
         renderIdentitySimGrid(); renderDeduction();
       } else if (state._currentPage === 'stats') {
@@ -5152,9 +5307,11 @@ function watchGameSession(sb) {
       if (state._currentPage === 'game') {
         renderGame();
         applyViewerMode();
+        if (_isOfflinePlayer && _mySecretRole) renderOfflinePlayerRoleCard();
       } else if (state._currentPage === 'end') {
         renderEnd();
       } else if (state._currentPage === 'tend') {
+        if (_isOfflinePlayer && _mySecretRole && !state.myRole) state.myRole = _mySecretRole;
         renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend();
         renderIdentitySimGrid(); renderDeduction();
       } else if (state._currentPage === 'stats') {
@@ -5435,14 +5592,18 @@ function updateMultiplayerStatusBar() {
       });
     }
   } else if (_isViewer) {
+    var isOfflinePlayer = _isOfflinePlayer && _mySecretRole;
+    var badgeHtml = isOfflinePlayer
+      ? '<span class="mp-badge viewer" style="background:rgba(0,122,255,0.18);color:#0a84ff" title="线下玩家">线下玩家</span>'
+      : '<span class="mp-badge viewer" title="你正在围观">围观中</span>';
     bar.innerHTML =
       '<div class="mp-status-row">' +
-        '<span class="mp-badge viewer" title="你正在围观">围观中</span>' +
+        badgeHtml +
         '<span class="mp-room-id" style="color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + roomsId + '</span>' +
       '</div>' +
       '<div class="mp-status-row">' +
         '<span class="mp-host-info" style="color:var(--gold);font-size:13px"></span>' +
-        '<span style="color:var(--text-dim);font-size:12px">等待房主操作...</span>' +
+        '<span style="color:var(--text-dim);font-size:12px">' + (isOfflinePlayer ? '实时观看中...' : '等待房主操作...') + '</span>' +
       '</div>' +
       '<div class="mp-status-row" id="mp-viewer-list-row">' +
         '<span style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
@@ -5550,17 +5711,19 @@ function applyViewerMode() {
   for (var j = 0; j < inputs.length; j++) {
     inputs[j].disabled = true;
   }
-  // 隐藏倾向页的操作控件
+  // 倾向页：线下玩家不禁用操作控件，纯围观者禁用
   var tendPage = document.getElementById('page-tend');
   if (tendPage) {
-    var tendBtns = tendPage.querySelectorAll('button:not(.nav-btn)');
-    for (var k = 0; k < tendBtns.length; k++) {
-      tendBtns[k].disabled = true;
-      tendBtns[k].classList.add('viewer-disabled');
-    }
-    var tendInputs = tendPage.querySelectorAll('select, input');
-    for (var m = 0; m < tendInputs.length; m++) {
-      tendInputs[m].disabled = true;
+    if (!_mySecretRole) {
+      var tendBtns = tendPage.querySelectorAll('button:not(.nav-btn)');
+      for (var k = 0; k < tendBtns.length; k++) {
+        tendBtns[k].disabled = true;
+        tendBtns[k].classList.add('viewer-disabled');
+      }
+      var tendInputs = tendPage.querySelectorAll('select, input');
+      for (var m = 0; m < tendInputs.length; m++) {
+        tendInputs[m].disabled = true;
+      }
     }
   }
   // 结束页禁用操作（保留强制结束按钮，让任何玩家都能使用）
@@ -6174,6 +6337,24 @@ function toggleEvidence(idx) {
 }
 
 /* ------- Game page inline summary ------- */
+// 线下玩家角色卡片：游戏页顶部显示隐私角色
+function renderOfflinePlayerRoleCard() {
+  var el = document.getElementById('offline-player-role-card');
+  if (!el) {
+    // 动态创建卡片
+    var sbEl = document.getElementById('multiplayer-status-bar');
+    if (!sbEl) return;
+    el = document.createElement('div');
+    el.id = 'offline-player-role-card';
+    el.style.cssText = 'margin:8px 12px 0;padding:10px 14px;border:1px dashed var(--gold);border-radius:var(--radius-sm);background:rgba(201,168,76,0.08);display:flex;align-items:center;gap:8px;font-size:13px';
+    sbEl.after(el);
+  }
+  el.innerHTML = '<span style="font-size:16px">&#x1f512;</span>' +
+    '<span style="color:var(--text-dim)">你的身份：</span>' +
+    '<span style="color:var(--gold-light);font-weight:700;font-size:14px">' + escapeHtml(_mySecretRole) + '</span>' +
+    '<span style="color:var(--text-dim);font-size:11px;margin-left:auto">仅自己可见</span>';
+}
+
 /* ------- 页面关闭清理 ------- */
 window.addEventListener('beforeunload', function() {
   if (_gameSessionId && (_isViewer || _isHost)) {
