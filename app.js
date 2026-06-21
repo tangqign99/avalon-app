@@ -549,6 +549,11 @@ function showPage(page) {
     updateMultiplayerStatusBar();
     renderGame();
     if (_isViewer) applyViewerMode();
+    // 围观者：重新建立Supabase Realtime订阅（防止断线后无法恢复）
+    if (_isViewer && _gameSessionId) {
+      var sb = getSupabase();
+      if (sb) watchGameSession(sb);
+    }
   }
   if (page === 'setup') { renderSetup(); renderVisitorLog(); renderMultiplayerIndicator(); }
   if (page === 'tend') { renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult(); }
@@ -4998,7 +5003,16 @@ function watchSessionAsHost(sb) {
 
 // 围观者：订阅 Supabase Realtime 更新
 function watchGameSession(sb) {
-  if (_gameSessionChannel) return;
+  // 允许重新订阅：先清理旧 channel 和轮询（防止断线后无法恢复）
+  if (_gameSessionChannel) {
+    try { _gameSessionChannel.unsubscribe(); } catch(e) {}
+    _gameSessionChannel = null;
+  }
+  if (_gameSessionPollInterval) {
+    clearInterval(_gameSessionPollInterval);
+    _gameSessionPollInterval = null;
+  }
+
   _gameSessionChannel = sb.channel('game-session-' + _gameSessionId);
 
   _gameSessionChannel.on(
@@ -5013,8 +5027,15 @@ function watchGameSession(sb) {
         showPage('setup');
         return;
       }
-      // 检查房间是否已结束（房主离开 / 超时释放 / 游戏完成）
+      // 检查房间是否已结束
       if (payload.new.status === 'finished' || payload.new.status === 'ended') {
+        // 如果 game_state 有 winner（游戏自然结束），让围观者跳到结束页看复盘
+        if (gs && gs.winner) {
+          deserializeGameState(gs);
+          showPage('end');
+          return;
+        }
+        // 否则是强制结束/超时/房主离开 — 直接回设置页
         clearViewerState('房主已离开，你可以成为新房主');
         showPage('setup');
         return;
@@ -5042,6 +5063,11 @@ function watchGameSession(sb) {
     'postgres_changes',
     { event: 'DELETE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
     function() {
+      // 如果当前已在结束页面，先停留让用户看复盘再跳转
+      if (state._currentPage === 'end') {
+        toast('房间已被关闭', 'warn');
+        return;
+      }
       clearViewerState('房主已离开，你可以成为新房主');
       showPage('setup');
     }
@@ -5052,7 +5078,6 @@ function watchGameSession(sb) {
   });
 
   // 轮询兜底：每 2 秒查询 Supabase，防止 Realtime 推送丢失
-  if (_gameSessionPollInterval) clearInterval(_gameSessionPollInterval);
   _gameSessionPollInterval = setInterval(function() {
     if (!_isViewer || !_gameSessionId) {
       clearInterval(_gameSessionPollInterval);
@@ -5068,6 +5093,13 @@ function watchGameSession(sb) {
       if (res.data.status === 'finished' || res.data.status === 'ended') {
         clearInterval(_gameSessionPollInterval);
         _gameSessionPollInterval = null;
+        // 如果 game_state 有 winner（游戏自然结束），让围观者跳到结束页看复盘
+        if (gs && gs.winner) {
+          deserializeGameState(gs);
+          showPage('end');
+          return;
+        }
+        // 否则是强制结束/超时/房主离开 — 直接回设置页
         clearViewerState('房主已离开，你可以成为新房主');
         showPage('setup');
         return;
@@ -5166,17 +5198,37 @@ function confirmForceEnd() {
     showForceEndSaveDialog();
     return;
   }
-  // 先更新状态为 finished，然后删除记录
+  var sessionId = _gameSessionId;
+  // 先更新状态为 finished，阻止新围观者加入，然后清理该房间相关记录
   sb.from('game_sessions').update({
-    status: 'finished'
-  }).eq('id', _gameSessionId).then(function(r) {
-    if (r.error) console.warn('[Multiplayer] forceEnd: update failed:', r.error);
+    status: 'finished',
+    updated_at: new Date().toISOString()
+  }).eq('id', sessionId).then(function(r) {
+    if (r.error) {
+      console.warn('[Multiplayer] forceEnd: update failed:', r.error);
+      // 即使更新失败也尝试删除（可能是权限问题）
+    }
+    // 删除 game_sessions 记录
+    return sb.from('game_sessions').delete().eq('id', sessionId);
+  }).then(function(r2) {
+    if (r2 && r2.error) {
+      console.warn('[Multiplayer] forceEnd: delete game_sessions failed:', r2.error);
+    } else {
+      console.log('[Multiplayer] forceEnd: game_sessions 已删除, id=' + sessionId);
+    }
+    // 清理 visitors 表中该房间相关的心跳记录（按 created_at 窗口：最近2小时内）
+    var cutoff = new Date(Date.now() - 7200000).toISOString();
+    return sb.from('visitors').delete().gte('created_at', cutoff);
+  }).then(function(r3) {
+    if (r3 && r3.error) {
+      console.warn('[Multiplayer] forceEnd: cleanup visitors failed:', r3.error);
+    } else {
+      console.log('[Multiplayer] forceEnd: visitors 清理完成');
+    }
+  }).catch(function(err) {
+    console.error('[Multiplayer] forceEnd: unexpected error:', err);
   }).finally(function() {
-    sb.from('game_sessions').delete().eq('id', _gameSessionId).then(function(r2) {
-      if (r2.error) console.warn('[Multiplayer] forceEnd: delete failed:', r2.error);
-    }).finally(function() {
-      showForceEndSaveDialog();
-    });
+    showForceEndSaveDialog();
   });
 }
 
