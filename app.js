@@ -538,9 +538,7 @@ function renderVisitorList(visitors) {
 }
 
 function goVisitorPage(p) {
-  var visitors = loadVisitors();
-  var totalPages = Math.ceil(visitors.length / state._visitorPageSize);
-  if (p < 0 || p >= totalPages) return;
+  if (p < 0) return;
   state._visitorPage = p;
   renderVisitorLog();
 }
