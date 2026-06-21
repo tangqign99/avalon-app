@@ -16,7 +16,15 @@ var _supabaseConnected = false;
 var _supabaseChannel = null;
 function getSupabase() {
   if (!_supabase && typeof supabase !== 'undefined') {
-    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    try {
+      _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log('[Supabase] client created successfully, URL:', SUPABASE_URL);
+    } catch(e) {
+      console.error('[Supabase] createClient failed:', e);
+      _supabase = null;
+    }
+  } else if (!_supabase && typeof supabase === 'undefined') {
+    console.warn('[Supabase] SDK not loaded (typeof supabase === undefined), running in offline mode');
   }
   return _supabase;
 }
@@ -4526,8 +4534,10 @@ function initGameSession(sb, callback) {
     if (gs && gs.playerCount) {
       deserializeGameState(gs);
     }
+    // 注册为观众
+    registerViewer(sb);
     console.log('[Multiplayer] initGameSession 结束 → viewer');
-    toast('已加入房间，当前为围观模式', 'success');
+    toast('已加入房间，当前为围观模式', 'info');
     watchGameSession(sb);
     showPage('game');
     callback('viewer');
@@ -4540,6 +4550,8 @@ function createNewSession(sb, callback) {
   _isHost = true;
   _isViewer = false;
   var initState = serializeGameState();
+  initState._viewers = [];
+  initState._hostFingerprint = generateDeviceId().slice(-6).toUpperCase();
   sb.from('game_sessions').insert({
     host_id: _deviceId,
     game_state: initState,
@@ -4548,35 +4560,151 @@ function createNewSession(sb, callback) {
   }).select('id').single().then(function(r2) {
     if (r2.error) {
       console.warn('[Multiplayer] create session failed:', r2.error);
+      _isHost = false;
+      _isViewer = false;
       toast('创建房间失败，使用单机模式', 'warn');
     } else {
       _gameSessionId = r2.data.id;
       console.log('[Multiplayer] session 创建成功, sessionId=' + _gameSessionId);
       toast('你是房主 — 创建了新房间', 'success');
+      // 房主心跳：定期更新 updated_at 保持房间活跃
+      startHostHeartbeat(sb);
     }
     callback('host');
   });
 }
 
-// 房主：将完整 state 写入 Supabase
+// 房主心跳：每60秒更新 updated_at 防止超时
+var _hostHeartbeatInterval = null;
+function startHostHeartbeat(sb) {
+  if (_hostHeartbeatInterval) clearInterval(_hostHeartbeatInterval);
+  var heartbeatCounter = 0;
+  _hostHeartbeatInterval = setInterval(function() {
+    if (!_isHost || !_gameSessionId) {
+      clearInterval(_hostHeartbeatInterval);
+      _hostHeartbeatInterval = null;
+      return;
+    }
+    sb.from('game_sessions').update({
+      updated_at: new Date().toISOString()
+    }).eq('id', _gameSessionId).then(function(r) {
+      if (r.error) console.warn('[Multiplayer] heartbeat failed:', r.error);
+    });
+    // 每 3 次心跳刷新状态栏（约每3分钟），确保观众数量及时更新
+    heartbeatCounter++;
+    if (heartbeatCounter % 3 === 0) updateMultiplayerStatusBar();
+  }, 60000);
+}
+
+// 观众注册：将自身 deviceId 添加到 game_sessions 的 _viewers 数组
+function registerViewer(sb) {
+  if (!_isViewer || !_gameSessionId) return;
+  var fp = _deviceId.slice(-6).toUpperCase();
+  // 读取当前 viewers 列表
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
+    if (res.error || !res.data) return;
+    var gs = res.data.game_state || {};
+    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
+    // 去重：已存在的 viewer 仅更新 last_seen
+    var found = false;
+    var now = new Date().toISOString();
+    for (var i = 0; i < viewers.length; i++) {
+      if (viewers[i].deviceId === _deviceId) {
+        viewers[i].lastSeen = now;
+        viewers[i].fingerprint = fp;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      viewers.push({ deviceId: _deviceId, fingerprint: fp, joinedAt: now, lastSeen: now });
+    }
+    gs._viewers = viewers;
+    sb.from('game_sessions').update({ game_state: gs, updated_at: now }).eq('id', _gameSessionId).then(function(r2) {
+      if (r2.error) console.warn('[Multiplayer] registerViewer failed:', r2.error);
+      else console.log('[Multiplayer] viewer registered, total viewers=' + viewers.length);
+    });
+  });
+  // 观众心跳：每30秒更新 lastSeen
+  startViewerHeartbeat(sb);
+}
+
+// 观众心跳
+var _viewerHeartbeatInterval = null;
+function startViewerHeartbeat(sb) {
+  if (_viewerHeartbeatInterval) clearInterval(_viewerHeartbeatInterval);
+  _viewerHeartbeatInterval = setInterval(function() {
+    if (!_isViewer || !_gameSessionId) {
+      clearInterval(_viewerHeartbeatInterval);
+      _viewerHeartbeatInterval = null;
+      return;
+    }
+    registerViewer(sb);
+  }, 30000);
+}
+
+// 观众离线：从 viewers 中移除自己
+function unregisterViewer(sb) {
+  if (!_gameSessionId || !_deviceId) return;
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
+    if (res.error || !res.data) return;
+    var gs = res.data.game_state || {};
+    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
+    var filtered = [];
+    for (var i = 0; i < viewers.length; i++) {
+      if (viewers[i].deviceId !== _deviceId) filtered.push(viewers[i]);
+    }
+    if (filtered.length !== viewers.length) {
+      gs._viewers = filtered;
+      sb.from('game_sessions').update({ game_state: gs, updated_at: new Date().toISOString() }).eq('id', _gameSessionId).then(function(r2) {
+        if (r2.error) console.warn('[Multiplayer] unregisterViewer failed:', r2.error);
+      });
+    }
+  });
+}
+
+// 房主：将完整 state 写入 Supabase（保留观众列表）
 function syncGameState() {
   if (!_isHost || !_gameSessionId) return;
   var sb = getSupabase();
   if (!sb) return;
   console.log('[Multiplayer] syncGameState 调用, sessionId=' + _gameSessionId);
-  var gs = serializeGameState();
-  sb.from('game_sessions').update({
-    game_state: gs,
-    status: state.winner ? 'finished' : 'active',
-    updated_at: new Date().toISOString()
-  }).eq('id', _gameSessionId).then(function(r) {
-    if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
-    else console.log('[Multiplayer] sync 成功');
+  // 先读取当前 viewers 列表以免覆盖
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(readRes) {
+    var gs = serializeGameState();
+    if (readRes.data && readRes.data.game_state) {
+      var currentGS = readRes.data.game_state;
+      if (currentGS._viewers) gs._viewers = currentGS._viewers;
+      if (currentGS._hostFingerprint) gs._hostFingerprint = currentGS._hostFingerprint;
+    }
+    sb.from('game_sessions').update({
+      game_state: gs,
+      status: state.winner ? 'finished' : 'active',
+      updated_at: new Date().toISOString()
+    }).eq('id', _gameSessionId).then(function(r) {
+      if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
+      else { console.log('[Multiplayer] sync 成功'); updateMultiplayerStatusBar(); }
+    });
+  }).catch(function(err) {
+    console.warn('[Multiplayer] read before sync failed:', err);
+    var gs = serializeGameState();
+    sb.from('game_sessions').update({
+      game_state: gs,
+      status: state.winner ? 'finished' : 'active',
+      updated_at: new Date().toISOString()
+    }).eq('id', _gameSessionId).then(function(r) {
+      if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
+      else { console.log('[Multiplayer] catch-sync 成功'); updateMultiplayerStatusBar(); }
+    });
   });
 }
 
 // 清除围观者状态，恢复操作权限
 function clearViewerState(msg) {
+  // 先尝试从房间注销自己
+  if (_isViewer && _gameSessionId) {
+    unregisterViewer(getSupabase());
+  }
   _isViewer = false;
   _isHost = false;
   _gameSessionId = null;
@@ -4588,8 +4716,17 @@ function clearViewerState(msg) {
     clearInterval(_gameSessionPollInterval);
     _gameSessionPollInterval = null;
   }
+  if (_viewerHeartbeatInterval) {
+    clearInterval(_viewerHeartbeatInterval);
+    _viewerHeartbeatInterval = null;
+  }
+  if (_hostHeartbeatInterval) {
+    clearInterval(_hostHeartbeatInterval);
+    _hostHeartbeatInterval = null;
+  }
   // 恢复 UI 控件
   restoreViewerControls();
+  updateMultiplayerStatusBar();
   toast(msg, 'warn');
 }
 
@@ -4632,6 +4769,7 @@ function watchGameSession(sb) {
       }
       if (!gs) return;
       deserializeGameState(gs);
+      updateMultiplayerStatusBar();
       // 重新渲染当前页面
       if (state._currentPage === 'game') {
         renderGame();
@@ -4691,6 +4829,7 @@ function watchGameSession(sb) {
       }
       if (!gs) return;
       deserializeGameState(gs);
+      updateMultiplayerStatusBar();
       if (state._currentPage === 'game') {
         renderGame();
         applyViewerMode();
@@ -4755,21 +4894,94 @@ function confirmForceRestart() {
 }
 
 // 更新多人状态栏：显示host/viewer/iPad按钮
+var _mpStatusBarVersion = 0;
 function updateMultiplayerStatusBar() {
   var bar = document.getElementById('multiplayer-status-bar');
   if (!bar) return;
+  var version = ++_mpStatusBarVersion;
   var h = '';
+  // 获取观众信息（从当前 game_state 中读取）
+  var viewers = [];
+  var hostFp = (_deviceId && _isHost) ? _deviceId.slice(-6).toUpperCase() : '';
+
   if (_isHost) {
-    h += '<span class="mp-badge host">房主</span>';
+    h += '<span class="mp-badge host" title="你是房主">房主 ' + hostFp + '</span>';
+    h += '<span class="mp-room-id" style="margin-left:8px;color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + (_gameSessionId || '').slice(0, 8) + '</span>';
     if (isIPad()) {
-      h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:8px">强制重启</button>';
+      h += '<button class="btn small danger" onclick="forceRestartSession()" style="margin-left:auto">强制重启</button>';
     }
+    // 尝试从 Supabase 读取观众数量
+    fetchViewerCount(function(count) {
+      if (version !== _mpStatusBarVersion) return; // 忽略过期回调
+      var countEl = bar.querySelector('.mp-viewer-count');
+      if (count >= 0) {
+        if (countEl) {
+          countEl.textContent = count > 0 ? '围观者: ' + count + '人' : '暂无围观者';
+        } else {
+          var span = document.createElement('span');
+          span.className = 'mp-viewer-count';
+          span.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
+          span.textContent = count > 0 ? '围观者: ' + count + '人' : '暂无围观者';
+          bar.appendChild(span);
+        }
+      }
+    });
   } else if (_isViewer) {
-    h += '<span class="mp-badge viewer">围观中</span>';
+    h += '<span class="mp-badge viewer" title="你正在围观">围观中</span>';
     h += '<span style="margin-left:8px;color:var(--text-dim);font-size:13px">等待房主操作...</span>';
+    h += '<span class="mp-room-id" style="margin-left:8px;color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + (_gameSessionId || '').slice(0, 8) + '</span>';
+    // 读取房主指纹
+    fetchHostFingerprint(function(fp) {
+      if (version !== _mpStatusBarVersion) return; // 忽略过期回调
+      var hostEl = bar.querySelector('.mp-host-info');
+      if (fp) {
+        if (hostEl) {
+          hostEl.textContent = '房主: ' + fp;
+        } else {
+          var span = document.createElement('span');
+          span.className = 'mp-host-info';
+          span.style.cssText = 'margin-left:8px;color:var(--gold);font-size:13px';
+          span.textContent = '房主: ' + fp;
+          bar.appendChild(span);
+        }
+      }
+    });
   }
   bar.innerHTML = h;
   bar.style.display = (_isHost || _isViewer) ? 'flex' : 'none';
+}
+
+// 从 Supabase 读取观众数量
+function fetchViewerCount(callback) {
+  if (!_gameSessionId || !_isHost) { callback(-1); return; }
+  var sb = getSupabase();
+  if (!sb) { callback(-1); return; }
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
+    if (res.error || !res.data || !res.data.game_state) { callback(-1); return; }
+    var gs = res.data.game_state;
+    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
+    // 过滤掉超过2分钟未心跳的观众
+    var now = Date.now();
+    var active = [];
+    for (var i = 0; i < viewers.length; i++) {
+      if (viewers[i].lastSeen) {
+        var age = now - new Date(viewers[i].lastSeen).getTime();
+        if (age < 120000) active.push(viewers[i]);
+      }
+    }
+    callback(active.length);
+  }).catch(function() { callback(-1); });
+}
+
+// 从 Supabase 读取房主指纹
+function fetchHostFingerprint(callback) {
+  if (!_gameSessionId || !_isViewer) { callback(''); return; }
+  var sb = getSupabase();
+  if (!sb) { callback(''); return; }
+  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
+    if (res.error || !res.data || !res.data.game_state) { callback(''); return; }
+    callback(res.data.game_state._hostFingerprint || '');
+  }).catch(function() { callback(''); });
 }
 
 // 围观模式下禁用所有操作控件
@@ -5411,3 +5623,46 @@ function toggleEvidence(idx) {
 }
 
 /* ------- Game page inline summary ------- */
+/* ------- 页面关闭清理 ------- */
+window.addEventListener('beforeunload', function() {
+  if (_gameSessionId && (_isViewer || _isHost)) {
+    // 使用 sendBeacon 确保清理请求能发出
+    var sb = getSupabase();
+    if (sb && _isViewer) {
+      // 同步注销观众（fire-and-forget）
+      unregisterViewerSync(sb);
+    }
+  }
+});
+
+// 同步注销观众（用于 beforeunload）
+function unregisterViewerSync(sb) {
+  if (!_gameSessionId || !_deviceId) return;
+  var url = sb.supabaseUrl + '/rest/v1/game_sessions?id=eq.' + _gameSessionId;
+  var key = sb.supabaseKey;
+  // 先读取当前 game_state，移除自己后再写回
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', url + '&select=game_state', false);
+  xhr.setRequestHeader('apikey', key);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + key);
+  try { xhr.send(); } catch(e) { return; }
+  if (xhr.status !== 200) return;
+  try {
+    var data = JSON.parse(xhr.responseText);
+    if (!data || !data[0] || !data[0].game_state) return;
+    var gs = data[0].game_state;
+    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
+    var filtered = [];
+    for (var i = 0; i < viewers.length; i++) {
+      if (viewers[i].deviceId !== _deviceId) filtered.push(viewers[i]);
+    }
+    gs._viewers = filtered;
+    var xhr2 = new XMLHttpRequest();
+    xhr2.open('PATCH', url, false);
+    xhr2.setRequestHeader('apikey', key);
+    xhr2.setRequestHeader('Authorization', 'Bearer ' + key);
+    xhr2.setRequestHeader('Content-Type', 'application/json');
+    xhr2.setRequestHeader('Prefer', 'return=minimal');
+    xhr2.send(JSON.stringify({ game_state: gs, updated_at: new Date().toISOString() }));
+  } catch(e) {}
+}
