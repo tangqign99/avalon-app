@@ -4625,11 +4625,38 @@ function initGameSession(sb, callback) {
       }
     }
 
+    _gameSessionId = session.id;
+    console.log('[Multiplayer] 活跃房间 host_id=' + session.host_id + ', 本设备 deviceId=' + _deviceId);
+
+    // 房主刷新页面后重新加入：检查当前设备是否就是房主
+    if (session.host_id && session.host_id === _deviceId) {
+      console.log('[Multiplayer] 当前设备为房主，恢复房主身份');
+      _isHost = true;
+      _isViewer = false;
+      _offlineMode = false;
+      var hostGs = session.game_state;
+      if (hostGs && hostGs.playerCount) {
+        console.log('[Multiplayer] 反序列化 game_state, playerCount=' + hostGs.playerCount);
+        deserializeGameState(hostGs);
+      } else {
+        console.log('[Multiplayer] game_state 无有效数据, gs=' + JSON.stringify(hostGs));
+      }
+      // 恢复房主基础设施
+      startHostHeartbeat(sb);
+      watchSessionAsHost(sb);
+      resetHostIdleTimer();
+      console.log('[Multiplayer] initGameSession 结束 → host (恢复)');
+      toast('已恢复房主身份', 'info');
+      showPage('game');
+      callback('host');
+      return;
+    }
+
+    // 不是房主 → 围观模式
     _isHost = false;
     _isViewer = true;
     _offlineMode = false;
-    _gameSessionId = session.id;
-    console.log('[Multiplayer] 加入已有房间, sessionId=' + _gameSessionId);
+    console.log('[Multiplayer] 加入已有房间作为围观者, sessionId=' + _gameSessionId);
     var gs = session.game_state;
     if (gs && gs.playerCount) {
       console.log('[Multiplayer] 反序列化 game_state, playerCount=' + gs.playerCount);
@@ -4637,7 +4664,6 @@ function initGameSession(sb, callback) {
     } else {
       console.log('[Multiplayer] game_state 无有效数据, gs=' + JSON.stringify(gs));
     }
-    // 注册为观众
     registerViewer(sb);
     console.log('[Multiplayer] initGameSession 结束 → viewer');
     toast('已加入房间，当前为围观模式', 'info');
