@@ -649,7 +649,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 @media(max-width:480px){
   .role-checkbox-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
   .role-checkbox-grid label{font-size:16px;padding:10px 14px;min-height:44px}
-  .role-group{flex-wrap:nowrap;gap:4px}
+  .role-group{flex-wrap:wrap;gap:4px}
+  .role-group label{font-size:13px;padding:8px 12px;min-height:38px}
   .role-horizontal{gap:18px}
   .faction-label{font-size:13px;padding:3px 10px}
   .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px;max-width:100%}
