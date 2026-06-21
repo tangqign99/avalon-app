@@ -1,4 +1,4 @@
-/* ==================== DATA ==================== */
+﻿/* ==================== DATA ==================== */
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
 var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
@@ -2957,6 +2957,11 @@ function renderEnd() {
   $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
 
   renderEndIdentityDropdowns();
+  // Show force-end card for host only
+  var forceEndCard = $('end-force-end-card');
+  if (forceEndCard) {
+    forceEndCard.style.display = (_isHost && !_offlineMode) ? 'block' : 'none';
+  }
 }
 
 function onEndRoleChange(idx) {
@@ -5149,7 +5154,7 @@ function updateMultiplayerStatusBar() {
           '<span class="mp-viewer-placeholder" style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
         '</div>' +
         '<div class="mp-status-row" style="justify-content:flex-end">' +
-          '<button class="btn small" style="background:linear-gradient(135deg,#8b1a1a,#c0392b);color:#fff;border:1px solid #ff6b6b;font-size:12px;padding:3px 12px" onclick="forceEndGame()">强制结束</button>' +
+          
           (isIPad() ? '<button class="btn small danger" onclick="forceRestartSession()">强制重启</button>' : '') +
         '</div>';
       // 异步加载围观者列表
