@@ -1060,11 +1060,39 @@ function startGame() {
   for (var i = 0; i < state.playerCount; i++) {
     if (state.playerNames[i] === '阿弟') { state.selfIndex = i; break; }
   }
+
+  // 关键：点击“开始游戏”时，以设置页当前选择为准。
+  // initGameSession 可能恢复旧房间状态，导致刚选的 8/9/10 人被旧的 7 人覆盖。
+  var setupSnapshot = {
+    playerCount: state.playerCount,
+    playerNames: state.playerNames.slice(),
+    selfIndex: state.selfIndex,
+    activeRoles: state.activeRoles.slice(),
+    ladyOfLakeEnabled: state.ladyOfLakeEnabled,
+    excaliburEnabled: state.excaliburEnabled,
+    timerMode: state.timerMode,
+    timerSeconds: state.timerSeconds
+  };
+  function restoreSetupSnapshot() {
+    state.playerCount = setupSnapshot.playerCount;
+    state.playerNames = setupSnapshot.playerNames.slice(0, setupSnapshot.playerCount);
+    for (var si = 0; si < setupSnapshot.playerCount; si++) {
+      if (!state.playerNames[si]) state.playerNames[si] = '玩家' + (si + 1);
+    }
+    state.selfIndex = setupSnapshot.selfIndex < setupSnapshot.playerCount ? setupSnapshot.selfIndex : -1;
+    state.activeRoles = setupSnapshot.activeRoles.slice();
+    state.ladyOfLakeEnabled = setupSnapshot.ladyOfLakeEnabled;
+    state.excaliburEnabled = setupSnapshot.excaliburEnabled;
+    state.timerMode = setupSnapshot.timerMode;
+    state.timerSeconds = setupSnapshot.timerSeconds;
+  }
+
   // 多人模式：先检查Supabase是否有活跃房间
   var sb = getSupabase();
   if (sb) {
     initGameSession(sb, function(role) {
       if (role === 'host') {
+        restoreSetupSnapshot();
         doStartGame();
       }
       // viewer: initGameSession 内部已设置_isViewer=true并订阅，直接切到游戏页
@@ -1074,6 +1102,7 @@ function startGame() {
     _isHost = true;
     _isViewer = false;
     toast('多人协同不可用（网络受限），使用单机模式', 'warn');
+    restoreSetupSnapshot();
     doStartGame();
   }
 }
@@ -1081,6 +1110,11 @@ function startGame() {
 
 
 function doStartGame() {
+  // 防御性修复：确保玩家数组长度与选择人数一致
+  state.playerNames = (state.playerNames || []).slice(0, state.playerCount);
+  for (var pn = 0; pn < state.playerCount; pn++) {
+    if (!state.playerNames[pn]) state.playerNames[pn] = '玩家' + (pn + 1);
+  }
   state.missions = MISSION_COUNTS[state.playerCount].map(function(size, i) {
     return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, launchFailures: 0, launchAttempts: [] };
   });
