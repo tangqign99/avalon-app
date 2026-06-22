@@ -38,6 +38,9 @@ var _historyRawCache = null;
 var _historyCache = null;
 var _normalizedHistoryRawCache = null;
 var _normalizedHistoryCache = null;
+var _tendScoreCacheKey = '';
+var _tendScoreCacheValue = null;
+var _statsRenderScheduled = false;
 
 var state = {
   playerCount: 7,
@@ -3288,6 +3291,18 @@ function saveGameRecord() {
 }
 
 /* ==================== STATS PANEL ==================== */
+function scheduleRenderStats() {
+  if (state._currentPage !== 'stats') return;
+  if (_statsRenderScheduled) return;
+  _statsRenderScheduled = true;
+  var run = function() {
+    _statsRenderScheduled = false;
+    if (state._currentPage === 'stats') renderStats();
+  };
+  if (window.requestAnimationFrame) requestAnimationFrame(run);
+  else setTimeout(run, 16);
+}
+
 function renderStats() {
   renderConnectionStatus();
   var history = loadNormalizedHistory();
@@ -4358,7 +4373,7 @@ function pullInitialData(sb) {
 
     if (newSyncTime) localStorage.setItem('avalon_last_sync', newSyncTime);
 
-    if (state._currentPage === 'stats') renderStats();
+    scheduleRenderStats();
   });
 
   // 拉取 name_pool
@@ -4414,9 +4429,7 @@ function setupRealtimeSubscriptions() {
           console.log('[Realtime] skipped duplicate record');
         }
         // 当前在 stats 页面则刷新
-        if (state._currentPage === 'stats') {
-          renderStats();
-        }
+        scheduleRenderStats();
       } catch(e) {
         console.warn('[Realtime] failed to process game_record:', e);
       }
@@ -4459,7 +4472,7 @@ function setupRealtimeSubscriptions() {
           localHistory.splice(found, 1);
           saveHistory(localHistory);
           console.log('[Realtime] removed deleted record, total:', localHistory.length);
-          if (state._currentPage === 'stats') renderStats();
+          scheduleRenderStats();
         }
       } catch(e) {
         console.warn('[Realtime] failed to process game_record delete:', e);
@@ -4698,9 +4711,54 @@ function setKnownIdentity(idx, value) {
   renderTendResult();
 }
 
+function buildTendScoreCacheKey() {
+  var missionSig = (state.missions || []).map(function(m) {
+    return {
+      r: m.round,
+      s: m.size,
+      ld: m.leader,
+      t: m.team,
+      v: m.votes,
+      res: m.result,
+      fc: m.failCount,
+      lf: m.launchFailures
+    };
+  });
+  return JSON.stringify({
+    pc: state.playerCount,
+    names: state.playerNames,
+    self: state.selfIndex,
+    role: state.myRole,
+    known: state.knownIdentities,
+    lady: state.ladyLakeChecks,
+    ex: state.excaliburHistory,
+    lanc: state.lancelotFlipped,
+    missions: missionSig
+  });
+}
+
+function cloneTendScoreList(list) {
+  if (!list) return null;
+  var cloned = list.map(function(item) {
+    return {
+      idx: item.idx,
+      score: item.score,
+      evidence: (item.evidence || []).slice()
+    };
+  });
+  cloned._dataQuality = list._dataQuality;
+  cloned._totalRounds = list._totalRounds;
+  return cloned;
+}
+
 /* ------- Scoring engine ------- */
 /* ---------- v7 Progressive Evidence-Accumulation Scoring Engine ---------- */
 function computeSuspectScores() {
+  var cacheKey = buildTendScoreCacheKey();
+  if (_tendScoreCacheKey === cacheKey && _tendScoreCacheValue) {
+    return cloneTendScoreList(_tendScoreCacheValue);
+  }
+
   var pc = state.playerCount;
   var persp = getPerspective();
   var selfIdx = state.selfIndex;
@@ -5068,7 +5126,9 @@ function computeSuspectScores() {
   list._dataQuality = totalRounds <= 1 ? 'low' : (totalRounds === 2 ? 'medium' : 'high');
   list._totalRounds = totalRounds;
 
-  return list;
+  _tendScoreCacheKey = cacheKey;
+  _tendScoreCacheValue = cloneTendScoreList(list);
+  return cloneTendScoreList(list);
 }
 
 

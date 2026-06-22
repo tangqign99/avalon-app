@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v107"></script>
+<script defer src="./app.js?v=v108"></script>
 </head>
 <body>
 
@@ -129,7 +129,7 @@
   <div class="card" id="v7-engine-card">
     <div class="v7-card-header">
       <h2 style="margin:0">&#9883; v7 算法面板</h2>
-      <span class="v7-version-badge">v107</span>
+      <span class="v7-version-badge">v108</span>
     </div>
 
     <!-- 全局状态条 -->
@@ -278,7 +278,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v107';
+  var SW_VERSION = 'v108';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
