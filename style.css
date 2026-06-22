@@ -1153,3 +1153,37 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 .btn.tiny{padding:2px 8px;font-size:11px;min-width:unset}
 
+
+
+
+
+/* ===== v7 算法面板 v101 ===== */
+#v7-engine-card{border-left:3px solid var(--accent);background:linear-gradient(135deg,rgba(201,168,76,0.08),rgba(201,168,76,0.02))}
+.v7-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.v7-card-header h2{font-size:15px}
+.v7-version-badge{font-size:10px;color:var(--accent);background:rgba(201,168,76,0.15);padding:2px 8px;border-radius:10px;font-weight:600;letter-spacing:0.5px}
+
+.v7-status-bar{display:flex;flex-wrap:wrap;gap:6px 14px;padding:8px 10px;margin-bottom:10px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:11px}
+.v7-status-bar .v7-stat{display:inline-flex;align-items:center;gap:4px;color:var(--text-dim)}
+.v7-status-bar .v7-stat strong{color:var(--text-bright);font-weight:600}
+
+.v7-step-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.v7-step{display:flex;align-items:flex-start;gap:6px;padding:6px 8px;border-radius:5px;background:rgba(255,255,255,0.03);border:1px solid rgba(201,168,76,0.08);font-size:11px;line-height:1.4}
+.v7-step.active{background:rgba(76,175,80,0.08);border-color:rgba(76,175,80,0.3)}
+.v7-step.idle{opacity:0.55}
+.v7-step-num{flex-shrink:0;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.v7-step.active .v7-step-num{background:#4caf50;color:#fff}
+.v7-step.idle .v7-step-num{background:#555;color:#aaa}
+.v7-step-body{flex:1;min-width:0}
+.v7-step-name{font-weight:600;color:var(--text-bright);font-size:11px}
+.v7-step-meta{font-size:10px;color:var(--text-dim);margin-top:2px}
+.v7-step-meta .hl{color:var(--accent);font-weight:600}
+.v7-step-meta .ok{color:#4caf50;font-weight:600}
+.v7-step-meta .warn{color:#ff9800;font-weight:600}
+
+.v7-formula{font-size:10px;color:var(--text-dim);padding:6px 10px;border-top:1px dashed rgba(201,168,76,0.15);margin-top:4px;line-height:1.6}
+
+@media(max-width:768px){
+  .v7-step-grid{grid-template-columns:1fr}
+  .v7-status-bar{flex-direction:column;gap:4px}
+}

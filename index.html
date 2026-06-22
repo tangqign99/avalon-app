@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js"></script>
+<script defer src="./app.js?v=v101"></script>
 </head>
 <body>
 
@@ -125,6 +125,27 @@
   <div class="card">
     <h2 id="tend-perspective-title">倾向分析</h2>
     <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
+  </div>
+
+  
+  <div class="card" id="v7-engine-card">
+    <div class="v7-card-header">
+      <h2 style="margin:0">&#9883; v7 算法面板</h2>
+      <span class="v7-version-badge">v101</span>
+    </div>
+
+    <!-- 全局状态条 -->
+    <div id="v7-engine-status" class="v7-status-bar"></div>
+
+    <!-- 算法 9 步实时状态 -->
+    <div id="v7-engine-steps" class="v7-step-grid"></div>
+
+    <!-- 公式说明 -->
+    <div class="v7-formula">
+      <span style="color:var(--accent)">&#9888;</span>
+      <strong>评分公式</strong>：分数 = 好人证据 / (好人证据 + 坏人证据) &#215; 100
+      &nbsp;|&nbsp; 先验 10:10，随轮次推进逐步收敛
+    </div>
   </div>
 
   <div class="card" id="known-identity-card">
@@ -263,7 +284,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v94';
+  var SW_VERSION = 'v101';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);

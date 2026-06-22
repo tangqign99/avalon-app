@@ -1,1 +1,56 @@
-const CACHE_NAME = 'avalon-assist-v22';const ASSETS = [  './index.html',  './style.css',  './app.js',  './manifest.json'];self.addEventListener('install', e => {  e.waitUntil(    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))  );  self.skipWaiting();});self.addEventListener('activate', e => {  e.waitUntil(    caches.keys().then(keys =>      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))    )  );  self.clients.claim();});self.addEventListener('fetch', e => {  e.respondWith(    caches.match(e.request).then(cached =>      cached || fetch(e.request).then(resp => {        if (resp.ok && resp.type === 'basic') {          const clone = resp.clone();          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));        }        return resp;      })    )  );});
+/* ==================== Service Worker v101 ==================== */
+// sw.js / service-worker.js - v101
+var CACHE_NAME = 'avalon-pwa-v101';
+var ASSETS = [
+  './',
+  './index.html',
+  './style.css',
+  './app.js?v=v101',
+  './vendor/supabase.min.js',
+  './manifest.json'
+];
+
+self.addEventListener('install', function(e) {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(function(cache) {
+      return Promise.allSettled(ASSETS.map(function(url) {
+        return cache.add(url).catch(function(err) {
+          console.warn('[SW] Failed to cache:', url, err && (err.message || err));
+        });
+      }));
+    })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.map(function(k) {
+        return caches.delete(k);
+      }));
+    }).then(function() {
+      return self.clients.claim();
+    })
+  );
+});
+
+self.addEventListener('message', function(e) {
+  if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
+self.addEventListener('fetch', function(e) {
+  e.respondWith(
+    fetch(e.request).then(function(resp) {
+      if (resp && resp.status === 200 && e.request.method === 'GET') {
+        var clone = resp.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(e.request, clone);
+        });
+      }
+      return resp;
+    }).catch(function() {
+      return caches.match(e.request);
+    })
+  );
+});

@@ -669,7 +669,7 @@ function showPage(page) {
     if (_isOfflinePlayer && _mySecretRole && !state.myRole) {
       state.myRole = _mySecretRole;
     }
-    renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
+    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
   }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
@@ -6064,328 +6064,516 @@ function setKnownIdentity(idx, value) {
 }
 
 /* ------- Scoring engine ------- */
+/* ---------- v7 Progressive Evidence-Accumulation Scoring Engine ---------- */
 function computeSuspectScores() {
   var pc = state.playerCount;
   var persp = getPerspective();
-  var scores = {};
+  var selfIdx = state.selfIndex;
 
-  // Initialize
+  // Evidence accumulation: good_ev / evil_ev with 10/10 smooth prior
+  var ev = {};
   for (var i = 0; i < pc; i++) {
-    if (i === state.selfIndex) continue;
-    scores[i] = { idx: i, score: 50, evidence: [] };
+    if (i === selfIdx) continue;
+    ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
   }
 
-  // Known identities: lock scores
-  for (var i = 0; i < pc; i++) {
-    if (i === state.selfIndex) continue;
-    var label = getKnownLabel(i);
-    if (!label) continue;
+  var knownIdentities = state.knownIdentities || {};
 
-    if (persp === 'good') {
-      // Good perspective: known goods → low suspicion; known evils → high suspicion
-      if (isGoodRole(label) || label === '正方') {
-        scores[i].score = 0;
-        scores[i].evidence.push('已知正方：' + label);
-      } else if (isEvilRole(label) || label === '反方') {
-        scores[i].score = 100;
-        scores[i].evidence.push('已知反方：' + label);
+  // Step 1: Lock known identities (hard anchors)
+  for (var i = 0; i < pc; i++) {
+    if (i === selfIdx) continue;
+    var label = knownIdentities[i];
+    if (!label) continue;
+    if (isGoodRole(label) || label === '正方' || label === '好人') {
+      ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
+      ev[i].lockReason = '已知：' + label;
+      ev[i].reasons.push('已知正派：' + label);
+      if (label === '梅林') ev[i].merlin = 100;
+    } else if (isEvilRole(label) || label === '反方' || label === '坏人') {
+      ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
+      ev[i].lockReason = '已知：' + label;
+      ev[i].reasons.push('已知反派：' + label);
+    }
+  }
+
+  // Step 2: Lady of the Lake checks (strong signal, non-locking)
+  var ladyChecks = state.ladyLakeChecks || [];
+  for (var c = 0; c < ladyChecks.length; c++) {
+    var check = ladyChecks[c];
+    var target = check.target;
+    if (target === undefined || target === selfIdx) continue;
+    if (!ev[target] || ev[target].locked) continue;
+    if (check.result === 'good') {
+      ev[target].good_ev += 20;
+      ev[target].reasons.push('湖中仙女：' + (state.playerNames[target] || '') + '为好 +20');
+    } else if (check.result === 'evil') {
+      ev[target].evil_ev += 20;
+      ev[target].reasons.push('湖中仙女：' + (state.playerNames[target] || '') + '为坏 +20');
+    }
+  }
+
+  // Step 3: Task result hard constraints (with round recency decay & dual-fail detection)
+  var missions = state.missions || [];
+  var completed = [];
+  for (var m = 0; m < missions.length; m++) {
+    if (missions[m].result) completed.push(missions[m]);
+  }
+  var totalRounds = completed.length;
+
+  // Collect known evils/goods for constraint propagation
+  var knownEvils = [];
+  var knownGoods = [];
+  for (var i = 0; i < pc; i++) {
+    if (i === selfIdx) continue;
+    if (ev[i].locked) {
+      if (ev[i].evil_ev === 100) knownEvils.push(i);
+      if (ev[i].good_ev === 100) knownGoods.push(i);
+    }
+  }
+
+  function roundRecency(r, total) {
+    if (total <= 2) return r === 0 ? 0.95 : 1.0;
+    return [0.7, 0.85, 1.0, 1.0, 1.0][Math.min(r, 4)] || 1.0;
+  }
+
+  for (var r = 0; r < completed.length; r++) {
+    var m = completed[r];
+    var team = m.team || [];
+    var resultStr = m.result;
+    var teamSize = team.length;
+    var failCount = m.failCount || 0;
+    var recency = roundRecency(r, totalRounds);
+
+    var knownEvilInTeam = [];
+    var unknownInTeam = [];
+    for (var t = 0; t < team.length; t++) {
+      var ti = team[t];
+      if (ti === selfIdx) continue;
+      if (ev[ti] && ev[ti].locked && ev[ti].evil_ev === 100) knownEvilInTeam.push(ti);
+      else if (ev[ti] && !ev[ti].locked) unknownInTeam.push(ti);
+    }
+
+    if (resultStr === 'fail') {
+      if (knownEvilInTeam.length > 0) {
+        for (var u = 0; u < unknownInTeam.length; u++) {
+          ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '失败(有已知坏人，不罚)');
+        }
+      } else if (unknownInTeam.length === 1) {
+        ev[unknownInTeam[0]].evil_ev += Math.floor(40 * recency);
+        ev[unknownInTeam[0]].reasons.push('R' + (r+1) + '失败，唯一未知者 +' + Math.floor(40 * recency));
+      } else if (unknownInTeam.length > 1) {
+        var share, note;
+        if (teamSize >= 5 && failCount >= 2) {
+          share = Math.floor(80 * recency / unknownInTeam.length);
+          note = '至少2坏人';
+        } else {
+          share = Math.floor(60 * recency / unknownInTeam.length);
+          note = '必有坏人';
+        }
+        for (var u = 0; u < unknownInTeam.length; u++) {
+          ev[unknownInTeam[u]].evil_ev += share;
+          ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '失败(' + note + ') +' + share);
+        }
       }
-    } else {
-      // Evil perspective: looking for Merlin
-      if (label === '梅林') {
-        scores[i].score = 100;
-        scores[i].evidence.push('已知就是梅林');
-      } else if (isGoodRole(label) || label === '正方') {
-        scores[i].score = 100;  // No longer need to find Merlin if we know them
-        scores[i].evidence.push('已知正方（排除出梅林搜索）：' + label);
-      } else if (isEvilRole(label) || label === '反方') {
-        scores[i].score = 0;
-        scores[i].evidence.push('已知反方（排除）：' + label);
+    }
+
+    if (resultStr === 'success') {
+      var addGood = knownEvilInTeam.length > 0 ? Math.floor(4 * recency) : Math.floor(6 * recency);
+      var suffix = knownEvilInTeam.length > 0 ? '(有坏人伪装)' : '';
+      for (var u = 0; u < unknownInTeam.length; u++) {
+        ev[unknownInTeam[u]].good_ev += addGood;
+        ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '成功' + suffix + ' +' + addGood);
       }
     }
   }
 
-  if (persp === 'good') {
-    computeGoodScores(scores, pc);
-  } else {
-    computeEvilScores(scores, pc);
+  // Step 4: Multi-round cross analysis (adaptive threshold)
+  var failCountMap = {};
+  var successCountMap = {};
+  for (var i = 0; i < pc; i++) { failCountMap[i] = 0; successCountMap[i] = 0; }
+  for (var r = 0; r < completed.length; r++) {
+    var m = completed[r];
+    var team = m.team || [];
+    if (m.result === 'fail') {
+      for (var t = 0; t < team.length; t++) failCountMap[team[t]]++;
+    } else {
+      for (var t = 0; t < team.length; t++) successCountMap[team[t]]++;
+    }
   }
 
-  // Convert to sorted list
+  var failThreshold = totalRounds <= 2 ? 1 : 2;
+  var successThreshold = totalRounds <= 2 ? 2 : 3;
+
+  for (var i = 0; i < pc; i++) {
+    if (i === selfIdx || ev[i].locked) continue;
+    if (failCountMap[i] >= failThreshold) {
+      var failRoundsWithKnownEvil = 0;
+      for (var r = 0; r < completed.length; r++) {
+        var m = completed[r];
+        if (m.result !== 'fail') continue;
+        var team = m.team || [];
+        if (team.indexOf(i) === -1) continue;
+        var hasKnownEvil = false;
+        for (var t = 0; t < team.length; t++) {
+          if (ev[team[t]] && ev[team[t]].locked && ev[team[t]].evil_ev === 100) { hasKnownEvil = true; break; }
+        }
+        if (hasKnownEvil) failRoundsWithKnownEvil++;
+      }
+      if (failRoundsWithKnownEvil < failCountMap[i]) {
+        var weight = totalRounds >= 3 ? 12 : 8;
+        ev[i].evil_ev += weight;
+        ev[i].reasons.push(failCountMap[i] + '轮失败 +' + weight);
+      }
+    }
+    if (successCountMap[i] >= successThreshold) {
+      ev[i].good_ev += 8;
+      ev[i].reasons.push(successCountMap[i] + '轮成功 +8');
+    }
+  }
+
+  // Step 5: Launch failure analysis
+  var leaderLaunchFails = {};
+  for (var r = 0; r < completed.length; r++) {
+    var m = completed[r];
+    var leader = m.leader;
+    var lf = m.launchFailures || 0;
+    if (!leader || lf <= 0) continue;
+    try {
+      var leaderIdx = parseInt(leader.split('号')[0]) - 1;
+      leaderLaunchFails[leaderIdx] = (leaderLaunchFails[leaderIdx] || 0) + lf;
+    } catch(e) {}
+  }
+  for (var i in leaderLaunchFails) {
+    i = parseInt(i);
+    if (i === selfIdx || !ev[i] || ev[i].locked) continue;
+    if (leaderLaunchFails[i] >= 3) {
+      ev[i].evil_ev += 3;
+      ev[i].reasons.push('累计' + leaderLaunchFails[i] + '次发车失败 +3');
+    }
+  }
+
+  // Step 6: Voting analysis (skip unanimous rounds, adaptive min votes)
+  for (var i = 0; i < pc; i++) {
+    if (i === selfIdx || ev[i].locked) continue;
+    var evilMatch = 0, evilTotal = 0;
+    var goodMatch = 0, goodTotal = 0;
+
+    for (var r = 0; r < completed.length; r++) {
+      var m = completed[r];
+      if (!m.votes) continue;
+      var iVote = m.votes[i];
+      if (!iVote) continue;
+
+      // Skip unanimous rounds
+      var allEvilVotes = [];
+      for (var e = 0; e < knownEvils.length; e++) {
+        var evv = m.votes[knownEvils[e]];
+        if (evv) allEvilVotes.push(evv);
+      }
+      if (allEvilVotes.length >= 2 && allEvilVotes.every(function(v) { return v === allEvilVotes[0]; })) continue;
+
+      var allGoodVotes = [];
+      for (var g = 0; g < knownGoods.length; g++) {
+        var gvv = m.votes[knownGoods[g]];
+        if (gvv) allGoodVotes.push(gvv);
+      }
+      if (allGoodVotes.length >= 2 && allGoodVotes.every(function(v) { return v === allGoodVotes[0]; })) continue;
+
+      for (var e = 0; e < knownEvils.length; e++) {
+        var eVote = m.votes[knownEvils[e]];
+        if (eVote) { evilTotal++; if (iVote === eVote) evilMatch++; }
+      }
+      for (var g = 0; g < knownGoods.length; g++) {
+        var gVote = m.votes[knownGoods[g]];
+        if (gVote) { goodTotal++; if (iVote === gVote) goodMatch++; }
+      }
+    }
+
+    var totalKnown = knownEvils.length + knownGoods.length;
+    var minVotes = totalRounds <= 2 ? Math.min(3, Math.floor(totalRounds * totalKnown / 2)) : 3;
+    if (evilTotal >= minVotes) {
+      var rate = evilMatch / evilTotal;
+      if (rate > 0.75) {
+        ev[i].evil_ev += 12;
+        ev[i].reasons.push('投票与坏人一致' + Math.round(rate*100) + '% +12');
+      }
+    }
+    if (goodTotal >= minVotes) {
+      var rate = goodMatch / goodTotal;
+      if (rate > 0.7) {
+        ev[i].good_ev += 10;
+        ev[i].reasons.push('投票与好人一致' + Math.round(rate*100) + '% +10');
+      }
+    }
+  }
+
+  // Step 7: Merlin hunting (evil perspective only)
+  if (persp === 'evil' && knownEvils.length > 0 && totalRounds >= 2) {
+    for (var i = 0; i < pc; i++) {
+      if (i === selfIdx || ev[i].locked) continue;
+      var evilInReject = 0, evilInTotal = 0;
+      var noEvilReject = 0, noEvilTotal = 0;
+      for (var r = 0; r < completed.length; r++) {
+        var m = completed[r];
+        if (!m.votes || !m.team) continue;
+        var team = m.team || [];
+        var hasEvil = false;
+        for (var t = 0; t < team.length; t++) {
+          if (knownEvils.indexOf(team[t]) !== -1) { hasEvil = true; break; }
+        }
+        var iVote = m.votes[i];
+        if (!iVote) continue;
+        if (hasEvil) {
+          evilInTotal++;
+          if (iVote === 'reject') evilInReject++;
+        } else {
+          noEvilTotal++;
+          if (iVote === 'reject') noEvilReject++;
+        }
+      }
+      if (evilInTotal >= 2) {
+        var rateWhen = evilInReject / evilInTotal;
+        var rateNo = noEvilTotal > 0 ? noEvilReject / noEvilTotal : 0;
+        ev[i].merlin = Math.max(0, Math.min(95, (rateWhen - rateNo) * 100 + 10));
+      }
+    }
+  }
+
+  // Step 8: Lancelot flip awareness
+  var lancelotFlipped = state.lancelotFlipped;
+  if (lancelotFlipped) {
+    for (var i = 0; i < pc; i++) {
+      if (i === selfIdx || !ev[i] || ev[i].locked) continue;
+      var label = knownIdentities[i] || '';
+      if (label === '兰斯洛特' || label === '兰斯洛特(蓝)' || label === '兰斯洛特(红)' || label === '蓝兰斯洛特' || label === '红兰斯洛特') {
+        ev[i].good_ev = Math.floor((ev[i].good_ev - 10) * 0.5 + 10);
+        ev[i].evil_ev = Math.floor((ev[i].evil_ev - 10) * 0.5 + 10);
+        ev[i].reasons.push('兰斯洛特已翻转，信号减半');
+      }
+    }
+  }
+
+  // Step 9: Convert to scores
   var list = [];
   for (var i = 0; i < pc; i++) {
-    if (i === state.selfIndex) continue;
-    list.push(scores[i]);
+    if (i === selfIdx) continue;
+    var e = ev[i];
+    var score;
+    if (e.locked) {
+      if (persp === 'evil') {
+        // Evil perspective: locked evil = 0, locked good = 0 (not Merlin target), locked Merlin = 100
+        score = (e.merlin === 100) ? 100 : 0;
+      } else {
+        score = e.evil_ev; // 0 or 100
+      }
+    } else {
+      if (persp === 'evil') {
+        // Evil perspective: use merlin hunting score, fall back to good probability
+        if (e.merlin > 0) {
+          score = e.merlin;
+        } else {
+          var total = e.good_ev + e.evil_ev;
+          score = total > 0 ? Math.round(e.good_ev / total * 100) : 50;
+        }
+      } else {
+        var total = e.good_ev + e.evil_ev;
+        score = total > 0 ? Math.round(e.evil_ev / total * 100) : 50;
+      }
+    }
+
+    list.push({
+      idx: i,
+      score: score,
+      evidence: e.reasons
+    });
   }
+
   list.sort(function(a, b) { return b.score - a.score; });
+
+  // Attach data quality metadata for progressive rendering
+  list._dataQuality = totalRounds <= 1 ? 'low' : (totalRounds === 2 ? 'medium' : 'high');
+  list._totalRounds = totalRounds;
+
   return list;
 }
 
-function computeGoodScores(scores, pc) {
-  // Good perspective: find evil players
-  var missions = state.missions;
 
-  for (var r = 0; r < missions.length; r++) {
-    var m = missions[r];
-    if (!m || !m.team || m.team.length === 0) continue;
 
-    // Mission result analysis
-    if (m.result === 'fail') {
-      // Failed mission: team members are suspected
-      for (var t = 0; t < m.team.length; t++) {
-        var pi = m.team[t];
-        if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
-        scores[pi].score += 18;
-        scores[pi].evidence.push('在第' + (r + 1) + '轮失败任务队伍中');
-      }
-    }
-    if (m.result === 'success') {
-      // Success mission: those who approved and were on team get a small trust bonus
-      for (var t = 0; t < m.team.length; t++) {
-        var pi = m.team[t];
-        if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
-        scores[pi].score -= 5;
-        scores[pi].evidence.push('成功完成第' + (r + 1) + '轮任务');
-      }
-    }
+/* ------- v7 Engine Info Panel (v101: 9-step visualizer) ------- */
+function renderV7EngineInfo() {
+  var statusEl = document.getElementById('v7-engine-status');
+  var stepsEl = document.getElementById('v7-engine-steps');
+  if (!statusEl || !stepsEl) return;
 
-    // Launch attempt voting analysis
-    var attempts = m.launchAttempts || [];
-    for (var a = 0; a < attempts.length; a++) {
-      var att = attempts[a];
-      var teamSet = {};
-      for (var t = 0; t < (att.team || []).length; t++) {
-        teamSet[att.team[t]] = true;
-      }
+  var pc = state.playerCount;
+  var persp = getPerspective();
+  var selfIdx = state.selfIndex;
+  var missions = state.missions || [];
+  var completed = [];
+  for (var m = 0; m < missions.length; m++) {
+    if (missions[m].result) completed.push(missions[m]);
+  }
+  var totalRounds = completed.length;
+  var knownIdentities = state.knownIdentities || {};
+  var knownCount = Object.keys(knownIdentities).length;
 
-      // Count approves
-      var approves = 0;
-      for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') approves++; }
-      var needed = Math.floor(pc / 2) + 1;
+  // === 全局状态 ===
+  var perspText = persp === 'good'
+    ? '<span style="color:#4caf50">好人视角</span>（找反方）'
+    : (persp === 'evil' ? '<span style="color:#f44336">反方视角</span>（找梅林）' : '<span style="color:var(--text-dim)">未设置</span>');
+  var quality = totalRounds <= 1 ? '<span class="warn">低（仅' + totalRounds + '轮）</span>'
+              : (totalRounds === 2 ? '<span class="warn">中（2轮）</span>'
+              : '<span class="ok">高（' + totalRounds + '轮）</span>');
 
-      if (approves < needed) {
-        // Proposal rejected
-        var hasSelf = teamSet[state.selfIndex];
-        for (var k = 0; k < pc; k++) {
-          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
-          var vote = att.votes[k];
+  statusEl.innerHTML =
+    '<span class="v7-stat">视角：<strong>' + perspText + '</strong></span>' +
+    '<span class="v7-stat">已完成：<strong>' + totalRounds + ' / ' + (missions.length || 5) + ' 轮</strong></span>' +
+    '<span class="v7-stat">数据置信度：<strong>' + quality + '</strong></span>' +
+    '<span class="v7-stat">已知身份锚点：<strong>' + knownCount + ' 人</strong></span>';
 
-          if (hasSelf) {
-            // Self was on team: those who rejected are sus
-            if (vote === 'reject') {
-              scores[k].score += 8;
-              scores[k].evidence.push('第' + (r + 1) + '轮拒绝含自己的队伍提案');
-            }
-          }
-          // Evil players often avoid approving teams with known goods
-          if (vote === 'approve' && approves <= needed) {
-            // Approving when it barely passes → slightly sus
-          }
-        }
-      } else {
-        // Proposal approved
-        var isSuccess = (m.result === 'success');
-        for (var k = 0; k < pc; k++) {
-          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
-          var vote = att.votes[k];
-
-          if (isSuccess && vote === 'reject') {
-            // Rejected a successful mission → sus
-            scores[k].score += 7;
-            scores[k].evidence.push('第' + (r + 1) + '轮拒绝成功的任务');
-          }
-          if (!isSuccess && vote === 'approve') {
-            // Approved a failing mission → sus if they weren't on it (why approve?）
-            if (!teamSet[k]) {
-              scores[k].score += 6;
-              scores[k].evidence.push('第' + (r + 1) + '轮批准了失败的任务（未在队伍中）');
-            }
-          }
-        }
-      }
-    }
+  // === 计算各步骤激活情况 ===
+  // Step 1: 已知身份锁定
+  var lockedGood = 0, lockedEvil = 0;
+  for (var k in knownIdentities) {
+    var lab = knownIdentities[k];
+    if (isGoodRole(lab) || lab === '正方' || lab === '好人') lockedGood++;
+    else if (isEvilRole(lab) || lab === '反方' || lab === '坏人') lockedEvil++;
   }
 
-  // Lady Lake analysis (good perspective)
-  if (state.ladyLakeEnabled && state.ladyLakeChecks.length > 0) {
-    for (var c = 0; c < state.ladyLakeChecks.length; c++) {
-      var check = state.ladyLakeChecks[c];
-      var checker = check.checker;
-      var target = check.target;
-      var owner = check.owner;
-      var result = check.result;
+  // Step 2: 湖中仙女
+  var ladyChecks = (state.ladyLakeChecks || []).filter(function(c){ return c && c.target !== undefined && c.target !== selfIdx; });
 
-      if (checker === state.selfIndex) {
-        // Self checked someone → result is reliable
-        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
-          if (result === 'evil') {
-            scores[target].score += 25;
-            scores[target].evidence.push('湖中仙女确认是反方');
-          } else {
-            scores[target].score -= 20;
-            scores[target].evidence.push('湖中仙女确认是正方');
-          }
-        }
-      }
+  // Step 3: 任务结果硬约束
+  var failRounds = 0, succRounds = 0, dualFail = 0;
+  for (var r = 0; r < completed.length; r++) {
+    if (completed[r].result === 'fail') {
+      failRounds++;
+      if ((completed[r].team || []).length >= 5 && (completed[r].failCount || 0) >= 2) dualFail++;
+    } else if (completed[r].result === 'success') succRounds++;
+  }
+  var recencyText = totalRounds <= 2 ? 'R1×0.95' : 'R1×0.7 / R2×0.85 / R3+×1.0';
 
-      // Known good used Lady Lake on someone
-      var checkerLabel = getKnownLabel(checker);
-      if (checkerLabel && isGoodRole(checkerLabel)) {
-        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
-          if (result === 'evil') {
-            scores[target].score += 20;
-            scores[target].evidence.push('已知正方' + state.playerNames[checker] + '用湖仙女确认是反方');
-          } else {
-            scores[target].score -= 15;
-            scores[target].evidence.push('已知正方' + state.playerNames[checker] + '用湖仙女确认是正方');
-          }
-        }
-      }
-    }
+  // Step 4: 多轮交叉分析
+  var failThreshold = totalRounds <= 2 ? 1 : 2;
+  var successThreshold = totalRounds <= 2 ? 2 : 3;
+  var crossActive = totalRounds >= 1;
+
+  // Step 5: 发车失败
+  var leaderLF = {};
+  for (var r = 0; r < completed.length; r++) {
+    var lf = completed[r].launchFailures || 0;
+    var ld = completed[r].leader;
+    if (!ld || lf <= 0) continue;
+    try {
+      var li = parseInt(ld.split('号')[0]) - 1;
+      leaderLF[li] = (leaderLF[li] || 0) + lf;
+    } catch(e) {}
+  }
+  var lfTriggered = 0;
+  for (var li in leaderLF) if (leaderLF[li] >= 3) lfTriggered++;
+  var lfTotal = 0;
+  for (var li in leaderLF) lfTotal += leaderLF[li];
+
+  // Step 6: 投票分析
+  var voteRoundsHasData = 0;
+  for (var r = 0; r < completed.length; r++) {
+    if (completed[r].votes && Object.keys(completed[r].votes).length >= 2) voteRoundsHasData++;
+  }
+  var voteAnchorTotal = lockedGood + lockedEvil;
+  var voteActive = voteRoundsHasData >= 1 && voteAnchorTotal >= 1;
+
+  // Step 7: 梅林猎杀
+  var merlinActive = persp === 'evil' && lockedEvil > 0 && totalRounds >= 2;
+
+  // Step 8: 兰斯洛特翻转
+  var lancFlipped = !!state.lancelotFlipped;
+  var lancInGame = (state.activeRoles || []).some(function(r){ return r && r.indexOf('兰斯洛特') !== -1; });
+
+  // Step 9: 始终运行
+  // === 渲染 9 步 ===
+  function step(num, name, active, meta) {
+    var cls = active ? 'active' : (totalRounds === 0 ? 'idle' : 'idle');
+    return '<div class="v7-step ' + cls + '">' +
+      '<div class="v7-step-num">' + num + '</div>' +
+      '<div class="v7-step-body">' +
+      '<div class="v7-step-name">' + name + '</div>' +
+      '<div class="v7-step-meta">' + meta + '</div>' +
+      '</div></div>';
   }
 
-  // Cap at 0-100
-  for (var i = 0; i < pc; i++) {
-    if (scores[i]) {
-      scores[i].score = Math.max(0, Math.min(100, scores[i].score));
-    }
+  var s1Meta = knownCount > 0
+    ? '<span class="ok">已锁定 ' + knownCount + ' 人</span>（好' + lockedGood + ' / 坏' + lockedEvil + '）硬锚点 0 或 100'
+    : '<span>暂无标注</span>，可在下方「已知身份」标记';
+
+  var s2Meta = ladyChecks.length > 0
+    ? '<span class="ok">已查验 ' + ladyChecks.length + ' 次</span>，每次 <span class="hl">±20</span>'
+    : '湖中女神<span>未触发</span>，单次贡献 ±20';
+
+  var s3Meta;
+  if (totalRounds === 0) {
+    s3Meta = '等待首轮任务，' + recencyText;
+  } else {
+    s3Meta = '失败 <span class="hl">' + failRounds + '</span> 轮 / 成功 <span class="hl">' + succRounds + '</span> 轮';
+    if (dualFail > 0) s3Meta += '，<span class="warn">双失败 ' + dualFail + ' 轮</span>';
+    s3Meta += '；衰减：' + recencyText;
   }
+
+  var s4Meta = totalRounds === 0
+    ? '待数据，门槛：失败≥' + failThreshold + ' / 成功≥' + successThreshold
+    : '失败门槛 <span class="hl">≥' + failThreshold + '</span>，成功门槛 <span class="hl">≥' + successThreshold + '</span>（R1-2 自适应放宽）';
+
+  var s5Meta = lfTotal === 0
+    ? '<span>暂无发车失败</span>，触发门槛 ≥3 次'
+    : (lfTriggered > 0
+      ? '<span class="warn">已触发 ' + lfTriggered + ' 名队长</span>（累计 ' + lfTotal + ' 次） +3'
+      : '累计 <span class="hl">' + lfTotal + '</span> 次未达门槛 (<3)');
+
+  var s6Meta;
+  if (!voteActive) {
+    s6Meta = voteAnchorTotal === 0 ? '需先标注已知身份才能比对' : '等待投票数据';
+  } else {
+    s6Meta = '<span class="ok">' + voteRoundsHasData + ' 轮投票</span>，跳过全票一致；与坏人 >75%→+12，与好人 >70%→+10';
+  }
+
+  var s7Meta;
+  if (persp !== 'evil') {
+    s7Meta = '仅<span class="hl">反方视角</span>启用';
+  } else if (lockedEvil === 0) {
+    s7Meta = '需标注 ≥1 名已知坏人';
+  } else if (totalRounds < 2) {
+    s7Meta = '需 ≥2 轮数据';
+  } else {
+    s7Meta = '<span class="ok">运行中</span>：条件拒绝率差 = P(拒|含坏)-P(拒|无坏)';
+  }
+
+  var s8Meta;
+  if (!lancInGame) {
+    s8Meta = '本局未启用兰斯洛特';
+  } else if (lancFlipped) {
+    s8Meta = '<span class="warn">已翻转</span>，兰斯洛特玩家信号 <span class="hl">×0.5</span>';
+  } else {
+    s8Meta = '兰斯洛特<span>未翻转</span>，正常计分';
+  }
+
+  var s9Meta;
+  if (totalRounds === 0) {
+    s9Meta = '所有未知玩家分数：50（先验 10:10）';
+  } else {
+    s9Meta = '<span class="ok">分数 = 好人证据 / (好人+坏人证据) × 100</span>';
+  }
+
+  stepsEl.innerHTML =
+    step(1, '已知身份锁定（硬锚点）', knownCount > 0, s1Meta) +
+    step(2, '湖中仙女检查（强信号 ±20）', ladyChecks.length > 0, s2Meta) +
+    step(3, '任务结果硬约束（轮次衰减+双失败）', totalRounds > 0, s3Meta) +
+    step(4, '多轮交叉分析（自适应门槛）', crossActive && totalRounds > 0, s4Meta) +
+    step(5, '发车失败分析（≥3 次）', lfTriggered > 0, s5Meta) +
+    step(6, '投票行为分析（跳过全票一致）', voteActive, s6Meta) +
+    step(7, '梅林猎杀（条件拒绝率差）', merlinActive, s7Meta) +
+    step(8, '兰斯洛特翻转感知（信号减半）', lancInGame, s8Meta) +
+    step(9, '证据累积 → 分数转换', true, s9Meta);
 }
 
-function computeEvilScores(scores, pc) {
-  // Evil perspective: find Merlin
-  var missions = state.missions;
-
-  // Track consecutive rejections of evil-containing launch attempts per player
-  var consecutiveRejectEvil = {};
-
-  for (var r = 0; r < missions.length; r++) {
-    var m = missions[r];
-    if (!m || !m.team || m.team.length === 0) continue;
-
-    // Mission result analysis
-    if (m.result === 'fail') {
-      // Check if failed mission team contains any known evil
-      var hasEvilInTeam = false;
-      for (var t = 0; t < m.team.length; t++) {
-        var tl = getKnownLabel(m.team[t]);
-        if (tl && (isEvilRole(tl) || tl === '反方')) {
-          hasEvilInTeam = true;
-          break;
-        }
-      }
-      // Slightly penalize members of a failed mission team that contained known evils
-      // (Merlin should know who evils are and avoid joining such teams)
-      if (hasEvilInTeam) {
-        for (var t = 0; t < m.team.length; t++) {
-          var pi = m.team[t];
-          if (pi === state.selfIndex || scores[pi].score === 0 || scores[pi].score === 100) continue;
-          scores[pi].score -= 2;
-          scores[pi].evidence.push('第' + (r + 1) + '轮失败任务队伍含反方（轻微减分）');
-        }
-      }
-    }
-
-    // Launch attempt voting
-    var attempts = m.launchAttempts || [];
-    for (var a = 0; a < attempts.length; a++) {
-      var att = attempts[a];
-      var teamSet = {};
-      for (var t = 0; t < (att.team || []).length; t++) {
-        teamSet[att.team[t]] = true;
-      }
-
-      var hasSelf = teamSet[state.selfIndex];
-      var hasKnownEvil = false;
-      for (var k = 0; k < pc; k++) {
-        var label = getKnownLabel(k);
-        if (teamSet[k] && label && (isEvilRole(label) || label === '反方')) {
-          hasKnownEvil = true;
-          break;
-        }
-      }
-
-      // Leader proposing a team with known evil → +6 (Merlin may test evil-containing teams)
-      if (hasKnownEvil && att.leader !== undefined && att.leader !== null && att.leader !== state.selfIndex) {
-        if (scores[att.leader] && scores[att.leader].score !== 0 && scores[att.leader].score !== 100) {
-          scores[att.leader].score += 6;
-          scores[att.leader].evidence.push('第' + (r + 1) + '轮提议含反方队伍（梅林试探）');
-        }
-      }
-
-      // Merlin tends to avoid approving teams with known/knowable evils
-      if (hasSelf || hasKnownEvil) {
-        for (var k = 0; k < pc; k++) {
-          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
-
-          if (att.votes[k] === 'reject') {
-            scores[k].score += 12;
-            scores[k].evidence.push('第' + (r + 1) + '轮拒绝含反方的队伍（梅林行为）');
-
-            // Track consecutive rejections of evil-containing teams
-            consecutiveRejectEvil[k] = (consecutiveRejectEvil[k] || 0) + 1;
-            if (consecutiveRejectEvil[k] >= 2) {
-              scores[k].score += 8;
-              scores[k].evidence.push('连续拒绝含反方队伍（强梅林信号）');
-              consecutiveRejectEvil[k] = 0;
-            }
-          } else {
-            consecutiveRejectEvil[k] = 0;
-          }
-
-          if (att.votes[k] === 'approve' && !teamSet[k]) {
-            scores[k].score -= 3;
-          }
-        }
-      }
-
-      // Mission approval pattern: Merlin often approves successful missions, rejects risky ones
-      if (m.result === 'success') {
-        for (var k = 0; k < pc; k++) {
-          if (k === state.selfIndex || scores[k].score === 0 || scores[k].score === 100) continue;
-          if (att.votes[k] === 'approve') {
-            scores[k].score += 4;
-            scores[k].evidence.push('第' + (r + 1) + '轮批准成功任务（梅林倾向）');
-          }
-        }
-      }
-    }
-  }
-
-  // Lady Lake analysis (evil perspective)
-  if (state.ladyLakeEnabled && state.ladyLakeChecks.length > 0) {
-    for (var c = 0; c < state.ladyLakeChecks.length; c++) {
-      var check = state.ladyLakeChecks[c];
-      var checker = check.checker;
-      var target = check.target;
-      var result = check.result;
-
-      // Known evil checking someone → Merlin won't check an evil
-      var checkerLabel = getKnownLabel(checker);
-      if (checkerLabel && isEvilRole(checkerLabel)) {
-        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
-          scores[target].score -= 15;
-          scores[target].evidence.push('已知反方' + state.playerNames[checker] + '检查过');
-        }
-      }
-
-      // Being checked as evil → strong signal of being targeted / suspected as Merlin
-      if (result && (result === 'evil' || result === '反方')) {
-        if (target !== state.selfIndex && scores[target] && scores[target].score !== 0 && scores[target].score !== 100) {
-          scores[target].score -= 20;
-          scores[target].evidence.push('被查验结果为反方（疑似梅林被锁定）');
-        }
-      }
-    }
-  }
-
-  // Cap at 0-100
-  for (var i = 0; i < pc; i++) {
-    if (scores[i]) {
-      scores[i].score = Math.max(0, Math.min(100, scores[i].score));
-    }
-  }
-}
 
 /* ------- Result rendering ------- */
 function renderTendResult() {
@@ -6410,6 +6598,31 @@ function renderTendResult() {
   }
 
   var list = computeSuspectScores();
+
+  // v7 Progressive Data Quality Badge
+  var quality = list._dataQuality || 'unknown';
+  var totalRounds = list._totalRounds || 0;
+  var qualityLabel = '';
+  var qualityColor = '';
+  var qualityBg = '';
+  if (quality === 'low') {
+    qualityLabel = '&#9888; 数据不足（仅' + totalRounds + '轮），谨慎参考';
+    qualityColor = '#ff9800';
+    qualityBg = 'rgba(255,152,0,0.1)';
+  } else if (quality === 'medium') {
+    qualityLabel = '&#9889; 中等置信度（' + totalRounds + '轮数据）';
+    qualityColor = '#ffc107';
+    qualityBg = 'rgba(255,193,7,0.1)';
+  } else if (quality === 'high') {
+    qualityLabel = '&#10004; 高置信度（' + totalRounds + '轮数据）';
+    qualityColor = '#4caf50';
+    qualityBg = 'rgba(76,175,80,0.1)';
+  }
+  if (qualityLabel) {
+    descEl.innerHTML = '<div style="display:inline-block;font-size:11px;color:' + qualityColor + ';background:' + qualityBg + ';padding:3px 10px;border-radius:4px;border:1px solid ' + qualityColor + ';margin-left:8px;vertical-align:middle">' + qualityLabel + '</div>';
+  } else {
+    descEl.innerHTML = '';
+  }
 
   if (list.length === 0) {
     listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">暂无数据</p>';
