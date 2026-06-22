@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v103"></script>
+<script defer src="./app.js?v=v104"></script>
 </head>
 <body>
 
@@ -27,7 +27,6 @@
 <main id="main-content">
 
 <section class="page active" id="page-setup">
-  <div id="multiplayer-indicator" style="display:none;text-align:center;padding:4px 10px;margin-bottom:8px;border-radius:var(--radius-sm);font-size:12px"></div>
   <div class="card">
     <h2>玩家人数</h2>
     <div class="count-grid" id="count-grid"></div>
@@ -78,7 +77,6 @@
 </section>
 
 <section class="page" id="page-game">
-  <div id="multiplayer-status-bar" style="display:none"></div>
   <div class="round-tracker" id="round-tracker"></div>
   <div class="lancelot-flip-tracker" id="lancelot-flip-tracker" style="display:none"></div>
   <div id="launch-fail-area"></div>
@@ -197,10 +195,6 @@
   <div style="text-align:center">
     <button class="btn primary" onclick="saveGameRecord()" style="font-size:18px;padding:13px 40px">保存对局记录</button>
   </div>
-  <div class="card" id="end-force-end-card" style="display:none;border:2px solid #c0392b;margin-top:12px">
-    <p style="font-size:12px;color:#ff6b6b;margin-bottom:8px">&#9888; 强制结束后所有玩家将被踢出，本局数据将保留。此操作不可撤销。</p>
-    <button class="btn" style="background:linear-gradient(135deg,#8b1a1a,#c0392b);color:#fff;border:1px solid #ff6b6b;font-size:14px;padding:8px 20px" onclick="forceEndGame()">&#9888; 强制结束</button>
-  </div>
 </section>
 
 <section class="page" id="page-stats">
@@ -284,7 +278,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v103';
+  var SW_VERSION = 'v104';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);

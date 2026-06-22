@@ -130,17 +130,9 @@ function initState(n) {
   }
 }
 
-/* ==================== MULTIPLAYER STATE ==================== */
-var _isHost = false;
-var _isViewer = false;
-var _isOfflinePlayer = false;  // 线下玩家：有隐私角色，非纯围观者
-var _mySecretRole = null;       // 线下玩家的隐私角色（仅本地可见）
-var _offlineMode = false;  // true when multiplayer init failed, UI shows "单机模式"
+/* ==================== MULTIPLAYER STATE (REMOVED) ==================== */
+// v104: 多人游戏协同已删除。保留 _deviceId 给访客记录使用。
 var _deviceId = null;
-var _gameSessionId = null;
-var _gameSessionChannel = null;
-var _gameSessionPollInterval = null;
-var _hostIdleTimer = null;  // 房主 30 分钟无操作自动退出
 
 /* ==================== PLAYER LABEL ==================== */
 function playerLabel(idx) {
@@ -660,76 +652,28 @@ function showPage(page) {
   var pg = document.getElementById('page-' + page);
   if (pg) pg.classList.add('active');
   setActiveNav(page);
-  // 多人模式：游戏页根据host/viewer状态处理
   if (page === 'game') {
-    updateMultiplayerStatusBar();
     renderGame();
-    if (_isViewer) applyViewerMode();
-    // 线下玩家：渲染隐私角色卡片
-    if (_isOfflinePlayer && _mySecretRole) renderOfflinePlayerRoleCard();
-    // 围观者：重新建立Supabase Realtime订阅（防止断线后无法恢复）
-    if (_isViewer && _gameSessionId) {
-      var sb = getSupabase();
-      if (sb) watchGameSession(sb);
-    }
   }
-  if (page === 'setup') { renderSetup(); renderVisitorLog(); renderMultiplayerIndicator(); }
+  if (page === 'setup') { renderSetup(); renderVisitorLog(); }
   if (page === 'tend') {
-    // 线下玩家：自动设置角色以启用倾向分析
-    if (_isOfflinePlayer && _mySecretRole && !state.myRole) {
-      state.myRole = _mySecretRole;
-    }
     renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
   }
   if (page === 'end') renderEnd();
   if (page === 'stats') { state._historyPage = 0; renderStats(); }
 }
 
-// 游戏导航入口：围观者点击"游戏"按钮直接进入围观模式，无需走setup流程
+// 游戏导航入口：未开始游戏则提示先去 setup 配置
 function goToGame() {
-  if (_isViewer || _isHost) {
-    showPage('game');
+  if (!state.missions || state.missions.length === 0) {
+    toast('请先在设置页面配置游戏参数', 'warn');
+    showPage('setup');
     return;
   }
-  var sb = getSupabase();
-  if (sb) {
-    initGameSession(sb, function(role) {
-      if (role === 'host') {
-        toast('请先在设置页面配置游戏参数', 'warn');
-        showPage('setup');
-      }
-      // viewer: initGameSession 内部已设置 _isViewer=true 并调用 showPage('game')
-    });
-  } else {
-    _offlineMode = true;
-    _isHost = true;
-    _isViewer = false;
-    toast('多人协同不可用，使用单机模式', 'warn');
-    showPage('game');
-  }
+  showPage('game');
 }
 
 /* ==================== SETUP RENDER ==================== */
-
-// 在 setup 页面顶部显示多人协同可用性状态
-function renderMultiplayerIndicator() {
-  var el = document.getElementById('multiplayer-indicator');
-  if (!el) return;
-  var sb = getSupabase();
-  if (sb) {
-    el.style.display = 'block';
-    el.style.background = 'rgba(74,144,217,0.1)';
-    el.style.border = '1px solid rgba(74,144,217,0.2)';
-    el.style.color = 'var(--blue-light, #99bbff)';
-    el.innerHTML = '多人协同已就绪 — 点击"开始游戏"后自动创建/加入房间';
-  } else {
-    el.style.display = 'block';
-    el.style.background = 'rgba(255,165,0,0.08)';
-    el.style.border = '1px solid rgba(255,165,0,0.2)';
-    el.style.color = '#ffb347';
-    el.innerHTML = '多人协同不可用（Supabase SDK 未加载），将使用单机模式';
-  }
-}
 
 function renderSetup() {
   var h = '';
@@ -1005,7 +949,6 @@ function toggleExcalibur() {
   state.excaliburEnabled = !state.excaliburEnabled;
   if (!state.excaliburHistory) state.excaliburHistory = [];
   renderSetup();
-  syncGameState();
 }
 
 function setTimerMode(mode) {
@@ -1060,51 +1003,12 @@ function startGame() {
   for (var i = 0; i < state.playerCount; i++) {
     if (state.playerNames[i] === '阿弟') { state.selfIndex = i; break; }
   }
-
-  // 关键：点击“开始游戏”时，以设置页当前选择为准。
-  // initGameSession 可能恢复旧房间状态，导致刚选的 8/9/10 人被旧的 7 人覆盖。
-  var setupSnapshot = {
-    playerCount: state.playerCount,
-    playerNames: state.playerNames.slice(),
-    selfIndex: state.selfIndex,
-    activeRoles: state.activeRoles.slice(),
-    ladyOfLakeEnabled: state.ladyOfLakeEnabled,
-    excaliburEnabled: state.excaliburEnabled,
-    timerMode: state.timerMode,
-    timerSeconds: state.timerSeconds
-  };
-  function restoreSetupSnapshot() {
-    state.playerCount = setupSnapshot.playerCount;
-    state.playerNames = setupSnapshot.playerNames.slice(0, setupSnapshot.playerCount);
-    for (var si = 0; si < setupSnapshot.playerCount; si++) {
-      if (!state.playerNames[si]) state.playerNames[si] = '玩家' + (si + 1);
-    }
-    state.selfIndex = setupSnapshot.selfIndex < setupSnapshot.playerCount ? setupSnapshot.selfIndex : -1;
-    state.activeRoles = setupSnapshot.activeRoles.slice();
-    state.ladyOfLakeEnabled = setupSnapshot.ladyOfLakeEnabled;
-    state.excaliburEnabled = setupSnapshot.excaliburEnabled;
-    state.timerMode = setupSnapshot.timerMode;
-    state.timerSeconds = setupSnapshot.timerSeconds;
+  // 防御：保证玩家名数组长度=人数
+  state.playerNames = (state.playerNames || []).slice(0, state.playerCount);
+  for (var pn = 0; pn < state.playerCount; pn++) {
+    if (!state.playerNames[pn]) state.playerNames[pn] = '玩家' + (pn + 1);
   }
-
-  // 多人模式：先检查Supabase是否有活跃房间
-  var sb = getSupabase();
-  if (sb) {
-    initGameSession(sb, function(role) {
-      if (role === 'host') {
-        restoreSetupSnapshot();
-        doStartGame();
-      }
-      // viewer: initGameSession 内部已设置_isViewer=true并订阅，直接切到游戏页
-    });
-  } else {
-    _offlineMode = true;
-    _isHost = true;
-    _isViewer = false;
-    toast('多人协同不可用（网络受限），使用单机模式', 'warn');
-    restoreSetupSnapshot();
-    doStartGame();
-  }
+  doStartGame();
 }
 
 
@@ -1154,7 +1058,6 @@ function doStartGame() {
   state.roundTendencies = [];
   saveLastGame();
   showPage('game');
-  syncGameState();
   var msg = '游戏开始！共 ' + state.playerCount + ' 名玩家，5 轮任务';
   if (state.myRole) msg += '（你的身份：' + state.myRole + '）';
   toast(msg);
@@ -1334,7 +1237,6 @@ function resolveInGameAssassin(isMerlin, targetIdx) {
   if (btn) btn.remove();
   toast(isMerlin ? '拍刀成功！反方获胜' : '拍刀失败！好人方获胜');
   renderGame();
-  syncGameState();
 }
 
 function renderRoundTracker() {
@@ -2437,7 +2339,6 @@ function setExcaliburHolder(round, holderIdx) {
   closeModal();
   toast('王者之剑持剑者：' + playerLabel(holderIdx));
   renderGame();
-  syncGameState();
 }
 
 function setExcaliburUsed(round, used) {
@@ -2455,7 +2356,6 @@ function setExcaliburUsed(round, used) {
     rec.feedbackRecorded = false;
   }
   renderStepPanelWithResult();
-  syncGameState();
 }
 
 function setExcaliburTarget(round, targetIdx) {
@@ -2463,7 +2363,6 @@ function setExcaliburTarget(round, targetIdx) {
   if (rec.holder === targetIdx) { toast('王者之剑不能对持剑者本人使用', 'warn'); return; }
   rec.target = targetIdx;
   renderStepPanelWithResult();
-  syncGameState();
 }
 
 function buildExcaliburPreResultPanel(m) {
@@ -2567,7 +2466,6 @@ function saveLadySpeechClaim() {
   state.ladyLakeHolder = target;
   toast('已记录湖中女神声明：' + playerLabel(holder) + ' → ' + playerLabel(target) + '：' + ladyClaimLabel(result));
   renderGame();
-  syncGameState();
 }
 
 function buildExcaliburFeedbackCard(rec) {
@@ -2596,7 +2494,6 @@ function saveExcaliburFeedback(round) {
   rec.feedbackAt = Date.now();
   toast('已记录王者之剑反馈：' + excaliburDirectionLabel(rec.claimedDirection));
   renderGame();
-  syncGameState();
 }
 
 function buildSpeechPhaseInfoPanel() {
@@ -2800,14 +2697,6 @@ function renderReviewEntry() {
   var el = $('review-section');
   if (!el) return;
   el.style.display = 'block';
-  // 围观者：自动展开复盘内容（无需点击按钮，按钮已被禁用）
-  if (_isViewer) {
-    var panel = $('review-panel');
-    if (panel) {
-      panel.style.display = 'block';
-      panel.innerHTML = buildReviewHTML();
-    }
-  }
 }
 
 function toggleReview() {
@@ -2951,11 +2840,6 @@ function toggleTeamMember(idx) {
   if (pos !== -1) m.team.splice(pos, 1);
   else if (m.team.length < m.size) m.team.push(idx);
   renderStepPanel();
-  // 同步到 Supabase（防抖：500ms 内多次调用只执行最后一次）
-  if (_isHost && !_offlineMode) {
-    clearTimeout(_teamSyncDebounce);
-    _teamSyncDebounce = setTimeout(function() { syncGameState(); }, 500);
-  }
 }
 
 function confirmTeam() {
@@ -2995,8 +2879,6 @@ function confirmTeam() {
   if (state.excaliburEnabled && !getExcaliburRecord(state.currentRound)) {
     setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
   }
-  // 同步到 Supabase：组队确认后立即同步（围观者需要看到组队结果）
-  syncGameState();
 }
 
 function transitionToVotes() {
@@ -3010,19 +2892,12 @@ function transitionToVotes() {
   var el = $('timer-display');
   if (el) el.style.display = 'none';
   renderStepPanel();
-  // 同步到 Supabase：进入投票阶段立即同步
-  syncGameState();
 }
 
 function castVote(idx, type) {
   var m = state.missions[state.currentRound];
   m.votes[idx] = type;
   renderStepPanel();
-  // 同步到 Supabase（防抖：500ms 内多次投票只执行最后一次）
-  if (_isHost && !_offlineMode) {
-    clearTimeout(_voteSyncDebounce);
-    _voteSyncDebounce = setTimeout(function() { syncGameState(); }, 500);
-  }
 }
 
 function allApprove() {
@@ -3031,7 +2906,6 @@ function allApprove() {
     m.votes[i] = 'approve';
   }
   renderStepPanel();
-  syncGameState();
 }
 
 function allReject() {
@@ -3040,7 +2914,6 @@ function allReject() {
     m.votes[i] = 'reject';
   }
   renderStepPanel();
-  syncGameState();
 }
 
 function confirmVotes() {
@@ -3064,7 +2937,6 @@ function confirmVotes() {
 
   if (approves > rejects) {
     renderStepPanelWithResult();
-    syncGameState();
   } else {
     clearExcaliburRecord(state.currentRound);
     m.launchFailures++;
@@ -3082,7 +2954,6 @@ function confirmVotes() {
       updateFinalTendencies();
       checkGameEnd();
       renderGame();
-      syncGameState();
       var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮连续 <span class="count">5</span> 次组队未通过，任务自动失败！</div>';
       $('launch-fail-area').innerHTML = banner;
       return;
@@ -3233,7 +3104,6 @@ function finalizeMission() {
     checkGameEnd();
     renderGame();
   }
-  syncGameState();
 }
 
 function updateFinalTendencies() {
@@ -3460,10 +3330,10 @@ function renderEnd() {
   $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
 
   renderEndIdentityDropdowns();
-  // Show force-end card for all players
+  // 强制结束按钮：始终隐藏（v104：单机模式下不需要）
   var forceEndCard = $('end-force-end-card');
   if (forceEndCard) {
-    forceEndCard.style.display = (!_offlineMode) ? 'block' : 'none';
+    forceEndCard.style.display = 'none';
   }
 }
 
@@ -3664,14 +3534,12 @@ function resolveAssassin(isMerlin) {
   }
   $('end-assassin-card').style.display = 'none';
   renderEnd();
-  syncGameState();
   toast(isMerlin ? '刺杀成功！反方获胜' : '刺杀失败！好人方获胜');
 }
 
 function setWinner(w) {
   state.winner = w;
   renderEnd();
-  syncGameState();
 }
 
 function saveGameRecord() {
@@ -3788,7 +3656,6 @@ function saveGameRecord() {
     state.playerNames = savedNames;
     state.selfIndex = savedSelf;
     state.myRole = null;
-    syncGameState();
     showPage('setup');
   }
   if (sb) {
@@ -5064,1247 +4931,12 @@ function makeRecordKey(record) {
   return (rec.date || '') + '|' + (rec.playerCount || 0) + '|' + identityStr;
 }
 
-/* ==================== MULTIPLAYER GAME SESSION ==================== */
-
-// 序列化需同步的 state 字段为 JSON
-function serializeGameState() {
-  return {
-    playerCount: state.playerCount,
-    playerNames: state.playerNames.slice(),
-    activeRoles: state.activeRoles.slice(),
-    selfIndex: state.selfIndex,
-    missions: JSON.parse(JSON.stringify(state.missions)),
-    currentRound: state.currentRound,
-    winner: state.winner,
-    tendencies: JSON.parse(JSON.stringify(state.tendencies)),
-    identityMarks: state.identityMarks ? JSON.parse(JSON.stringify(state.identityMarks)) : [],
-    assassinTarget: state.assassinTarget,
-    assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
-    assassinFromMission: state.assassinFromMission,
-    assassinMode: state.assassinMode,
-    _assassinAfterRound: state._assassinAfterRound,
-    ladyOfLakeEnabled: state.ladyOfLakeEnabled,
-    excaliburEnabled: state.excaliburEnabled,
-    excaliburHistory: state.excaliburHistory ? JSON.parse(JSON.stringify(state.excaliburHistory)) : [],
-    ladyLakeHolder: state.ladyLakeHolder,
-    ladyLakeChecks: state.ladyLakeChecks ? JSON.parse(JSON.stringify(state.ladyLakeChecks)) : [],
-    ladyCheckHistory: state.ladyCheckHistory ? JSON.parse(JSON.stringify(state.ladyCheckHistory)) : [],
-    roundTendencies: state.roundTendencies ? JSON.parse(JSON.stringify(state.roundTendencies)) : [],
-    lancelotFlipped: state.lancelotFlipped,
-    lancelotDeck: state.lancelotDeck ? state.lancelotDeck.slice() : null,
-    lancelotDrawResults: state.lancelotDrawResults ? state.lancelotDrawResults.slice() : [],
-    lancelotFlipCount: state.lancelotFlipCount || 0,
-    lancelotRoundFlips: state.lancelotRoundFlips ? state.lancelotRoundFlips.slice() : [],
-    timerMode: state.timerMode,
-    timerDuration: state.timerSeconds,
-    timerRemaining: state.timerRemaining || 0,
-    _firstLeaderPicked: state._firstLeaderPicked,
-    _lastLeaderIdx: state._lastLeaderIdx,
-    consecutiveRejects: JSON.parse(JSON.stringify(state.consecutiveRejects))
-  };
-}
-
-// 从 Supabase 同步的 JSON 反序列化到 state
-function deserializeGameState(gs) {
-  state.playerCount = gs.playerCount || 7;
-  state.playerNames = gs.playerNames || [];
-  state.activeRoles = gs.activeRoles || [];
-  state.selfIndex = gs.selfIndex !== undefined ? gs.selfIndex : -1;
-  state.missions = gs.missions || [];
-  state.currentRound = gs.currentRound || 0;
-  state.winner = gs.winner || null;
-  state.tendencies = gs.tendencies || {};
-  state.identityMarks = gs.identityMarks || [];
-  state.assassinTarget = gs.assassinTarget || null;
-  state._assassinSuccess = gs.assassinSuccess || null;
-  state.assassinFromMission = gs.assassinFromMission || false;
-  state.assassinMode = gs.assassinMode || false;
-  state._assassinAfterRound = gs._assassinAfterRound !== undefined ? gs._assassinAfterRound : null;
-  state.ladyOfLakeEnabled = gs.ladyOfLakeEnabled || false;
-  state.excaliburEnabled = gs.excaliburEnabled || false;
-  state.excaliburHistory = gs.excaliburHistory || [];
-  state.ladyLakeHolder = gs.ladyLakeHolder !== undefined ? gs.ladyLakeHolder : -1;
-  state.ladyLakeChecks = gs.ladyLakeChecks || [];
-  state.ladyCheckHistory = gs.ladyCheckHistory || [];
-  state.roundTendencies = gs.roundTendencies || [];
-  state.lancelotFlipped = gs.lancelotFlipped || false;
-  state.lancelotDeck = gs.lancelotDeck || null;
-  state.lancelotDrawResults = gs.lancelotDrawResults || [];
-  state.lancelotFlipCount = gs.lancelotFlipCount || 0;
-  state.lancelotRoundFlips = gs.lancelotRoundFlips || [];
-  state.timerMode = gs.timerMode || 'all';
-  state.timerSeconds = gs.timerDuration || 60;
-  state.timerRemaining = gs.timerRemaining || 0;
-  state._firstLeaderPicked = gs._firstLeaderPicked || false;
-  state._lastLeaderIdx = gs._lastLeaderIdx !== undefined ? gs._lastLeaderIdx : -1;
-  state.consecutiveRejects = gs.consecutiveRejects || {};
-  // 确保 internal 字段存在
-  if (!state.identityMarks) state.identityMarks = [];
-  if (!state.roundTendencies) state.roundTendencies = [];
-  if (!state.excaliburHistory) state.excaliburHistory = [];
-  if (!state.ladyCheckHistory) state.ladyCheckHistory = [];
-}
-
-// 初始化游戏房间：检查是否有活跃房间，没有则创建（成为host），有则加入（成为viewer）
-function initGameSession(sb, callback) {
-  console.log('[Multiplayer] initGameSession 开始, deviceId=' + generateDeviceId());
-  console.log('[Multiplayer] getSupabase() 返回:', sb ? 'client 对象存在 (connected=' + _supabaseConnected + ')' : 'null — SDK 未加载或 createClient 失败');
-  _deviceId = generateDeviceId();
-
-  sb.from('game_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1).then(function(res) {
-    if (res.error) {
-      console.error('[Multiplayer] check session FAILED — 完整错误对象:', JSON.stringify(res.error, null, 2));
-      console.error('[Multiplayer] 错误 code:', res.error.code, '| message:', res.error.message, '| details:', res.error.details, '| hint:', res.error.hint);
-      // 检测是否为表不存在错误（Supabase 返回 code: 'PGRST205' 或 HTTP 404）
-      var errMsg = (res.error && (res.error.message || res.error.details || '')) + '';
-      var isTableMissing = (res.error.code === 'PGRST205') || (errMsg.indexOf('Could not find the table') !== -1) || (errMsg.indexOf('relation') !== -1 && errMsg.indexOf('does not exist') !== -1);
-      if (isTableMissing) {
-        console.error('[Multiplayer] game_sessions 表不存在！需要在 Supabase SQL Editor 中执行 supabase_setup.sql 来创建该表。');
-        toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。详见 supabase_setup.sql', 'warn');
-      } else {
-        console.error('[Multiplayer] 非 PGRST205 错误，错误码=' + res.error.code + '，需要排查 Supabase 项目配置');
-        toast('多人协同不可用（Supabase 查询失败，错误码=' + (res.error.code || 'unknown') + '），使用单机模式', 'warn');
-      }
-      _isHost = true;
-      _isViewer = false;
-      _offlineMode = true;
-      callback('host');
-      return;
-    }
-
-    console.log('[Multiplayer] game_sessions 查询成功, 返回行数=' + (res.data ? res.data.length : 0));
-
-    if (!res.data || res.data.length === 0) {
-      console.log('[Multiplayer] 无活跃房间，创建新房间');
-      createNewSession(sb, callback);
-      return;
-    }
-
-    var session = res.data[0];
-    console.log('[Multiplayer] 找到活跃房间, id=' + session.id + ', status=' + session.status + ', host_id=' + session.host_id);
-
-    var updatedAt = session.updated_at;
-    var TIMEOUT_MS = 5 * 60 * 1000;
-    if (updatedAt) {
-      var age = Date.now() - new Date(updatedAt).getTime();
-      console.log('[Multiplayer] 房间年龄=' + Math.round(age / 1000) + 's, 超时阈值=' + (TIMEOUT_MS / 1000) + 's');
-      if (age > TIMEOUT_MS) {
-        console.log('[Multiplayer] session timed out (age=' + age + 'ms), deleting old session and creating new');
-        sb.from('game_sessions').delete().eq('id', session.id).then(function(delRes) {
-          if (delRes.error) {
-            console.warn('[Multiplayer] delete timed-out session failed:', delRes.error);
-          } else {
-            console.log('[Multiplayer] 超时房间已删除');
-          }
-          createNewSession(sb, callback);
-        });
-        return;
-      }
-    }
-
-    _gameSessionId = session.id;
-    console.log('[Multiplayer] 活跃房间 host_id=' + session.host_id + ', 本设备 deviceId=' + _deviceId);
-
-    // 房主刷新页面后重新加入：检查当前设备是否就是房主
-    if (session.host_id && session.host_id === _deviceId) {
-      console.log('[Multiplayer] 当前设备为房主，恢复房主身份');
-      _isHost = true;
-      _isViewer = false;
-      _offlineMode = false;
-      var hostGs = session.game_state;
-      if (hostGs && hostGs.playerCount) {
-        console.log('[Multiplayer] 反序列化 game_state, playerCount=' + hostGs.playerCount);
-        deserializeGameState(hostGs);
-      } else {
-        console.log('[Multiplayer] game_state 无有效数据, gs=' + JSON.stringify(hostGs));
-      }
-      // 恢复房主基础设施
-      startHostHeartbeat(sb);
-      watchSessionAsHost(sb);
-      resetHostIdleTimer();
-      console.log('[Multiplayer] initGameSession 结束 → host (恢复)');
-      toast('已恢复房主身份', 'info');
-      showPage('game');
-      callback('host');
-      return;
-    }
-
-    // 不是房主 → 检查是否有保存的线下玩家角色
-    _isHost = false;
-    _offlineMode = false;
-    console.log('[Multiplayer] 加入已有房间, sessionId=' + _gameSessionId);
-    var gs = session.game_state;
-    if (gs && gs.playerCount) {
-      console.log('[Multiplayer] 反序列化 game_state, playerCount=' + gs.playerCount);
-      deserializeGameState(gs);
-    } else {
-      console.log('[Multiplayer] game_state 无有效数据, gs=' + JSON.stringify(gs));
-    }
-    var savedRole = loadOfflinePlayerRole();
-    if (savedRole) {
-      // 已有保存的隐私角色 → 线下玩家模式
-      _isOfflinePlayer = true;
-      _isViewer = true;
-      _mySecretRole = savedRole;
-      state.myRole = savedRole;
-      console.log('[Multiplayer] 线下玩家模式, secretRole=' + savedRole);
-      registerOfflinePlayer(sb);
-      console.log('[Multiplayer] initGameSession 结束 → offlinePlayer');
-      toast('已加入房间，身份：' + savedRole + '（线下玩家）', 'info');
-      watchGameSession(sb);
-      showPage('game');
-      callback('offlinePlayer');
-    } else {
-      // 无保存角色 → 弹出角色选择模态框
-      console.log('[Multiplayer] 无保存角色，显示角色选择界面');
-      showOfflinePlayerRoleModal(sb, callback);
-    }
-  }).catch(function(err) {
-    console.error('[Multiplayer] game_sessions 查询抛出异常 (catch):', err);
-    console.error('[Multiplayer] 异常类型:', typeof err, '| message:', err && err.message);
-    _isHost = true;
-    _isViewer = false;
-    _offlineMode = true;
-    toast('多人协同网络异常，使用单机模式', 'warn');
-    callback('host');
-  });
-}
-
-// 创建新游戏房间（房主）
-function createNewSession(sb, callback) {
-  console.log('[Multiplayer] createNewSession 开始, deviceId=' + _deviceId);
-  _isHost = true;
-  _isViewer = false;
-  _offlineMode = false;
-  var initState = serializeGameState();
-  initState._viewers = [];
-  initState._hostFingerprint = generateDeviceId().slice(-6).toUpperCase();
-  console.log('[Multiplayer] 即将插入 game_sessions, host_id=' + _deviceId + ', hostFingerprint=' + initState._hostFingerprint);
-  sb.from('game_sessions').insert({
-    host_id: _deviceId,
-    game_state: initState,
-    status: 'active',
-    updated_at: new Date().toISOString()
-  }).select('id').single().then(function(r2) {
-    if (r2.error) {
-      console.error('[Multiplayer] create session FAILED — 完整错误:', JSON.stringify(r2.error, null, 2));
-      console.error('[Multiplayer] create error code:', r2.error.code, '| message:', r2.error.message, '| details:', r2.error.details);
-      var errMsg2 = (r2.error && (r2.error.message || r2.error.details || '')) + '';
-      var isTableMissing2 = (r2.error.code === 'PGRST205') || (errMsg2.indexOf('Could not find the table') !== -1) || (errMsg2.indexOf('relation') !== -1 && errMsg2.indexOf('does not exist') !== -1);
-      _isHost = true;
-      _isViewer = false;
-      _offlineMode = true;
-      if (isTableMissing2) {
-        toast('多人协同不可用：数据库未初始化（缺少 game_sessions 表），使用单机模式。请执行 supabase_setup.sql', 'warn');
-      } else {
-        console.error('[Multiplayer] 非 PGRST205 错误，创建房间失败，错误码=' + r2.error.code);
-        toast('创建房间失败（错误码=' + (r2.error.code || 'unknown') + '），使用单机模式', 'warn');
-      }
-    } else {
-      _gameSessionId = r2.data.id;
-      console.log('[Multiplayer] session 创建成功, sessionId=' + _gameSessionId);
-      toast('你是房主 — 创建了新房间', 'success');
-      // 房主心跳：定期更新 updated_at 保持房间活跃
-      startHostHeartbeat(sb);
-      // 房主订阅 Realtime：实时感知观众加入/离开
-      watchSessionAsHost(sb);
-      // 启动 30 分钟空闲计时器
-      resetHostIdleTimer();
-    }
-    callback('host');
-  }).catch(function(err) {
-    console.error('[Multiplayer] createNewSession 插入抛出异常 (catch):', err);
-    _isHost = true;
-    _isViewer = false;
-    _offlineMode = true;
-    toast('创建房间网络异常，使用单机模式', 'warn');
-    callback('host');
-  });
-}
-
-// 房主心跳：每60秒更新 updated_at 防止超时
-var _hostHeartbeatInterval = null;
-function startHostHeartbeat(sb) {
-  if (_hostHeartbeatInterval) clearInterval(_hostHeartbeatInterval);
-  var heartbeatCounter = 0;
-  _hostHeartbeatInterval = setInterval(function() {
-    if (!_isHost || !_gameSessionId) {
-      clearInterval(_hostHeartbeatInterval);
-      _hostHeartbeatInterval = null;
-      return;
-    }
-    sb.from('game_sessions').update({
-      updated_at: new Date().toISOString()
-    }).eq('id', _gameSessionId).then(function(r) {
-      if (r.error) console.warn('[Multiplayer] heartbeat failed:', r.error);
-    });
-    // 每 3 次心跳刷新状态栏（约每3分钟），确保观众数量及时更新
-    heartbeatCounter++;
-    if (heartbeatCounter % 3 === 0) updateMultiplayerStatusBar();
-  }, 60000);
-}
-
-// 观众注册：将自身 deviceId 添加到 game_sessions 的 _viewers 数组
-function registerViewer(sb) {
-  if (!_isViewer || !_gameSessionId) return;
-  var fp = _deviceId.slice(-6).toUpperCase();
-  // 读取当前 viewers 列表
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data) return;
-    var gs = res.data.game_state || {};
-    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-    // 去重：已存在的 viewer 仅更新 last_seen
-    var found = false;
-    var now = new Date().toISOString();
-    for (var i = 0; i < viewers.length; i++) {
-      if (viewers[i].deviceId === _deviceId) {
-        viewers[i].lastSeen = now;
-        viewers[i].fingerprint = fp;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      viewers.push({ deviceId: _deviceId, fingerprint: fp, joinedAt: now, lastSeen: now });
-    }
-    gs._viewers = viewers;
-    sb.from('game_sessions').update({ game_state: gs, updated_at: now }).eq('id', _gameSessionId).then(function(r2) {
-      if (r2.error) console.warn('[Multiplayer] registerViewer failed:', r2.error);
-      else console.log('[Multiplayer] viewer registered, total viewers=' + viewers.length);
-    });
-  });
-  // 观众心跳：每30秒更新 lastSeen
-  startViewerHeartbeat(sb);
-}
-
-// 观众心跳
-var _viewerHeartbeatInterval = null;
-function startViewerHeartbeat(sb) {
-  if (_viewerHeartbeatInterval) clearInterval(_viewerHeartbeatInterval);
-  _viewerHeartbeatInterval = setInterval(function() {
-    if (!_isViewer || !_gameSessionId) {
-      clearInterval(_viewerHeartbeatInterval);
-      _viewerHeartbeatInterval = null;
-      return;
-    }
-    registerViewer(sb);
-  }, 30000);
-}
-
-// 观众离线：从 viewers 中移除自己
-function unregisterViewer(sb) {
-  if (!_gameSessionId || !_deviceId) return;
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data) return;
-    var gs = res.data.game_state || {};
-    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-    var filtered = [];
-    for (var i = 0; i < viewers.length; i++) {
-      if (viewers[i].deviceId !== _deviceId) filtered.push(viewers[i]);
-    }
-    if (filtered.length !== viewers.length) {
-      gs._viewers = filtered;
-      sb.from('game_sessions').update({ game_state: gs, updated_at: new Date().toISOString() }).eq('id', _gameSessionId).then(function(r2) {
-        if (r2.error) console.warn('[Multiplayer] unregisterViewer failed:', r2.error);
-      });
-    }
-  });
-}
-
-// 线下玩家：角色 localStorage 存储
-function saveOfflinePlayerRole(role) {
-  localStorage.setItem('avalon_offline_player_role', role);
-}
-
-function loadOfflinePlayerRole() {
-  return localStorage.getItem('avalon_offline_player_role');
-}
-
-function clearOfflinePlayerRole() {
-  localStorage.removeItem('avalon_offline_player_role');
-}
-
-// 注册线下玩家（含角色声明，写入 game_sessions._claimedRoles）
-function registerOfflinePlayer(sb) {
-  if (!_isOfflinePlayer || !_gameSessionId) return;
-  var fp = _deviceId.slice(-6).toUpperCase();
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data) return;
-    var gs = res.data.game_state || {};
-    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-    var claimedRoles = Array.isArray(gs._claimedRoles) ? gs._claimedRoles : [];
-    var found = false;
-    var now = new Date().toISOString();
-    for (var i = 0; i < viewers.length; i++) {
-      if (viewers[i].deviceId === _deviceId) {
-        viewers[i].lastSeen = now;
-        viewers[i].fingerprint = fp;
-        viewers[i].isOfflinePlayer = true;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      viewers.push({ deviceId: _deviceId, fingerprint: fp, joinedAt: now, lastSeen: now, isOfflinePlayer: true });
-    }
-    if (_mySecretRole && claimedRoles.indexOf(_mySecretRole) === -1) {
-      claimedRoles.push(_mySecretRole);
-    }
-    gs._viewers = viewers;
-    gs._claimedRoles = claimedRoles;
-    sb.from('game_sessions').update({ game_state: gs, updated_at: now }).eq('id', _gameSessionId).then(function(r2) {
-      if (r2.error) console.warn('[Multiplayer] registerOfflinePlayer failed:', r2.error);
-      else console.log('[Multiplayer] offline player registered, claimedRoles=' + JSON.stringify(claimedRoles));
-    });
-  });
-  startViewerHeartbeat(sb);
-}
-
-// 显示线下玩家角色选择模态框
-var _pendingOfflinePlayerCallback = null;
-var _pendingOfflinePlayerSb = null;
-function showOfflinePlayerRoleModal(sb, callback) {
-  _pendingOfflinePlayerCallback = callback;
-  _pendingOfflinePlayerSb = sb;
-  var overlay = document.createElement('div');
-  overlay.id = 'offline-role-overlay';
-  overlay.className = 'modal-overlay active';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center';
-  var h = '<div class="card" style="max-width:380px;width:90%;margin:auto;padding:24px;background:var(--bg-dark,#1a1a2e);border:2px solid var(--gold);border-radius:var(--radius);text-align:center">';
-  h += '<h2 style="margin:0 0 4px;color:var(--gold-light)">选择你的身份</h2>';
-  h += '<p style="color:var(--text-dim);font-size:13px;margin:0 0 16px">私下选择角色后进入游戏。<br>该角色仅自己可见，不会公开。</p>';
-  h += '<select id="offline-role-select" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.3);background:var(--parchment);color:var(--text);font-size:15px;cursor:pointer;min-height:44px;margin-bottom:16px">';
-  h += '<option value="">-- 选择角色 --</option>';
-  for (var j = 0; j < ALL_ROLES.length; j++) {
-    h += '<option value="' + ALL_ROLES[j] + '">' + ALL_ROLES[j] + '</option>';
-  }
-  h += '</select>';
-  h += '<div style="display:flex;gap:10px;justify-content:center">';
-  h += '<button class="btn primary" id="offline-role-confirm-btn" disabled onclick="confirmOfflinePlayerRole()" style="flex:1">确认加入</button>';
-  h += '<button class="btn" onclick="skipOfflinePlayerRole()" style="flex:1;background:rgba(255,255,255,0.08);color:var(--text-dim)">跳过，纯围观</button>';
-  h += '</div></div>';
-  overlay.innerHTML = h;
-  document.body.appendChild(overlay);
-  // 监听下拉框变化以启用确认按钮
-  setTimeout(function() {
-    var sel = document.getElementById('offline-role-select');
-    var btn = document.getElementById('offline-role-confirm-btn');
-    if (sel && btn) {
-      sel.addEventListener('change', function() {
-        btn.disabled = !sel.value;
-      });
-    }
-  }, 50);
-}
-
-function confirmOfflinePlayerRole() {
-  var sel = document.getElementById('offline-role-select');
-  if (!sel || !sel.value) return;
-  var role = sel.value;
-  _mySecretRole = role;
-  _isOfflinePlayer = true;
-  _isViewer = true;
-  saveOfflinePlayerRole(role);
-  state.myRole = role;
-  var overlay = document.getElementById('offline-role-overlay');
-  if (overlay) overlay.remove();
-  if (_pendingOfflinePlayerSb && _pendingOfflinePlayerCallback) {
-    registerOfflinePlayer(_pendingOfflinePlayerSb);
-    toast('已加入房间，身份：' + role + '（线下玩家）', 'info');
-    watchGameSession(_pendingOfflinePlayerSb);
-    showPage('game');
-    _pendingOfflinePlayerCallback('offlinePlayer');
-  }
-  _pendingOfflinePlayerCallback = null;
-  _pendingOfflinePlayerSb = null;
-}
-
-function skipOfflinePlayerRole() {
-  _isOfflinePlayer = false;
-  _isViewer = true;
-  _mySecretRole = null;
-  var overlay = document.getElementById('offline-role-overlay');
-  if (overlay) overlay.remove();
-  if (_pendingOfflinePlayerSb && _pendingOfflinePlayerCallback) {
-    registerViewer(_pendingOfflinePlayerSb);
-    toast('已加入房间，当前为围观模式', 'info');
-    watchGameSession(_pendingOfflinePlayerSb);
-    showPage('game');
-    _pendingOfflinePlayerCallback('viewer');
-  }
-  _pendingOfflinePlayerCallback = null;
-  _pendingOfflinePlayerSb = null;
-}
-
-// 房主：将完整 state 写入 Supabase（保留观众列表）
-function syncGameState() {
-  if (!_isHost || !_gameSessionId) return;
-  var sb = getSupabase();
-  if (!sb) return;
-  console.log('[Multiplayer] syncGameState 调用, sessionId=' + _gameSessionId);
-  // 先读取当前 viewers 列表以免覆盖
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(readRes) {
-    var gs = serializeGameState();
-    if (readRes.data && readRes.data.game_state) {
-      var currentGS = readRes.data.game_state;
-      if (currentGS._viewers) gs._viewers = currentGS._viewers;
-      if (currentGS._claimedRoles) gs._claimedRoles = currentGS._claimedRoles;
-      if (currentGS._hostFingerprint) gs._hostFingerprint = currentGS._hostFingerprint;
-    }
-    sb.from('game_sessions').update({
-      game_state: gs,
-      status: state.winner ? 'finished' : 'active',
-      updated_at: new Date().toISOString()
-    }).eq('id', _gameSessionId).then(function(r) {
-      if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
-      else { console.log('[Multiplayer] sync 成功'); updateMultiplayerStatusBar(); }
-    });
-  }).catch(function(err) {
-    console.warn('[Multiplayer] read before sync failed:', err);
-    var gs = serializeGameState();
-    sb.from('game_sessions').update({
-      game_state: gs,
-      status: state.winner ? 'finished' : 'active',
-      updated_at: new Date().toISOString()
-    }).eq('id', _gameSessionId).then(function(r) {
-      if (r.error) console.warn('[Multiplayer] sync failed:', r.error);
-      else { console.log('[Multiplayer] catch-sync 成功'); updateMultiplayerStatusBar(); }
-    });
-  });
-}
-
-// 清除围观者状态，恢复操作权限
-function clearViewerState(msg) {
-  // 先尝试从房间注销自己
-  if (_isViewer && _gameSessionId) {
-    unregisterViewer(getSupabase());
-  }
-  _isViewer = false;
-  _isHost = false;
-  _isOfflinePlayer = false;
-  _mySecretRole = null;
-  _offlineMode = false;
-  _gameSessionId = null;
-  if (_gameSessionChannel) {
-    _gameSessionChannel.unsubscribe();
-    _gameSessionChannel = null;
-  }
-  if (_gameSessionPollInterval) {
-    clearInterval(_gameSessionPollInterval);
-    _gameSessionPollInterval = null;
-  }
-  if (_viewerHeartbeatInterval) {
-    clearInterval(_viewerHeartbeatInterval);
-    _viewerHeartbeatInterval = null;
-  }
-  if (_hostHeartbeatInterval) {
-    clearInterval(_hostHeartbeatInterval);
-    _hostHeartbeatInterval = null;
-  }
-  // 恢复 UI 控件
-  restoreViewerControls();
-  // 移除线下玩家角色卡片
-  var roleCard = document.getElementById('offline-player-role-card');
-  if (roleCard) roleCard.remove();
-  updateMultiplayerStatusBar();
-  toast(msg, 'warn');
-}
-
-// 房主清理状态（强制结束/超时退出时调用）
-function clearHostState() {
-  if (_hostIdleTimer) {
-    clearTimeout(_hostIdleTimer);
-    _hostIdleTimer = null;
-  }
-  if (_hostHeartbeatInterval) {
-    clearInterval(_hostHeartbeatInterval);
-    _hostHeartbeatInterval = null;
-  }
-  if (_gameSessionChannel) {
-    _gameSessionChannel.unsubscribe();
-    _gameSessionChannel = null;
-  }
-  if (_gameSessionPollInterval) {
-    clearInterval(_gameSessionPollInterval);
-    _gameSessionPollInterval = null;
-  }
-  _isHost = false;
-  _isViewer = false;
-  _offlineMode = false;
-  _gameSessionId = null;
-  restoreViewerControls();
-  initState(state.playerCount || 7);
-}  
-
-// 房主空闲计时器：30 分钟无操作自动退出
-var HOST_IDLE_TIMEOUT = 1800000; // 30 分钟
-function resetHostIdleTimer() {
-  if (_hostIdleTimer) clearTimeout(_hostIdleTimer);
-  if (!_isHost || _offlineMode || !_gameSessionId) return;
-  _hostIdleTimer = setTimeout(function() {
-    console.log('[Multiplayer] 房主 30 分钟无操作，自动结束游戏');
-    var sb = getSupabase();
-    if (sb && _gameSessionId) {
-      sb.from('game_sessions').update({ status: 'finished' }).eq('id', _gameSessionId).then(function() {
-        sb.from('game_sessions').delete().eq('id', _gameSessionId);
-      });
-    }
-    toast('30 分钟无操作，游戏自动结束', 'warn');
-    clearHostState();
-    showPage('setup');
-  }, HOST_IDLE_TIMEOUT);
-}
-
-// 全局用户活动监听：重置房主空闲计时器
-document.addEventListener('click', function(e) { if (_isHost && !_offlineMode) resetHostIdleTimer(); });
-document.addEventListener('touchstart', function(e) { if (_isHost && !_offlineMode) resetHostIdleTimer(); });
-document.addEventListener('keydown', function(e) { if (_isHost && !_offlineMode) resetHostIdleTimer(); });
-
-// 恢复被围观模式禁用的控件
-function restoreViewerControls() {
-  var pages = ['page-game', 'page-tend', 'page-end'];
-  for (var p = 0; p < pages.length; p++) {
-    var page = document.getElementById(pages[p]);
-    if (!page) continue;
-    var disabledEls = page.querySelectorAll('.viewer-disabled');
-    for (var i = 0; i < disabledEls.length; i++) {
-      disabledEls[i].disabled = false;
-      disabledEls[i].classList.remove('viewer-disabled');
-    }
-  }
-}
-
-// 房主：订阅 game_sessions Realtime 更新，实时感知观众加入/离开
-function watchSessionAsHost(sb) {
-  if (_gameSessionChannel) return;
-  _gameSessionChannel = sb.channel('game-session-host-' + _gameSessionId);
-  _gameSessionChannel.on(
-    'postgres_changes',
-    { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
-    function(payload) {
-      var gs = payload.new && payload.new.game_state;
-      if (!gs) return;
-      var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-      var now = Date.now();
-      var activeCount = 0;
-      for (var i = 0; i < viewers.length; i++) {
-        if (viewers[i].lastSeen) {
-          if (now - new Date(viewers[i].lastSeen).getTime() < 120000) activeCount++;
-        } else {
-          activeCount++;
-        }
-      }
-      console.log('[Multiplayer] host realtime: viewers updated, active=' + activeCount);
-      // 更新状态栏中的观众数
-      var bar = document.getElementById('multiplayer-status-bar');
-      if (!bar) return;
-      var countEl = bar.querySelector('.mp-viewer-count');
-      var txt = activeCount > 0 ? '围观者: ' + activeCount + '人' : '暂无围观者';
-      if (countEl) {
-        countEl.textContent = txt;
-      } else {
-        var span = document.createElement('span');
-        span.className = 'mp-viewer-count';
-        span.style.cssText = 'margin-left:12px;color:var(--text-dim);font-size:13px';
-        span.textContent = txt;
-        bar.appendChild(span);
-      }
-    }
-  );
-  _gameSessionChannel.subscribe(function(status) {
-    console.log('[Multiplayer] host channel status:', status);
-  });
-}
-
-// 围观者：订阅 Supabase Realtime 更新
-function watchGameSession(sb) {
-  // 允许重新订阅：先清理旧 channel 和轮询（防止断线后无法恢复）
-  if (_gameSessionChannel) {
-    try { _gameSessionChannel.unsubscribe(); } catch(e) {}
-    _gameSessionChannel = null;
-  }
-  if (_gameSessionPollInterval) {
-    clearInterval(_gameSessionPollInterval);
-    _gameSessionPollInterval = null;
-  }
-
-  _gameSessionChannel = sb.channel('game-session-' + _gameSessionId);
-
-  _gameSessionChannel.on(
-    'postgres_changes',
-    { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
-    function(payload) {
-      console.log('[Multiplayer] watchGameSession 收到推送, sessionId=' + _gameSessionId + ', status=' + payload.new.status);
-      var gs = payload.new.game_state;
-      // 检查房间是否被强制重启（status变为waiting且game_state清空）
-      if (payload.new.status === 'waiting' && (!gs || !gs.playerCount || gs.playerCount === 0)) {
-        clearViewerState('房间已被房主重置，请重新进入');
-        showPage('setup');
-        return;
-      }
-      // 检查房间是否已结束
-      if (payload.new.status === 'finished' || payload.new.status === 'ended') {
-        // 如果 game_state 有 winner（游戏自然结束），让围观者跳到结束页看复盘
-        if (gs && gs.winner) {
-          deserializeGameState(gs);
-          showPage('end');
-          return;
-        }
-        // 否则是强制结束/超时/房主离开 — 直接回设置页
-        clearViewerState('房主已离开，你可以成为新房主');
-        showPage('setup');
-        return;
-      }
-      if (!gs) return;
-      deserializeGameState(gs);
-      console.log('[Multiplayer] rt sync: round=' + state.currentRound +
-        ', missions=' + (state.missions ? state.missions.filter(Boolean).length : 0) +
-        ', teamSize=' + (state.missions[state.currentRound] ? state.missions[state.currentRound].team.length : '?') +
-        ', winner=' + (state.winner || 'none') +
-        ', page=' + state._currentPage);
-      updateMultiplayerStatusBar();
-      // 重新渲染当前页面
-      if (state._currentPage === 'game') {
-        renderGame();
-        applyViewerMode();
-        if (_isOfflinePlayer && _mySecretRole) renderOfflinePlayerRoleCard();
-      } else if (state._currentPage === 'end') {
-        renderEnd();
-      } else if (state._currentPage === 'tend') {
-        if (_isOfflinePlayer && _mySecretRole && !state.myRole) state.myRole = _mySecretRole;
-        renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend();
-        renderIdentitySimGrid(); renderDeduction();
-      } else if (state._currentPage === 'stats') {
-        renderStats();
-      }
-    }
-  );
-
-  // 订阅 DELETE 事件（房间被关闭/删除）
-  _gameSessionChannel.on(
-    'postgres_changes',
-    { event: 'DELETE', schema: 'public', table: 'game_sessions', filter: 'id=eq.' + _gameSessionId },
-    function() {
-      // 如果当前已在结束页面，先停留让用户看复盘再跳转
-      if (state._currentPage === 'end') {
-        toast('房间已被关闭', 'warn');
-        return;
-      }
-      clearViewerState('房主已离开，你可以成为新房主');
-      showPage('setup');
-    }
-  );
-
-  _gameSessionChannel.subscribe(function(status) {
-    console.log('[Multiplayer] channel status:', status);
-  });
-
-  // 轮询兜底：每 2 秒查询 Supabase，防止 Realtime 推送丢失
-  _gameSessionPollInterval = setInterval(function() {
-    if (!_isViewer || !_gameSessionId) {
-      clearInterval(_gameSessionPollInterval);
-      _gameSessionPollInterval = null;
-      return;
-    }
-    var sbPoll = getSupabase();
-    if (!sbPoll) return;
-    sbPoll.from('game_sessions').select('game_state,status').eq('id', _gameSessionId).single().then(function(res) {
-      if (res.error || !res.data) return;
-      var gs = res.data.game_state;
-      // 检查房间状态
-      if (res.data.status === 'finished' || res.data.status === 'ended') {
-        clearInterval(_gameSessionPollInterval);
-        _gameSessionPollInterval = null;
-        // 如果 game_state 有 winner（游戏自然结束），让围观者跳到结束页看复盘
-        if (gs && gs.winner) {
-          deserializeGameState(gs);
-          showPage('end');
-          return;
-        }
-        // 否则是强制结束/超时/房主离开 — 直接回设置页
-        clearViewerState('房主已离开，你可以成为新房主');
-        showPage('setup');
-        return;
-      }
-      if (res.data.status === 'waiting' && (!gs || !gs.playerCount || gs.playerCount === 0)) {
-        clearInterval(_gameSessionPollInterval);
-        _gameSessionPollInterval = null;
-        clearViewerState('房间已被房主重置，请重新进入');
-        showPage('setup');
-        return;
-      }
-      if (!gs) return;
-      deserializeGameState(gs);
-      // 诊断日志：输出当前同步到的 game_state 关键字段
-      console.log('[Multiplayer] poll sync: round=' + state.currentRound +
-        ', missions=' + (state.missions ? state.missions.filter(Boolean).length : 0) +
-        ', teamSize=' + (state.missions[state.currentRound] ? state.missions[state.currentRound].team.length : '?') +
-        ', winner=' + (state.winner || 'none') +
-        ', page=' + state._currentPage);
-      updateMultiplayerStatusBar();
-      if (state._currentPage === 'game') {
-        renderGame();
-        applyViewerMode();
-        if (_isOfflinePlayer && _mySecretRole) renderOfflinePlayerRoleCard();
-      } else if (state._currentPage === 'end') {
-        renderEnd();
-      } else if (state._currentPage === 'tend') {
-        if (_isOfflinePlayer && _mySecretRole && !state.myRole) state.myRole = _mySecretRole;
-        renderTendencyFull(); renderIdentityPrediction(); renderMerlinPredictTend();
-        renderIdentitySimGrid(); renderDeduction();
-      } else if (state._currentPage === 'stats') {
-        renderStats();
-      }
-    });
-  }, 2000);
-}
-
-// iPad 强制重启：清除房间
-function forceRestartSession() {
-  if (!isIPad()) return;
-  var sb = getSupabase();
-  if (!sb || !_gameSessionId) return;
-  showModal(
-    '<h2>强制重启</h2>' +
-    '<p>将清除当前游戏房间，所有玩家回到等待状态。确定？</p>' +
-    '<div class="modal-actions">' +
-    '<button class="btn danger" onclick="confirmForceRestart()">确认重启</button>' +
-    '<button class="btn" onclick="closeModal()">取消</button>' +
-    '</div>'
-  );
-}
-
-function confirmForceRestart() {
-  closeModal();
-  var sb = getSupabase();
-  if (!sb || !_gameSessionId) return;
-  sb.from('game_sessions').update({
-    game_state: serializeGameState(),
-    status: 'waiting'
-  }).eq('id', _gameSessionId).then(function(r) {
-    if (r.error) {
-      toast('强制重启失败: ' + r.error.message, 'warn');
-      return;
-    }
-    // 然后删除该记录触发所有设备重置
-    sb.from('game_sessions').delete().eq('id', _gameSessionId).then(function(r2) {
-      if (r2.error) {
-        // 删除失败，用 status=waiting 触发重置
-        toast('房间已重置，等待新房主', 'success');
-      } else {
-        toast('房间已关闭，所有玩家回到等待状态', 'success');
-      }
-      _isHost = false;
-      _isViewer = false;
-      _gameSessionId = null;
-      if (_gameSessionChannel) {
-        _gameSessionChannel.unsubscribe();
-        _gameSessionChannel = null;
-      }
-      initState(state.playerCount || 7);
-      showPage('setup');
-    });
-  });
-}
-
-// 房主强制结束游戏（仅房主可见，红色按钮）
-function forceEndGame() {
-  if (_offlineMode) return;
-  showModal(
-    '<h2>强制结束游戏</h2>' +
-    '<p style="color:var(--red-bright)">确定要强制结束当前游戏吗？所有围观者将被断开。</p>' +
-    '<div class="modal-actions">' +
-    '<button class="btn danger" onclick="confirmForceEnd()">确认结束</button>' +
-    '<button class="btn" onclick="closeModal()">取消</button>' +
-    '</div>'
-  );
-}
-
-function confirmForceEnd() {
-  closeModal();
-  var sb = getSupabase();
-  if (!sb || !_gameSessionId) {
-    // 无 Supabase 连接时直接弹出保存选择框
-    showForceEndSaveDialog();
-    return;
-  }
-  var sessionId = _gameSessionId;
-  // 先更新状态为 finished，阻止新围观者加入，然后清理该房间相关记录
-  sb.from('game_sessions').update({
-    status: 'finished',
-    updated_at: new Date().toISOString()
-  }).eq('id', sessionId).then(function(r) {
-    if (r.error) {
-      console.warn('[Multiplayer] forceEnd: update failed:', r.error);
-      // 即使更新失败也尝试删除（可能是权限问题）
-    }
-    // 删除 game_sessions 记录
-    return sb.from('game_sessions').delete().eq('id', sessionId);
-  }).then(function(r2) {
-    if (r2 && r2.error) {
-      console.warn('[Multiplayer] forceEnd: delete game_sessions failed:', r2.error);
-    } else {
-      console.log('[Multiplayer] forceEnd: game_sessions 已删除, id=' + sessionId);
-    }
-    // 清理 visitors 表中该房间相关的心跳记录（按 created_at 窗口：最近2小时内）
-    var cutoff = new Date(Date.now() - 7200000).toISOString();
-    return sb.from('visitors').delete().gte('created_at', cutoff);
-  }).then(function(r3) {
-    if (r3 && r3.error) {
-      console.warn('[Multiplayer] forceEnd: cleanup visitors failed:', r3.error);
-    } else {
-      console.log('[Multiplayer] forceEnd: visitors 清理完成');
-    }
-  }).catch(function(err) {
-    console.error('[Multiplayer] forceEnd: unexpected error:', err);
-  }).finally(function() {
-    showForceEndSaveDialog();
-  });
-}
-
-// 强制结束后弹出"是否保存记录"选择框
-function showForceEndSaveDialog() {
-  showModal(
-    '<h2>是否保存本局记录？</h2>' +
-    '<div style="margin:12px 0">' +
-    '<label style="font-size:13px;color:var(--text-dim);display:block;margin-bottom:6px">强制结束原因（可选）</label>' +
-    '<input id="force-end-reason" type="text" style="width:100%;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;box-sizing:border-box" placeholder="如：有人掉线、测试结束、房主离开...">' +
-    '</div>' +
-    '<div class="modal-actions">' +
-    '<button class="btn primary" onclick="saveForceEndRecord()">保存</button>' +
-    '<button class="btn" onclick="skipForceEndRecord()">不保存</button>' +
-    '</div>'
-  );
-}
-
-function saveForceEndRecord() {
-  var reason = (document.getElementById('force-end-reason') || {}).value || '';
-  closeModal();
-
-  var identities = [];
-  for (var i = 0; i < state.playerCount; i++) {
-    var sel = document.getElementById('end-role-' + i);
-    var role = sel ? sel.value : '';
-    identities.push({ name: state.playerNames[i], index: i, role: role });
-  }
-
-  var lancelotFlips = {};
-  for (var i = 0; i < state.playerCount; i++) {
-    var role = identities[i].role;
-    if (role === '兰斯洛特(蓝)' || role === '兰斯洛特(红)') {
-      lancelotFlips[i] = state.lancelotFlipped;
-    }
-  }
-
-  var history = loadHistory();
-  var record = {
-    date: new Date().toISOString().slice(0, 10),
-    forceEndTime: new Date().toISOString(),
-    playerCount: state.playerCount,
-    winner: state.winner,
-    identities: identities,
-    lancelotFlips: lancelotFlips,
-    activeRoles: state.activeRoles.slice(),
-    roundTendencies: state.roundTendencies || [],
-    assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
-    assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
-    assassinAfterRound: state._assassinAfterRound !== null ? state._assassinAfterRound : null,
-    currentRound: state._assassinAfterRound !== null ? state._assassinAfterRound : state.currentRound,
-    identityMarks: (state.identityMarks || []).map(function(m) {
-      return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
-    }),
-    missions: (state.missions || []).map(function(m) {
-      return {
-        round: m.round,
-        size: m.size,
-        leader: m.leader !== null ? playerLabel(m.leader) : '',
-        team: (m.team || []).map(function(ti) { return playerLabel(ti); }),
-        result: m.result,
-        failCount: m.failCount,
-        launchFailures: m.launchFailures,
-        launchAttempts: (m.launchAttempts || []).map(function(att) {
-          return {
-            team: (att.team || []).map(function(ti) { return playerLabel(ti); }),
-            votes: Object.keys(att.votes || {}).reduce(function(acc, k) {
-              acc[playerLabel(parseInt(k))] = att.votes[k];
-              return acc;
-            }, {}),
-            leader: playerLabel(att.leader)
-          };
-        }),
-        votes: Object.keys(m.votes || {}).reduce(function(acc, k) {
-          acc[playerLabel(parseInt(k))] = m.votes[k];
-          return acc;
-        }, {})
-      };
-    }),
-    ladyCheckHistory: (state.ladyCheckHistory || []).map(function(h) {
-      return {
-        round: h.round,
-        holder: h.holder,
-        holderName: playerLabel(h.holder),
-        target: h.target,
-        targetName: playerLabel(h.target),
-        result: h.result,
-        note: h.note || '',
-        recordedAtRound: h.recordedAtRound,
-        recordedAtSpeaker: h.recordedAtSpeaker
-      };
-    }),
-    excaliburEnabled: state.excaliburEnabled,
-    excaliburHistory: (state.excaliburHistory || []).map(function(e) {
-      return {
-        round: e.round,
-        leader: e.leader,
-        leaderName: e.leader >= 0 ? playerLabel(e.leader) : '',
-        team: (e.team || []).map(function(ti) { return playerLabel(ti); }),
-        holder: e.holder,
-        holderName: e.holder >= 0 ? playerLabel(e.holder) : '',
-        used: e.used,
-        target: e.target,
-        targetName: e.target !== null && e.target !== undefined ? playerLabel(e.target) : '',
-        feedbackRecorded: e.feedbackRecorded,
-        feedbackRound: e.feedbackRound,
-        feedbackSpeaker: e.feedbackSpeaker,
-        claimedDirection: e.claimedDirection || '',
-        note: e.note || ''
-      };
-    }),
-    forceEnded: true,
-    forceEndReason: reason
-  };
-  var recordV2 = toRecordV2(record);
-  history.push(recordV2);
-  saveHistory(history);
-
-  // Supabase 同步
-  var sb = getSupabase();
-  if (sb) {
-    sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
-      if (!res.error && res.data && res.data.id) {
-        history[history.length - 1]._sid = res.data.id;
-        saveHistory(history);
-      }
-    });
-  }
-
-  toast('游戏已强制结束，记录已保存', 'success');
-  cleanupAfterForceEnd();
-}
-
-function skipForceEndRecord() {
-  closeModal();
-  toast('游戏已强制结束，未保存记录', 'success');
-  cleanupAfterForceEnd();
-}
-
-function cleanupAfterForceEnd() {
-  clearHostState();
-  // 清理 viewer 特有的心跳定时器（clearHostState 不会清理此定时器）
-  if (_viewerHeartbeatInterval) {
-    clearInterval(_viewerHeartbeatInterval);
-    _viewerHeartbeatInterval = null;
-  }
-  showPage('setup');
-}
-
-// 更新多人状态栏：显示host/viewer/iPad按钮
-var _mpStatusBarVersion = 0;
-function updateMultiplayerStatusBar() {
-  var bar = document.getElementById('multiplayer-status-bar');
-  if (!bar) return;
-  var version = ++_mpStatusBarVersion;
-  var hostFp = (_deviceId && _isHost) ? _deviceId.slice(-6).toUpperCase() : '';
-  var roomsId = (_gameSessionId || '').slice(0, 8);
-
-  if (_isHost) {
-    if (_offlineMode) {
-      bar.innerHTML =
-        '<div class="mp-status-row">' +
-          '<span class="mp-badge host" title="多人协同未连接，使用单机模式" style="background:rgba(255,165,0,0.25);color:#ffb347;border:1px solid rgba(255,165,0,0.3)">单机模式</span>' +
-          '<span style="color:var(--text-dim);font-size:12px">多人协同未连接</span>' +
-        '</div>';
-    } else {
-      bar.innerHTML =
-        '<div class="mp-status-row">' +
-          '<span class="mp-badge host" title="你是房主">房主 ' + hostFp + '</span>' +
-          '<span class="mp-room-id" style="color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + roomsId + '</span>' +
-        '</div>' +
-        '<div class="mp-status-row" id="mp-viewer-row">' +
-          '<span class="mp-viewer-placeholder" style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
-        '</div>' +
-        (isIPad() ? '<div class="mp-status-row" style="justify-content:flex-end"><button class="btn small danger" onclick="forceRestartSession()">强制重启</button></div>' : '');
-      // 异步加载围观者列表
-      fetchViewerList(function(viewers) {
-        if (version !== _mpStatusBarVersion) return;
-        var viewerRow = document.getElementById('mp-viewer-row');
-        if (!viewerRow) return;
-        if (viewers && viewers.length > 0) {
-          var html = '<span style="color:var(--text-dim);font-size:12px">围观者: ' + viewers.length + '人</span>';
-          for (var vi = 0; vi < viewers.length; vi++) {
-            var fp = (viewers[vi].fingerprint || '').slice(0, 6);
-            var hue = hashStrToHue(fp);
-            html += '<span style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%);padding:1px 6px;border-radius:8px;font-size:11px;font-family:monospace;margin-left:4px">#' + fp + '</span>';
-          }
-          viewerRow.innerHTML = html;
-        } else {
-          viewerRow.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无围观者</span>';
-        }
-      });
-    }
-  } else if (_isViewer) {
-    var isOfflinePlayer = _isOfflinePlayer && _mySecretRole;
-    var badgeHtml = isOfflinePlayer
-      ? '<span class="mp-badge viewer" style="background:rgba(0,122,255,0.18);color:#0a84ff" title="线下玩家">线下玩家</span>'
-      : '<span class="mp-badge viewer" title="你正在围观">围观中</span>';
-    bar.innerHTML =
-      '<div class="mp-status-row">' +
-        badgeHtml +
-        '<span class="mp-room-id" style="color:var(--text-dim);font-size:12px;font-family:monospace">房间 ' + roomsId + '</span>' +
-      '</div>' +
-      '<div class="mp-status-row">' +
-        '<span class="mp-host-info" style="color:var(--gold);font-size:13px"></span>' +
-        '<span style="color:var(--text-dim);font-size:12px">' + (isOfflinePlayer ? '实时观看中...' : '等待房主操作...') + '</span>' +
-      '</div>' +
-      '<div class="mp-status-row" id="mp-viewer-list-row">' +
-        '<span style="color:var(--text-dim);font-size:12px">正在加载围观者...</span>' +
-      '</div>';
-    // 异步读取房主指纹
-    fetchHostFingerprint(function(fp) {
-      if (version !== _mpStatusBarVersion) return;
-      var hostEl = bar.querySelector('.mp-host-info');
-      if (hostEl && fp) hostEl.textContent = '房主: ' + fp;
-    });
-    // 异步加载围观者列表
-    fetchViewerListForViewer(function(viewers) {
-      if (version !== _mpStatusBarVersion) return;
-      var listRow = document.getElementById('mp-viewer-list-row');
-      if (!listRow) return;
-      if (viewers && viewers.length > 0) {
-        var html = '<span style="color:var(--text-dim);font-size:12px">围观者: ' + viewers.length + '人</span>';
-        for (var vi = 0; vi < viewers.length; vi++) {
-          var fp = (viewers[vi].fingerprint || '').slice(0, 6);
-          var hue = hashStrToHue(fp);
-          html += '<span style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%);padding:1px 6px;border-radius:8px;font-size:11px;font-family:monospace;margin-left:4px">#' + fp + '</span>';
-        }
-        listRow.innerHTML = html;
-      } else {
-        listRow.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无围观者</span>';
-      }
-    });
-  }
-  bar.style.display = (_isHost || _isViewer) ? 'flex' : 'none';
-}
-
-// 从 Supabase 读取围观者列表（含指纹标识）
-function fetchViewerList(callback) {
-  if (!_gameSessionId || !_isHost) { callback(null); return; }
-  var sb = getSupabase();
-  if (!sb) { callback(null); return; }
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data || !res.data.game_state) { callback(null); return; }
-    var gs = res.data.game_state;
-    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-    // 过滤掉超过2分钟未心跳的观众
-    var now = Date.now();
-    var active = [];
-    for (var i = 0; i < viewers.length; i++) {
-      if (viewers[i].lastSeen) {
-        var age = now - new Date(viewers[i].lastSeen).getTime();
-        if (age < 120000) active.push(viewers[i]);
-      }
-    }
-    callback(active);
-  }).catch(function() { callback(null); });
-}
-
-// 围观者视角读取围观者列表（无 _isHost 限制）
-function fetchViewerListForViewer(callback) {
-  if (!_gameSessionId || !_isViewer) { callback(null); return; }
-  var sb = getSupabase();
-  if (!sb) { callback(null); return; }
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data || !res.data.game_state) { callback(null); return; }
-    var gs = res.data.game_state;
-    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-    var now = Date.now();
-    var active = [];
-    for (var i = 0; i < viewers.length; i++) {
-      if (viewers[i].lastSeen) {
-        var age = now - new Date(viewers[i].lastSeen).getTime();
-        if (age < 120000) active.push(viewers[i]);
-      }
-    }
-    callback(active);
-  }).catch(function() { callback(null); });
-}
-
-// 从 Supabase 读取房主指纹
-function fetchHostFingerprint(callback) {
-  if (!_gameSessionId || !_isViewer) { callback(''); return; }
-  var sb = getSupabase();
-  if (!sb) { callback(''); return; }
-  sb.from('game_sessions').select('game_state').eq('id', _gameSessionId).single().then(function(res) {
-    if (res.error || !res.data || !res.data.game_state) { callback(''); return; }
-    callback(res.data.game_state._hostFingerprint || '');
-  }).catch(function() { callback(''); });
-}
-
-// 围观模式下禁用所有操作控件
-function applyViewerMode() {
-  if (!_isViewer) return;
-  // 禁用游戏页所有按钮（除了导航和复盘区域）
-  var gamePage = document.getElementById('page-game');
-  if (!gamePage) return;
-  var btns = gamePage.querySelectorAll('button:not(.nav-btn)');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].disabled = true;
-    btns[i].classList.add('viewer-disabled');
-  }
-  // 恢复复盘区域按钮（围观者需要看复盘）
-  var reviewBtns = gamePage.querySelectorAll('.review-section button');
-  for (var ri = 0; ri < reviewBtns.length; ri++) {
-    reviewBtns[ri].disabled = false;
-    reviewBtns[ri].classList.remove('viewer-disabled');
-  }
-  // 禁用 select 和 input
-  var inputs = gamePage.querySelectorAll('select, input');
-  for (var j = 0; j < inputs.length; j++) {
-    inputs[j].disabled = true;
-  }
-  // 倾向页：线下玩家不禁用操作控件，纯围观者禁用
-  var tendPage = document.getElementById('page-tend');
-  if (tendPage) {
-    if (!_mySecretRole) {
-      var tendBtns = tendPage.querySelectorAll('button:not(.nav-btn)');
-      for (var k = 0; k < tendBtns.length; k++) {
-        tendBtns[k].disabled = true;
-        tendBtns[k].classList.add('viewer-disabled');
-      }
-      var tendInputs = tendPage.querySelectorAll('select, input');
-      for (var m = 0; m < tendInputs.length; m++) {
-        tendInputs[m].disabled = true;
-      }
-    }
-  }
-  // 结束页禁用操作（保留强制结束按钮，让任何玩家都能使用）
-  var endPage = document.getElementById('page-end');
-  if (endPage) {
-    var endBtns = endPage.querySelectorAll('button:not(.nav-btn)');
-    for (var n = 0; n < endBtns.length; n++) {
-      if (endBtns[n].closest('#end-force-end-card')) continue;
-      endBtns[n].disabled = true;
-      endBtns[n].classList.add('viewer-disabled');
-    }
-  }
-}
-
 /* ==================== INIT ==================== */
 (function() {
   generateDeviceId();
   recordVisitor();
   startOnlineTracking();
-  // 建立 Supabase Realtime 订阅（跨设备实时同步）
+  // 建立 Supabase Realtime 订阅（仅同步对局记录与玩家管理，不再做游戏房间协同）
   setupRealtimeSubscriptions();
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
   var initAudioOnce = function() {
@@ -7154,65 +5786,3 @@ function toggleEvidence(idx) {
   el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
 }
 
-/* ------- Game page inline summary ------- */
-// 线下玩家角色卡片：游戏页顶部显示隐私角色
-function renderOfflinePlayerRoleCard() {
-  var el = document.getElementById('offline-player-role-card');
-  if (!el) {
-    // 动态创建卡片
-    var sbEl = document.getElementById('multiplayer-status-bar');
-    if (!sbEl) return;
-    el = document.createElement('div');
-    el.id = 'offline-player-role-card';
-    el.style.cssText = 'margin:8px 12px 0;padding:10px 14px;border:1px dashed var(--gold);border-radius:var(--radius-sm);background:rgba(201,168,76,0.08);display:flex;align-items:center;gap:8px;font-size:13px';
-    sbEl.after(el);
-  }
-  el.innerHTML = '<span style="font-size:16px">&#x1f512;</span>' +
-    '<span style="color:var(--text-dim)">你的身份：</span>' +
-    '<span style="color:var(--gold-light);font-weight:700;font-size:14px">' + escapeHtml(_mySecretRole) + '</span>' +
-    '<span style="color:var(--text-dim);font-size:11px;margin-left:auto">仅自己可见</span>';
-}
-
-/* ------- 页面关闭清理 ------- */
-window.addEventListener('beforeunload', function() {
-  if (_gameSessionId && (_isViewer || _isHost)) {
-    // 使用 sendBeacon 确保清理请求能发出
-    var sb = getSupabase();
-    if (sb && _isViewer) {
-      // 同步注销观众（fire-and-forget）
-      unregisterViewerSync(sb);
-    }
-  }
-});
-
-// 同步注销观众（用于 beforeunload）
-function unregisterViewerSync(sb) {
-  if (!_gameSessionId || !_deviceId) return;
-  var url = sb.supabaseUrl + '/rest/v1/game_sessions?id=eq.' + _gameSessionId;
-  var key = sb.supabaseKey;
-  // 先读取当前 game_state，移除自己后再写回
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url + '&select=game_state', false);
-  xhr.setRequestHeader('apikey', key);
-  xhr.setRequestHeader('Authorization', 'Bearer ' + key);
-  try { xhr.send(); } catch(e) { return; }
-  if (xhr.status !== 200) return;
-  try {
-    var data = JSON.parse(xhr.responseText);
-    if (!data || !data[0] || !data[0].game_state) return;
-    var gs = data[0].game_state;
-    var viewers = Array.isArray(gs._viewers) ? gs._viewers : [];
-    var filtered = [];
-    for (var i = 0; i < viewers.length; i++) {
-      if (viewers[i].deviceId !== _deviceId) filtered.push(viewers[i]);
-    }
-    gs._viewers = filtered;
-    var xhr2 = new XMLHttpRequest();
-    xhr2.open('PATCH', url, false);
-    xhr2.setRequestHeader('apikey', key);
-    xhr2.setRequestHeader('Authorization', 'Bearer ' + key);
-    xhr2.setRequestHeader('Content-Type', 'application/json');
-    xhr2.setRequestHeader('Prefer', 'return=minimal');
-    xhr2.send(JSON.stringify({ game_state: gs, updated_at: new Date().toISOString() }));
-  } catch(e) {}
-}
