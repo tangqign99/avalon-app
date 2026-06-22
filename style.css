@@ -639,14 +639,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .faction-label{font-size:12px;padding:2px 8px}
   .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px;max-width:100%}
   /* 手机端轮次圆圈缩小，避免溢出变椭圆 */
-  .round-dot{width:56px;height:56px;font-size:20px}
-  .round-dot .badge{top:-4px;right:-4px;width:14px;height:14px;font-size:8px;line-height:14px}
-  .badge.flip{width:16px;height:16px;font-size:9px;line-height:16px}
-  .round-tracker{gap:12px}
-  .lancelot-flip-row{gap:12px}
-  .lancelot-flip-dot{width:56px;height:56px}
-  .lancelot-flip-dot svg{width:36px;height:36px}
-  .lancelot-flip-tracker{gap:0}
+  .round-dot{width:48px;height:48px;font-size:18px}
+  .round-dot .badge{top:-3px;right:-3px;width:12px;height:12px;font-size:7px;line-height:12px}
+  .badge.flip{width:14px;height:14px;font-size:8px;line-height:14px}
+  .round-tracker{gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* 兰斯洛特反转与轮次上下对齐 */
+  .lancelot-flip-tracker{flex-direction:column;align-items:center;gap:4px}
+  .lancelot-flip-row{gap:10px}
+  .lancelot-flip-dot{width:48px;height:48px}
+  .lancelot-flip-dot svg{width:30px;height:30px}
 }
 @media(min-width:481px) and (max-width:1024px){
   .role-checkbox-grid label{font-size:16px;padding:10px 14px;min-height:48px;min-width:74px}
@@ -853,10 +854,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* Responsive: assassin mode */
 @media(max-width:480px){
   .assassin-float-btn {
-    top: 165px;
-    right: 8px;
-    padding: 6px 14px;
-    font-size: 13px;
+    top: 78px;
+    right: 4px;
+    padding: 5px 10px;
+    font-size: 12px;
   }
   .assassin-modal {
     padding: 16px;
