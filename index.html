@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v106"></script>
+<script defer src="./app.js?v=v107"></script>
 </head>
 <body>
 
@@ -129,7 +129,7 @@
   <div class="card" id="v7-engine-card">
     <div class="v7-card-header">
       <h2 style="margin:0">&#9883; v7 算法面板</h2>
-      <span class="v7-version-badge">v103</span>
+      <span class="v7-version-badge">v107</span>
     </div>
 
     <!-- 全局状态条 -->
@@ -244,7 +244,7 @@
   </div>
   <div class="card" style="text-align:center">
     <div class="add-name-row" style="margin-bottom:8px">
-      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:16px;padding:4px 6px;width:25px">
+      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
       <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">新增玩家</button>
     </div>
     <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
@@ -278,7 +278,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v106';
+  var SW_VERSION = 'v107';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);

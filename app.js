@@ -34,6 +34,10 @@ function getSupabase() {
 }
 
 var namePool = DEFAULT_NAME_POOL.slice();
+var _historyRawCache = null;
+var _historyCache = null;
+var _normalizedHistoryRawCache = null;
+var _normalizedHistoryCache = null;
 
 var state = {
   playerCount: 7,
@@ -145,9 +149,17 @@ function loadNamePool() {
 function saveNamePool() {
   localStorage.setItem('avalon_name_pool', JSON.stringify(namePool));
 }
+function invalidateHistoryCache() {
+  _historyRawCache = null;
+  _historyCache = null;
+  _normalizedHistoryRawCache = null;
+  _normalizedHistoryCache = null;
+}
 function loadHistory() {
   try {
-    var raw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
+    var rawText = localStorage.getItem('avalon_history_v2') || '[]';
+    if (_historyRawCache === rawText && _historyCache) return _historyCache.slice();
+    var raw = JSON.parse(rawText);
     var migrated = false;
     for (var i = 0; i < raw.length; i++) {
       if (!isRecordV2(raw[i])) {
@@ -155,12 +167,33 @@ function loadHistory() {
         migrated = true;
       }
     }
-    if (migrated) localStorage.setItem('avalon_history_v2', JSON.stringify(raw));
-    return raw;
+    if (migrated) {
+      rawText = JSON.stringify(raw);
+      localStorage.setItem('avalon_history_v2', rawText);
+    }
+    _historyRawCache = rawText;
+    _historyCache = raw;
+    _normalizedHistoryRawCache = null;
+    _normalizedHistoryCache = null;
+    return raw.slice();
   } catch(e) { return []; }
 }
+function loadNormalizedHistory() {
+  var rawText = localStorage.getItem('avalon_history_v2') || '[]';
+  if (_normalizedHistoryRawCache === rawText && _normalizedHistoryCache) return _normalizedHistoryCache.slice();
+  var raw = loadHistory();
+  var history = raw.map(function(r) { return normalizeRecord(r); });
+  _normalizedHistoryRawCache = localStorage.getItem('avalon_history_v2') || '[]';
+  _normalizedHistoryCache = history;
+  return history.slice();
+}
 function saveHistory(data) {
-  localStorage.setItem('avalon_history_v2', JSON.stringify(data));
+  var rawText = JSON.stringify(data);
+  localStorage.setItem('avalon_history_v2', rawText);
+  _historyRawCache = rawText;
+  _historyCache = data.slice();
+  _normalizedHistoryRawCache = null;
+  _normalizedHistoryCache = null;
 }
 
 // 将旧格式记录转为 v2 短字段格式
@@ -245,10 +278,10 @@ function normalizeRecord(record) {
   return record; // 兼容未迁移的旧格式
 }
 function getSortedNamePool() {
-  var raw = loadHistory();
+  var history = loadNormalizedHistory();
   var counts = {};
-  for (var i = 0; i < raw.length; i++) {
-    var rec = normalizeRecord(raw[i]);
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
     if (!rec.identities) continue;
     for (var j = 0; j < rec.identities.length; j++) {
       var name = rec.identities[j].name;
@@ -646,6 +679,7 @@ function setActiveNav(page) {
   if (btn) btn.classList.add('active');
 }
 function showPage(page) {
+  var prevPage = state._currentPage;
   state._currentPage = page;
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   var pg = document.getElementById('page-' + page);
@@ -659,7 +693,10 @@ function showPage(page) {
     renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
   }
   if (page === 'end') renderEnd();
-  if (page === 'stats') { state._historyPage = 0; renderStats(); }
+  if (page === 'stats') {
+    if (prevPage !== 'stats') state._historyPage = 0;
+    renderStats();
+  }
 }
 
 // 游戏导航入口：未开始游戏则提示先去 setup 配置
@@ -1443,8 +1480,7 @@ function computeMerlinProbability() {
   }
 
   // --- Historical analysis: check past games where each player was Merlin ---
-  var raw = loadHistory();
-  var history = raw.map(function(r) { return normalizeRecord(r); });
+  var history = loadNormalizedHistory();
   if (history.length > 0) {
     for (var i = 0; i < pc; i++) {
       if (i === state.selfIndex) continue;
@@ -3254,8 +3290,7 @@ function saveGameRecord() {
 /* ==================== STATS PANEL ==================== */
 function renderStats() {
   renderConnectionStatus();
-  var raw = loadHistory();
-  var history = raw.map(function(r) { return normalizeRecord(r); });
+  var history = loadNormalizedHistory();
   var total = history.length;
   var goodWins = history.filter(function(h) { return h.winner === 'good'; }).length;
   var evilWins = history.filter(function(h) { return h.winner === 'evil'; }).length;
@@ -4180,6 +4215,7 @@ function confirmClearStats() {
   closeModal();
   localStorage.removeItem('avalon_history_v2');
   localStorage.removeItem('avalon_last_sync');
+  invalidateHistoryCache();
   toast('已清除所有统计');
   renderStats();
 }
@@ -4248,6 +4284,7 @@ function doImport() {
     var k = validKeys[i];
     if (k in data) {
       localStorage.setItem(k, JSON.stringify(data[k]));
+      if (k === 'avalon_history_v2') invalidateHistoryCache();
       imported++;
     }
   }
