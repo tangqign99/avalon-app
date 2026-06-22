@@ -1,11 +1,11 @@
-/* ==================== Service Worker v108 ==================== */
-// sw.js / service-worker.js - v108
-var CACHE_NAME = 'avalon-pwa-v108';
+/* ==================== Service Worker v109 ==================== */
+// sw.js / service-worker.js - v109
+var CACHE_NAME = 'avalon-pwa-v109';
 var ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js?v=v108',
+  './app.js?v=v109',
   './vendor/supabase.min.js',
   './manifest.json'
 ];

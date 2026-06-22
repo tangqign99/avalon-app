@@ -20,12 +20,14 @@ body{
   user-select:none;-webkit-user-select:none;
   position:relative;
 }
-/* Dark forest background image (very subtle overlay) */
+/* 背景氛围层：使用纯 CSS，避免缺失图片造成额外 404 请求 */
 body::before{
-  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity: 0.12;
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.18;
   background:
-    url('./images/dark-forest-bg.png') center/cover no-repeat,
-    url('./images/stone-wall-tile.png') repeat;
+    radial-gradient(circle at 20% 10%,rgba(201,168,76,0.16),transparent 28%),
+    radial-gradient(circle at 78% 18%,rgba(74,144,217,0.12),transparent 24%),
+    linear-gradient(135deg,rgba(255,255,255,0.04) 0 1px,transparent 1px 16px),
+    linear-gradient(180deg,rgba(13,11,8,0.2),rgba(13,11,8,0.55));
 }
 /* Castle silhouette at bottom */
 body::after{
