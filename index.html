@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v101"></script>
+<script defer src="./app.js?v=v102"></script>
 </head>
 <body>
 
@@ -42,7 +42,7 @@
   </div>
   <div class="card">
     <h2 style="text-align:center">可选规则</h2>
-    <div style="display:flex;justify-content:center"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button></div>
+    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button><button id="excalibur-row" class="lady-toggle-btn" onclick="toggleExcalibur()">王者之剑</button></div>
     <div class="timer-setup" id="timer-setup">
       <h3>计时模式</h3>
       <div class="timer-mode-row">
@@ -131,7 +131,7 @@
   <div class="card" id="v7-engine-card">
     <div class="v7-card-header">
       <h2 style="margin:0">&#9883; v7 算法面板</h2>
-      <span class="v7-version-badge">v101</span>
+      <span class="v7-version-badge">v102</span>
     </div>
 
     <!-- 全局状态条 -->
@@ -284,7 +284,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v101';
+  var SW_VERSION = 'v102';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);

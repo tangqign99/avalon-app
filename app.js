@@ -60,6 +60,8 @@ var state = {
   _assassinTimerRemaining: 0,
   _assassinTimerInterval: null,
   ladyOfLakeEnabled: true,
+  excaliburEnabled: false,
+  excaliburHistory: [],
   ladyLakeHolder: -1,
   ladyLakeChecks: [],
   timerMode: 'all',
@@ -105,6 +107,8 @@ function initState(n) {
   state._assassinTimerRemaining = 0;
   state._assassinTimerInterval = null;
   state.ladyOfLakeEnabled = true;
+  state.excaliburEnabled = false;
+  state.excaliburHistory = [];
   state.ladyLakeHolder = -1;
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
@@ -193,7 +197,11 @@ function toRecordV2(record) {
     return vm;
   });
   if (record.ladyCheckHistory) v2.lch = record.ladyCheckHistory.map(function(h) {
-    return { r: h.round, h: h.holder, hn: h.holderName, t: h.target, tn: h.targetName, res: h.result };
+    return { r: h.round, h: h.holder, hn: h.holderName, t: h.target, tn: h.targetName, res: h.result, n: h.note, rr: h.recordedAtRound, sp: h.recordedAtSpeaker };
+  });
+  if (record.excaliburEnabled !== undefined) v2.ee = record.excaliburEnabled;
+  if (record.excaliburHistory) v2.ex = record.excaliburHistory.map(function(e) {
+    return { r: e.round, ld: e.leader, ldn: e.leaderName, tm: e.team, h: e.holder, hn: e.holderName, u: e.used, t: e.target, tn: e.targetName, fr: e.feedbackRecorded, fbr: e.feedbackRound, fs: e.feedbackSpeaker, cd: e.claimedDirection, n: e.note };
   });
   if (record.forceEnded) v2.fe = record.forceEnded;
   if (record.forceEndReason) v2.fer = record.forceEndReason;
@@ -224,7 +232,9 @@ function fromRecordV2(v2) {
     if (m.v) rm.votes = m.v;
     return rm;
   });
-  rec.ladyCheckHistory = (v2.lch || []).map(function(h) { return { round: h.r, holder: h.h, holderName: h.hn, target: h.t, targetName: h.tn, result: h.res }; });
+  rec.ladyCheckHistory = (v2.lch || []).map(function(h) { return { round: h.r, holder: h.h, holderName: h.hn, target: h.t, targetName: h.tn, result: h.res, note: h.n || '', recordedAtRound: h.rr, recordedAtSpeaker: h.sp }; });
+  rec.excaliburEnabled = !!v2.ee;
+  rec.excaliburHistory = (v2.ex || []).map(function(e) { return { round: e.r, leader: e.ld, leaderName: e.ldn, team: e.tm || [], holder: e.h, holderName: e.hn, used: e.u, target: e.t, targetName: e.tn, feedbackRecorded: e.fr, feedbackRound: e.fbr, feedbackSpeaker: e.fs, claimedDirection: e.cd || '', note: e.n || '' }; });
   rec.forceEnded = v2.fe || false;
   rec.forceEndReason = v2.fer || '';
   rec.forceEndTime = v2.fet || '';
@@ -786,6 +796,11 @@ function renderSetup() {
     if (state.ladyOfLakeEnabled) { ladyRow.classList.add('checked'); }
     else { ladyRow.classList.remove('checked'); }
   }
+  var excaliburRow = document.getElementById('excalibur-row');
+  if (excaliburRow) {
+    if (state.excaliburEnabled) { excaliburRow.classList.add('checked'); }
+    else { excaliburRow.classList.remove('checked'); }
+  }
 }
 
 function setPlayerCount(n) {
@@ -983,6 +998,14 @@ function toggleLadyOfLake() {
   var row = document.getElementById('lady-check-row');
   if (state.ladyOfLakeEnabled) { row.classList.add('checked'); }
   else { row.classList.remove('checked'); }
+}
+
+
+function toggleExcalibur() {
+  state.excaliburEnabled = !state.excaliburEnabled;
+  if (!state.excaliburHistory) state.excaliburHistory = [];
+  renderSetup();
+  syncGameState();
 }
 
 function setTimerMode(mode) {
@@ -1365,6 +1388,7 @@ function renderStepPanel() {
     h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
     h += '</div>';
+    h += buildSpeechPhaseInfoPanel();
 
     c.innerHTML = h;
     return;
@@ -1801,13 +1825,10 @@ function renderLadyLakeResults() {
 }
 
 function renderLadyLakeEntry() {
+  // 湖中女神改为发言阶段记录，不再保留侧边栏手动入口
   var el = $('lady-lake-entry');
   if (!el) return;
-  if (state.ladyOfLakeEnabled) {
-    el.style.display = 'block';
-  } else {
-    el.style.display = 'none';
-  }
+  el.style.display = 'none';
 }
 
 function renderLadyLakeHolderInfo() {
@@ -2301,6 +2322,279 @@ function renderDeduction() {
   setActiveNav('tend');
 }
 
+
+/* ==================== 发言阶段信息：湖中女神 / 王者之剑 ==================== */
+function excaliburDirectionLabel(dir) {
+  if (dir === 'fail_to_success') return '失败 → 成功';
+  if (dir === 'success_to_fail') return '成功 → 失败';
+  if (dir === 'unknown') return '未说明';
+  if (dir === 'refused') return '拒绝说明';
+  return '待反馈';
+}
+
+function ladyClaimLabel(res) {
+  if (res === 'good') return '好人';
+  if (res === 'evil') return '反方';
+  if (res === 'unknown') return '未说明';
+  if (res === 'refused') return '拒绝说明';
+  return '未记录';
+}
+
+function getExcaliburRecord(round) {
+  var arr = state.excaliburHistory || [];
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].round === round) return arr[i];
+  }
+  return null;
+}
+
+function clearExcaliburRecord(round) {
+  if (!state.excaliburHistory) return;
+  state.excaliburHistory = state.excaliburHistory.filter(function(e) { return e.round !== round; });
+}
+
+function ensureExcaliburRecord(round) {
+  if (!state.excaliburHistory) state.excaliburHistory = [];
+  var rec = getExcaliburRecord(round);
+  if (rec) return rec;
+  var m = state.missions[round];
+  rec = {
+    round: round,
+    leader: m ? m.leader : -1,
+    team: m && m.team ? m.team.slice() : [],
+    holder: -1,
+    used: null,
+    target: null,
+    feedbackRecorded: false,
+    feedbackRound: null,
+    feedbackSpeaker: null,
+    claimedDirection: '',
+    note: '',
+    createdAt: Date.now(),
+    feedbackAt: null
+  };
+  state.excaliburHistory.push(rec);
+  return rec;
+}
+
+function showExcaliburHolderModal(round) {
+  if (!state.excaliburEnabled) return;
+  var m = state.missions[round];
+  if (!m || !m.team || m.team.length === 0) return;
+  var rec = ensureExcaliburRecord(round);
+  var h = '<h2>王者之剑</h2>';
+  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。后续若使用，只能对队伍中除持剑者外的玩家使用。</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  for (var i = 0; i < m.team.length; i++) {
+    var pi = m.team[i];
+    h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+  }
+  h += '</div>';
+  if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
+  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()">稍后指定</button></div>';
+  showModal(h);
+}
+
+function setExcaliburHolder(round, holderIdx) {
+  var rec = ensureExcaliburRecord(round);
+  rec.holder = holderIdx;
+  rec.used = rec.used === undefined ? null : rec.used;
+  rec.target = (rec.target === holderIdx) ? null : rec.target;
+  closeModal();
+  toast('王者之剑持剑者：' + playerLabel(holderIdx));
+  renderGame();
+  syncGameState();
+}
+
+function setExcaliburUsed(round, used) {
+  var rec = ensureExcaliburRecord(round);
+  if (rec.holder < 0) { toast('请先指定王者之剑持剑者', 'warn'); return; }
+  rec.used = !!used;
+  if (!used) {
+    rec.target = null;
+    rec.feedbackRecorded = true;
+    rec.feedbackRound = null;
+    rec.feedbackSpeaker = null;
+    rec.claimedDirection = '';
+    rec.note = '';
+  } else {
+    rec.feedbackRecorded = false;
+  }
+  renderStepPanelWithResult();
+  syncGameState();
+}
+
+function setExcaliburTarget(round, targetIdx) {
+  var rec = ensureExcaliburRecord(round);
+  if (rec.holder === targetIdx) { toast('王者之剑不能对持剑者本人使用', 'warn'); return; }
+  rec.target = targetIdx;
+  renderStepPanelWithResult();
+  syncGameState();
+}
+
+function buildExcaliburPreResultPanel(m) {
+  if (!state.excaliburEnabled) return '';
+  var round = state.currentRound;
+  var rec = ensureExcaliburRecord(round);
+  var h = '<div class="speech-info-card excalibur-card">';
+  h += '<div class="speech-info-title">王者之剑 · 任务结果公布前确认</div>';
+  if (rec.holder < 0) {
+    h += '<div class="speech-info-sub">队长需要先从本轮队伍成员中指定持剑者。</div>';
+    h += '<button class="btn small" onclick="showExcaliburHolderModal(' + round + ')">指定持剑者</button>';
+    h += '</div>';
+    return h;
+  }
+  h += '<div class="speech-info-sub">持剑者：<strong>' + playerLabel(rec.holder) + '</strong></div>';
+  h += '<div class="btn-row" style="margin:6px 0">';
+  h += '<button class="btn small' + (rec.used === false ? ' success' : '') + '" onclick="setExcaliburUsed(' + round + ',false)">不使用</button>';
+  h += '<button class="btn small' + (rec.used === true ? ' warn' : '') + '" onclick="setExcaliburUsed(' + round + ',true)">使用</button>';
+  h += '</div>';
+  if (rec.used === true) {
+    h += '<div class="speech-info-sub">使用目标（仅限本轮队伍中除持剑者外）：</div><div class="btn-row" style="gap:6px">';
+    for (var i = 0; i < m.team.length; i++) {
+      var pi = m.team[i];
+      if (pi === rec.holder) continue;
+      h += '<button class="btn small' + (rec.target === pi ? ' primary' : '') + '" onclick="setExcaliburTarget(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+    }
+    h += '</div><div class="speech-info-sub">下一轮发言阶段只记录持剑者口述的改变方向。</div>';
+  } else if (rec.used === false) {
+    h += '<div class="speech-info-sub">本轮确认不使用，下一轮不会弹出王者之剑反馈。</div>';
+  } else {
+    h += '<div class="speech-info-sub">请在公布任务结果前确认是否使用。</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function hasLadyClaimThisRound() {
+  var arr = state.ladyCheckHistory || [];
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].round === state.currentRound) return true;
+  }
+  return false;
+}
+
+function shouldShowLadySpeechCard() {
+  if (!state.ladyOfLakeEnabled || state.currentRound <= 0 || state.ladyLakeHolder < 0 || hasLadyClaimThisRound()) return false;
+  if (state.timerMode === 'all') return state._teamConfirmedPending;
+  if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
+    return state.speakerOrder[state.currentSpeakerIdx] === state.ladyLakeHolder;
+  }
+  return false;
+}
+
+function getPendingExcaliburFeedbacks() {
+  var arr = state.excaliburHistory || [];
+  var list = [];
+  for (var i = 0; i < arr.length; i++) {
+    var e = arr[i];
+    if (e.used === true && e.target !== null && !e.feedbackRecorded && e.round < state.currentRound) {
+      if (state.timerMode === 'all') list.push(e);
+      else if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0 && state.speakerOrder[state.currentSpeakerIdx] === e.holder) list.push(e);
+    }
+  }
+  return list;
+}
+
+function buildLadySpeechCard() {
+  var holder = state.ladyLakeHolder;
+  var h = '<div class="speech-info-card lady-card">';
+  h += '<div class="speech-info-title">湖中女神声明</div>';
+  h += '<div class="speech-info-sub">持有人：<strong>' + playerLabel(holder) + '</strong>。请在其发言时记录口述验人结果。</div>';
+  h += '<label class="speech-info-label">口述验人对象</label><select id="lady-speech-target" class="speech-info-select">';
+  for (var i = 0; i < state.playerCount; i++) {
+    if (i === holder) continue;
+    h += '<option value="' + i + '">' + playerLabel(i) + '</option>';
+  }
+  h += '</select>';
+  h += '<label class="speech-info-label">口述结果</label><select id="lady-speech-result" class="speech-info-select">';
+  h += '<option value="good">好人</option><option value="evil">反方</option><option value="unknown">未说明</option><option value="refused">拒绝说明</option>';
+  h += '</select>';
+  h += '<input id="lady-speech-note" class="speech-info-input" placeholder="备注：记录原话或简述">';
+  h += '<button class="btn small primary" onclick="saveLadySpeechClaim()">保存湖中女神声明</button>';
+  h += '</div>';
+  return h;
+}
+
+function saveLadySpeechClaim() {
+  var holder = state.ladyLakeHolder;
+  if (holder < 0) return;
+  var targetEl = document.getElementById('lady-speech-target');
+  var resultEl = document.getElementById('lady-speech-result');
+  var noteEl = document.getElementById('lady-speech-note');
+  if (!targetEl || !resultEl) return;
+  var target = parseInt(targetEl.value);
+  var result = resultEl.value;
+  var note = noteEl ? noteEl.value : '';
+  var speaker = (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) ? state.speakerOrder[state.currentSpeakerIdx] : null;
+  var rec = { round: state.currentRound, holder: holder, target: target, result: result, note: note, recordedAtRound: state.currentRound, recordedAtSpeaker: speaker };
+  state.ladyLakeChecks.push(rec);
+  state.ladyCheckHistory.push(rec);
+  state.ladyLakeHolder = target;
+  toast('已记录湖中女神声明：' + playerLabel(holder) + ' → ' + playerLabel(target) + '：' + ladyClaimLabel(result));
+  renderGame();
+  syncGameState();
+}
+
+function buildExcaliburFeedbackCard(rec) {
+  var h = '<div class="speech-info-card excalibur-card">';
+  h += '<div class="speech-info-title">上一轮王者之剑反馈</div>';
+  h += '<div class="speech-info-sub">第' + (rec.round + 1) + '轮持剑者：<strong>' + playerLabel(rec.holder) + '</strong>；使用目标：<strong>' + playerLabel(rec.target) + '</strong></div>';
+  h += '<label class="speech-info-label">持剑者口述改变方向</label><select id="excalibur-feedback-dir-' + rec.round + '" class="speech-info-select">';
+  h += '<option value="fail_to_success">失败 → 成功</option><option value="success_to_fail">成功 → 失败</option><option value="unknown">未说明</option><option value="refused">拒绝说明</option>';
+  h += '</select>';
+  h += '<input id="excalibur-feedback-note-' + rec.round + '" class="speech-info-input" placeholder="备注：记录原话或简述">';
+  h += '<button class="btn small primary" onclick="saveExcaliburFeedback(' + rec.round + ')">保存王者之剑反馈</button>';
+  h += '</div>';
+  return h;
+}
+
+function saveExcaliburFeedback(round) {
+  var rec = getExcaliburRecord(round);
+  if (!rec) return;
+  var dirEl = document.getElementById('excalibur-feedback-dir-' + round);
+  var noteEl = document.getElementById('excalibur-feedback-note-' + round);
+  rec.claimedDirection = dirEl ? dirEl.value : 'unknown';
+  rec.note = noteEl ? noteEl.value : '';
+  rec.feedbackRecorded = true;
+  rec.feedbackRound = state.currentRound;
+  rec.feedbackSpeaker = (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) ? state.speakerOrder[state.currentSpeakerIdx] : null;
+  rec.feedbackAt = Date.now();
+  toast('已记录王者之剑反馈：' + excaliburDirectionLabel(rec.claimedDirection));
+  renderGame();
+  syncGameState();
+}
+
+function buildSpeechPhaseInfoPanel() {
+  if (!state._teamConfirmedPending || state.timerMode === 'off') return '';
+  var cards = [];
+  if (shouldShowLadySpeechCard()) cards.push(buildLadySpeechCard());
+  var exs = getPendingExcaliburFeedbacks();
+  for (var i = 0; i < exs.length; i++) cards.push(buildExcaliburFeedbackCard(exs[i]));
+  if (!cards.length) return '';
+  var title = state.timerMode === 'all' ? '发言阶段信息记录' : '当前发言人信息记录';
+  return '<div class="speech-info-panel"><div class="speech-info-panel-title">' + title + '（待处理 ' + cards.length + ' 项）</div>' + cards.join('') + '</div>';
+}
+
+function renderExcaliburHistorySummary() {
+  var arr = state.excaliburHistory || [];
+  if (!arr.length) return '';
+  var h = '<div style="font-size:12px;color:var(--text-dim);margin-top:6px">';
+  for (var i = 0; i < arr.length; i++) {
+    var e = arr[i];
+    h += '<div>第' + (e.round + 1) + '轮王者之剑：';
+    h += e.holder >= 0 ? playerLabel(e.holder) : '未指定';
+    if (e.used === false) h += '，未使用';
+    else if (e.used === true) {
+      h += '，对 ' + (e.target !== null ? playerLabel(e.target) : '未选目标') + ' 使用';
+      h += e.feedbackRecorded ? '，声明：' + excaliburDirectionLabel(e.claimedDirection) : '，待反馈';
+    } else h += '，待确认';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 /* ==================== TIMER ==================== */
 function renderTimerDisplay() {
   var el = $('timer-display');
@@ -2391,6 +2685,7 @@ function speakEnd() {
     var btnRow = document.getElementById('timer-btns');
     if (btnRow) btnRow.hidden = false;
     renderTimerDisplay();
+    renderStepPanel();
     startTimer();
   } else {
     state.currentSpeakerIdx = -1;
@@ -2642,12 +2937,6 @@ function confirmTeam() {
   // Start speech phase before voting
   state._teamConfirmedPending = true;
 
-  // 湖中女神验人弹出：第3轮起，每轮第一次确认组队后触发
-  if (state.ladyOfLakeEnabled && state.currentRound >= 2 && !state._ladyCheckTriggeredThisRound) {
-    state._ladyCheckTriggeredThisRound = true;
-    showLadyCheck();
-  }
-
   if (state.timerMode === 'per') {
     state.speakerOrder = [];
     state.speakTimes = {};
@@ -2669,6 +2958,9 @@ function confirmTeam() {
     startTimer();
   }
   renderStepPanel();
+  if (state.excaliburEnabled && !getExcaliburRecord(state.currentRound)) {
+    setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
+  }
   // 同步到 Supabase：组队确认后立即同步（围观者需要看到组队结果）
   syncGameState();
 }
@@ -2740,6 +3032,7 @@ function confirmVotes() {
     renderStepPanelWithResult();
     syncGameState();
   } else {
+    clearExcaliburRecord(state.currentRound);
     m.launchFailures++;
 
     // Save tendency snapshot for this failed launch attempt
@@ -2812,6 +3105,7 @@ function renderStepPanelWithResult() {
   var rejects = state.playerCount - approves;
   h += '<div style="font-size:14px;color:var(--green-bright);margin-bottom:10px">组队成功！赞成 ' + approves + ' / 反对 ' + rejects + '</div>';
 
+  h += buildExcaliburPreResultPanel(m);
   h += '<hr style="border-color:var(--border);margin-bottom:10px">';
   h += '<div class="step-label">步骤D：任务结果</div>';
   h += '<div class="mission-result-area">';
@@ -2864,6 +3158,12 @@ function finalizeMission() {
   var m = state.missions[state.currentRound];
   if (!m.result) { toast('请选择任务结果', 'warn'); return; }
   if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
+  if (state.excaliburEnabled) {
+    var exRec = getExcaliburRecord(state.currentRound);
+    if (!exRec || exRec.holder < 0) { toast('请先指定王者之剑持剑者', 'warn'); return; }
+    if (exRec.used === null || exRec.used === undefined) { toast('请先确认王者之剑是否使用', 'warn'); return; }
+    if (exRec.used === true && (exRec.target === null || exRec.target === undefined)) { toast('请选择王者之剑使用目标', 'warn'); return; }
+  }
 
   // 第4轮保护轮：需2张失败票任务才失败，1张失败任务仍成功（6人局例外，无保护）
   if (state.currentRound === 3 && m.result === 'fail' && (m.failCount || 0) === 1 && state.playerCount !== 6) {
@@ -3409,7 +3709,29 @@ function saveGameRecord() {
         holderName: playerLabel(h.holder),
         target: h.target,
         targetName: playerLabel(h.target),
-        result: h.result
+        result: h.result,
+        note: h.note || '',
+        recordedAtRound: h.recordedAtRound,
+        recordedAtSpeaker: h.recordedAtSpeaker
+      };
+    }),
+    excaliburEnabled: state.excaliburEnabled,
+    excaliburHistory: (state.excaliburHistory || []).map(function(e) {
+      return {
+        round: e.round,
+        leader: e.leader,
+        leaderName: e.leader >= 0 ? playerLabel(e.leader) : '',
+        team: (e.team || []).map(function(ti) { return playerLabel(ti); }),
+        holder: e.holder,
+        holderName: e.holder >= 0 ? playerLabel(e.holder) : '',
+        used: e.used,
+        target: e.target,
+        targetName: e.target !== null && e.target !== undefined ? playerLabel(e.target) : '',
+        feedbackRecorded: e.feedbackRecorded,
+        feedbackRound: e.feedbackRound,
+        feedbackSpeaker: e.feedbackSpeaker,
+        claimedDirection: e.claimedDirection || '',
+        note: e.note || ''
       };
     })
   };
@@ -4088,6 +4410,29 @@ function showGameDetail(idx) {
     }
   }
 
+
+
+  if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
+    h += '<h3 style="margin-top:10px">王者之剑</h3>';
+    for (var ei = 0; ei < rec.excaliburHistory.length; ei++) {
+      var ex = rec.excaliburHistory[ei];
+      h += '<div style="margin-bottom:5px;padding:6px 10px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.18);border-radius:var(--radius-sm);font-size:13px">';
+      h += '<strong>第' + (ex.round + 1) + '轮：</strong>';
+      h += '持剑者 ' + (ex.holderName || (ex.holder !== undefined ? (ex.holder + 1) + '号' : '未指定'));
+      if (ex.used === false) {
+        h += '，<span style="color:var(--text-dim)">未使用</span>';
+      } else if (ex.used === true) {
+        h += '，对 ' + (ex.targetName || (ex.target !== undefined && ex.target !== null ? (ex.target + 1) + '号' : '未记录目标')) + ' 使用';
+        h += '，反馈：<span style="font-weight:700;color:var(--gold-light)">' + excaliburDirectionLabel(ex.claimedDirection) + '</span>';
+        if (ex.feedbackRound !== null && ex.feedbackRound !== undefined) h += '（第' + (ex.feedbackRound + 1) + '轮发言记录）';
+      } else {
+        h += '，<span style="color:var(--orange)">待确认是否使用</span>';
+      }
+      if (ex.note) h += '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">备注：' + ex.note + '</div>';
+      h += '</div>';
+    }
+  }
+
   if (rec.roundTendencies && rec.roundTendencies.length > 0) {
     h += '<h3 style="margin-top:10px">倾向值变化</h3>';
     h += '<table style="font-size:12px;width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid var(--border)"><th style="padding:4px 6px;text-align:left">玩家</th>';
@@ -4705,6 +5050,8 @@ function serializeGameState() {
     assassinMode: state.assassinMode,
     _assassinAfterRound: state._assassinAfterRound,
     ladyOfLakeEnabled: state.ladyOfLakeEnabled,
+    excaliburEnabled: state.excaliburEnabled,
+    excaliburHistory: state.excaliburHistory ? JSON.parse(JSON.stringify(state.excaliburHistory)) : [],
     ladyLakeHolder: state.ladyLakeHolder,
     ladyLakeChecks: state.ladyLakeChecks ? JSON.parse(JSON.stringify(state.ladyLakeChecks)) : [],
     ladyCheckHistory: state.ladyCheckHistory ? JSON.parse(JSON.stringify(state.ladyCheckHistory)) : [],
@@ -4740,6 +5087,8 @@ function deserializeGameState(gs) {
   state.assassinMode = gs.assassinMode || false;
   state._assassinAfterRound = gs._assassinAfterRound !== undefined ? gs._assassinAfterRound : null;
   state.ladyOfLakeEnabled = gs.ladyOfLakeEnabled || false;
+  state.excaliburEnabled = gs.excaliburEnabled || false;
+  state.excaliburHistory = gs.excaliburHistory || [];
   state.ladyLakeHolder = gs.ladyLakeHolder !== undefined ? gs.ladyLakeHolder : -1;
   state.ladyLakeChecks = gs.ladyLakeChecks || [];
   state.ladyCheckHistory = gs.ladyCheckHistory || [];
@@ -4758,6 +5107,7 @@ function deserializeGameState(gs) {
   // 确保 internal 字段存在
   if (!state.identityMarks) state.identityMarks = [];
   if (!state.roundTendencies) state.roundTendencies = [];
+  if (!state.excaliburHistory) state.excaliburHistory = [];
   if (!state.ladyCheckHistory) state.ladyCheckHistory = [];
 }
 
@@ -5661,7 +6011,29 @@ function saveForceEndRecord() {
         holderName: playerLabel(h.holder),
         target: h.target,
         targetName: playerLabel(h.target),
-        result: h.result
+        result: h.result,
+        note: h.note || '',
+        recordedAtRound: h.recordedAtRound,
+        recordedAtSpeaker: h.recordedAtSpeaker
+      };
+    }),
+    excaliburEnabled: state.excaliburEnabled,
+    excaliburHistory: (state.excaliburHistory || []).map(function(e) {
+      return {
+        round: e.round,
+        leader: e.leader,
+        leaderName: e.leader >= 0 ? playerLabel(e.leader) : '',
+        team: (e.team || []).map(function(ti) { return playerLabel(ti); }),
+        holder: e.holder,
+        holderName: e.holder >= 0 ? playerLabel(e.holder) : '',
+        used: e.used,
+        target: e.target,
+        targetName: e.target !== null && e.target !== undefined ? playerLabel(e.target) : '',
+        feedbackRecorded: e.feedbackRecorded,
+        feedbackRound: e.feedbackRound,
+        feedbackSpeaker: e.feedbackSpeaker,
+        claimedDirection: e.claimedDirection || '',
+        note: e.note || ''
       };
     }),
     forceEnded: true,
@@ -6112,6 +6484,44 @@ function computeSuspectScores() {
     }
   }
 
+
+
+  // Step 2B: 王者之剑声明类证据
+  var exHistory = state.excaliburHistory || [];
+  for (var exi = 0; exi < exHistory.length; exi++) {
+    var ex = exHistory[exi];
+    if (!ex || ex.used !== true || ex.holder === undefined || ex.holder < 0) continue;
+    var holder = ex.holder;
+    var target = ex.target;
+    var dir = ex.claimedDirection || '';
+    if (ev[holder] && !ev[holder].locked) {
+      if (!ex.feedbackRecorded) {
+        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用，待反馈；该轮任务权重降低');
+      } else if (dir === 'fail_to_success') {
+        ev[holder].good_ev += 10;
+        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑声明：失败→成功，持剑者好人证据 +10');
+      } else if (dir === 'success_to_fail') {
+        ev[holder].evil_ev += 15;
+        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑声明：成功→失败，持剑者坏人证据 +15');
+      } else if (dir === 'unknown') {
+        ev[holder].evil_ev += 4;
+        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用但未说明方向 +4');
+      } else if (dir === 'refused') {
+        ev[holder].evil_ev += 5;
+        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用但拒绝说明 +5');
+      }
+    }
+    if (target !== null && target !== undefined && ev[target] && !ev[target].locked && ex.feedbackRecorded) {
+      if (dir === 'fail_to_success') {
+        ev[target].evil_ev += 8;
+        ev[target].reasons.push('R' + (ex.round + 1) + '王者之剑声明：目标原为失败牌 +8');
+      } else if (dir === 'success_to_fail') {
+        ev[target].good_ev += 6;
+        ev[target].reasons.push('R' + (ex.round + 1) + '王者之剑声明：目标原为成功牌，好人也可能被改成失败 +6');
+      }
+    }
+  }
+
   // Step 3: Task result hard constraints (with round recency decay & dual-fail detection)
   var missions = state.missions || [];
   var completed = [];
@@ -6143,6 +6553,8 @@ function computeSuspectScores() {
     var teamSize = team.length;
     var failCount = m.failCount || 0;
     var recency = roundRecency(r, totalRounds);
+    var exRoundRec = getExcaliburRecord(m.round != null ? m.round : r);
+    if (exRoundRec && exRoundRec.used === true) recency *= 0.7;
 
     var knownEvilInTeam = [];
     var unknownInTeam = [];
@@ -6399,7 +6811,7 @@ function computeSuspectScores() {
 
 
 
-/* ------- v7 Engine Info Panel (v101: 9-step visualizer) ------- */
+/* ------- v7 Engine Info Panel (v102: 9-step visualizer) ------- */
 function renderV7EngineInfo() {
   var statusEl = document.getElementById('v7-engine-status');
   var stepsEl = document.getElementById('v7-engine-steps');
@@ -6440,8 +6852,11 @@ function renderV7EngineInfo() {
     else if (isEvilRole(lab) || lab === '反方' || lab === '坏人') lockedEvil++;
   }
 
-  // Step 2: 湖中仙女
+  // Step 2: 声明类信息（湖中女神 / 王者之剑）
   var ladyChecks = (state.ladyLakeChecks || []).filter(function(c){ return c && c.target !== undefined && c.target !== selfIdx; });
+  var exTotal = (state.excaliburHistory || []).length;
+  var exUsed = (state.excaliburHistory || []).filter(function(e){ return e && e.used === true; }).length;
+  var exPending = (state.excaliburHistory || []).filter(function(e){ return e && e.used === true && !e.feedbackRecorded; }).length;
 
   // Step 3: 任务结果硬约束
   var failRounds = 0, succRounds = 0, dualFail = 0;
@@ -6505,9 +6920,10 @@ function renderV7EngineInfo() {
     ? '<span class="ok">已锁定 ' + knownCount + ' 人</span>（好' + lockedGood + ' / 坏' + lockedEvil + '）硬锚点 0 或 100'
     : '<span>暂无标注</span>，可在下方「已知身份」标记';
 
-  var s2Meta = ladyChecks.length > 0
-    ? '<span class="ok">已查验 ' + ladyChecks.length + ' 次</span>，每次 <span class="hl">±20</span>'
-    : '湖中女神<span>未触发</span>，单次贡献 ±20';
+  var s2Meta = '湖中女神声明 <span class="hl">' + ladyChecks.length + '</span> 次（±20）';
+  s2Meta += '；王者之剑 <span class="hl">' + exTotal + '</span> 轮，已使用 <span class="hl">' + exUsed + '</span> 次';
+  if (exPending > 0) s2Meta += '，<span class="warn">待反馈 ' + exPending + ' 次</span>';
+  s2Meta += '；声明不等于事实';
 
   var s3Meta;
   if (totalRounds === 0) {
@@ -6564,7 +6980,7 @@ function renderV7EngineInfo() {
 
   stepsEl.innerHTML =
     step(1, '已知身份锁定（硬锚点）', knownCount > 0, s1Meta) +
-    step(2, '湖中仙女检查（强信号 ±20）', ladyChecks.length > 0, s2Meta) +
+    step(2, '声明类信息（湖中女神 / 王者之剑）', ladyChecks.length > 0 || exTotal > 0, s2Meta) +
     step(3, '任务结果硬约束（轮次衰减+双失败）', totalRounds > 0, s3Meta) +
     step(4, '多轮交叉分析（自适应门槛）', crossActive && totalRounds > 0, s4Meta) +
     step(5, '发车失败分析（≥3 次）', lfTriggered > 0, s5Meta) +

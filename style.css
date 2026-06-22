@@ -1187,3 +1187,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .v7-step-grid{grid-template-columns:1fr}
   .v7-status-bar{flex-direction:column;gap:4px}
 }
+
+
+/* 发言阶段信息记录：湖中女神 / 王者之剑 */
+.speech-info-panel{margin:12px 0;padding:10px;border:1px solid rgba(201,168,76,0.25);border-radius:var(--radius);background:rgba(201,168,76,0.06)}
+.speech-info-panel-title{font-size:14px;font-weight:700;color:var(--gold-light);margin-bottom:8px}
+.speech-info-card{padding:8px;margin:8px 0;border-radius:var(--radius-sm);background:rgba(0,0,0,0.16);border:1px solid rgba(255,255,255,0.08)}
+.speech-info-card.lady-card{border-left:3px solid var(--blue)}
+.speech-info-card.excalibur-card{border-left:3px solid var(--gold)}
+.speech-info-title{font-size:13px;font-weight:700;color:var(--text-bright);margin-bottom:4px}
+.speech-info-sub{font-size:12px;color:var(--text-dim);line-height:1.5;margin:4px 0}
+.speech-info-label{display:block;font-size:11px;color:var(--text-dim);margin:6px 0 3px}
+.speech-info-select,.speech-info-input{width:100%;box-sizing:border-box;margin-bottom:6px;padding:7px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px}
