@@ -1,9 +1,8 @@
-﻿/* ==================== DATA ==================== */
+/* ==================== DATA ==================== */
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
 var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
-var MULTI_ROLES = ['忠臣','爪牙'];
 var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
@@ -805,20 +804,6 @@ function _addNameCore(name) {
   return true;
 }
 
-function addNameToPool() {
-  var input = $('add-name-input');
-  var name = input.value.trim();
-  if (_addNameCore(name)) input.value = '';
-}
-
-function addNameFromSetup() {
-  var name = prompt('输入新玩家姓名（不超过10个字符）：');
-  if (!name) return;
-  name = name.trim();
-  if (name.length > 10) { toast('名字不能超过10个字符', 'warn'); return; }
-  _addNameCore(name);
-}
-
 var _swapSeatFirst = null;
 var _endSwapRoleFirst = null;
 
@@ -1010,7 +995,6 @@ function startGame() {
   }
   doStartGame();
 }
-
 
 
 function doStartGame() {
@@ -1416,16 +1400,6 @@ function renderTendencyMini() {
   el.innerHTML = h;
 }
 
-function renderTendencyFull() {
-  var el = $('tendency-full');
-  var probs = computeMerlinProbability();
-  var h = '';
-  for (var i = 0; i < state.playerCount; i++) {
-    h += renderTendencyItem(i, state.tendencies[i] || 50, probs[i]);
-  }
-  el.innerHTML = h || '<p style="color:var(--text-dim)">暂无数据，请先开始游戏</p>';
-}
-
 /* ==================== MERLIN PREDICTION ==================== */
 function computeMerlinProbability() {
   var pc = state.playerCount;
@@ -1533,225 +1507,8 @@ function computeMerlinProbability() {
   return probs;
 }
 
-function renderMerlinPredictMini() {
-  var el = $('merlin-predict-mini');
-  if (!el) return;
-  var probs = computeMerlinProbability();
-  var pc = state.playerCount;
-
-  // Sort by probability descending
-  var sorted = [];
-  for (var i = 0; i < pc; i++) {
-    sorted.push({ idx: i, prob: probs[i] });
-  }
-  sorted.sort(function(a, b) { return b.prob - a.prob; });
-
-  var h = '';
-  for (var k = 0; k < sorted.length; k++) {
-    var p = sorted[k];
-    h += '<div class="merlin-bar-row">';
-    h += '<span class="m-name">' + playerLabel(p.idx) + '</span>';
-    h += '<div class="m-bar-wrap"><div class="m-bar-fill" style="width:' + p.prob + '%"></div></div>';
-    h += '<span class="m-pct">' + p.prob + '%</span>';
-    h += '</div>';
-  }
-  el.innerHTML = h || '<p style="color:var(--text-dim);font-size:12px">暂无数据</p>';
-}
-
-function renderMerlinPredictTend() {
-  var el = $('merlin-predict-tend');
-  if (!el) return;
-  var probs = computeMerlinProbability();
-  var pc = state.playerCount;
-
-  var sorted = [];
-  for (var i = 0; i < pc; i++) {
-    sorted.push({ idx: i, prob: probs[i] });
-  }
-  sorted.sort(function(a, b) { return b.prob - a.prob; });
-
-  var h = '';
-  for (var k = 0; k < sorted.length; k++) {
-    var p = sorted[k];
-    h += '<div class="merlin-bar-row">';
-    h += '<span class="m-name">' + playerLabel(p.idx) + '</span>';
-    h += '<div class="m-bar-wrap"><div class="m-bar-fill" style="width:' + p.prob + '%"></div></div>';
-    h += '<span class="m-pct">' + p.prob + '%</span>';
-    h += '</div>';
-  }
-  el.innerHTML = h || '<p style="color:var(--text-dim);font-size:12px">暂无数据</p>';
-}
-
 /* ==================== IDENTITY SIMULATION ==================== */
 var SIM_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','兰斯洛特(红)','兰斯洛特(蓝)','奥伯伦'];
-
-function renderIdentitySimGrid() {
-  var el = $('identity-sim-grid');
-  if (!el) return;
-  var pc = state.playerCount;
-  var h = '';
-  for (var i = 0; i < pc; i++) {
-    h += '<div class="identity-sim-row">';
-    h += '<span class="sim-name"><span class="sim-idx">' + (i + 1) + '号</span>' + playerLabel(i) + '</span>';
-    h += '<select id="sim-role-' + i + '">';
-    h += '<option value="">未指定</option>';
-    for (var j = 0; j < SIM_ROLES.length; j++) {
-      h += '<option value="' + SIM_ROLES[j] + '">' + SIM_ROLES[j] + '</option>';
-    }
-    h += '</select>';
-    h += '</div>';
-  }
-  el.innerHTML = h;
-}
-
-function getSimRole(i) {
-  var sel = document.getElementById('sim-role-' + i);
-  return sel ? sel.value : '';
-}
-
-function runIdentitySimulation() {
-  var el = $('identity-sim-result');
-  if (!el) return;
-  var pc = state.playerCount;
-  var assigned = {};
-  for (var i = 0; i < pc; i++) {
-    var r = getSimRole(i);
-    if (r) assigned[i] = r;
-  }
-
-  if (Object.keys(assigned).length < 2) {
-    el.innerHTML = '<div class="sim-contradiction info">请至少为 2 名玩家指定身份后再校验</div>';
-    return;
-  }
-
-  var contradictions = [];
-
-  // Build maps for quick lookup
-  var roleMap = {}; // idx -> role
-  var factionMap = {}; // idx -> 'good'/'evil'
-  for (var i = 0; i < pc; i++) {
-    roleMap[i] = assigned[i];
-    factionMap[i] = EVIL_ROLES.indexOf(assigned[i]) !== -1 ? 'evil' : 'good';
-  }
-
-  // Rule 1: Task fail => team must have at least one evil
-  for (var r = 0; r < state.missions.length; r++) {
-    var m = state.missions[r];
-    if (!m || !m.result || m.result !== 'fail') continue;
-    if (!m.team || m.team.length === 0) continue;
-    var hasEvil = false;
-    for (var t = 0; t < m.team.length; t++) {
-      if (factionMap[m.team[t]] === 'evil') { hasEvil = true; break; }
-    }
-    if (!hasEvil) {
-      contradictions.push('第' + (r + 1) + '轮任务失败，但假设中队伍[' + m.team.map(function(i) { return playerLabel(i); }).join('、') + ']里没有反方角色');
-    }
-  }
-
-  // Rule 2: Task success - if all team members are good, but team has known evil (less likely contradiction)
-  // Rule 3: Merlin & Morgana: both know evil, shouldn't both approve a fail mission
-  var merlinIdx = -1, morganaIdx = -1;
-  for (var i = 0; i < pc; i++) {
-    if (assigned[i] === '梅林') merlinIdx = i;
-    if (assigned[i] === '莫甘娜') morganaIdx = i;
-  }
-
-  if (merlinIdx !== -1 && morganaIdx !== -1) {
-    for (var r = 0; r < state.missions.length; r++) {
-      var m = state.missions[r];
-      if (!m || !m.result || !m.launchAttempts) continue;
-      for (var a = 0; a < m.launchAttempts.length; a++) {
-        var att = m.launchAttempts[a];
-        if (!att.votes) continue;
-        var mVote = att.votes[merlinIdx];
-        var mgVote = att.votes[morganaIdx];
-        // If mission failed and both Merlin and Morgana voted approve, both are complicit
-        // Not necessarily a contradiction since Morgana may approve to blend in
-        // But if mission was a FAIL and the team is all good (from merlin's POV), merlin shouldn't approve
-        if (m.result === 'fail' && mVote === 'approve' && mgVote === 'approve') {
-          // Check if merlin knew there was evil in the team
-          if (m.team && m.team.length > 0) {
-            var teamEvil = false;
-            for (var t = 0; t < m.team.length; t++) {
-              if (factionMap[m.team[t]] === 'evil' && assigned[m.team[t]] !== '莫德雷德') { teamEvil = true; break; }
-            }
-            if (teamEvil && merlinIdx !== -1) {
-              contradictions.push('第' + (r + 1) + '轮任务失败，梅林(' + playerLabel(merlinIdx) + ')和莫甘娜(' + playerLabel(morganaIdx) + ')都投了赞成，但梅林已知队伍中有非莫德雷德的反方');
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Rule 4: Assassin & Mordred don't know each other, votes should not be 100% identical
-  var assassinIdx = -1, mordredIdx = -1;
-  for (var i = 0; i < pc; i++) {
-    if (assigned[i] === '刺客') assassinIdx = i;
-    if (assigned[i] === '莫德雷德') mordredIdx = i;
-  }
-  if (assassinIdx !== -1 && mordredIdx !== -1 && state.missions.length > 0) {
-    var totalVotes = 0, sameVotes = 0;
-    for (var r = 0; r < state.missions.length; r++) {
-      var m = state.missions[r];
-      if (!m || !m.launchAttempts) continue;
-      for (var a = 0; a < m.launchAttempts.length; a++) {
-        var att = m.launchAttempts[a];
-        if (!att.votes) continue;
-        if (att.votes[assassinIdx] && att.votes[mordredIdx]) {
-          totalVotes++;
-          if (att.votes[assassinIdx] === att.votes[mordredIdx]) sameVotes++;
-        }
-      }
-    }
-    if (totalVotes > 3 && sameVotes === totalVotes) {
-      contradictions.push('刺客(' + playerLabel(assassinIdx) + ')和莫德雷德(' + playerLabel(mordredIdx) + ')在所有' + totalVotes + '次投票中完全一致，但互不知身份，可疑');
-    }
-  }
-
-  // Rule 5: Lancelot flip - after flip, their faction changes
-  var lancelotBlueIdx = -1, lancelotRedIdx = -1;
-  for (var i = 0; i < pc; i++) {
-    if (assigned[i] === '兰斯洛特(蓝)') lancelotBlueIdx = i;
-    if (assigned[i] === '兰斯洛特(红)') lancelotRedIdx = i;
-  }
-
-  // Simple check: if both Lancelots exist and there are more than 3 missions, 
-  // their voting pattern might indicate a flip point
-  if (lancelotBlueIdx !== -1 && lancelotRedIdx !== -1 && state.lancelotFlipped !== undefined) {
-    // Check if flipped lancelot's votes changed dramatically
-    if (state.lancelotFlipped) {
-      var blueVotes = [], redVotes = [];
-      for (var r = 0; r < state.missions.length; r++) {
-        var m = state.missions[r];
-        if (!m || !m.launchAttempts || m.launchAttempts.length === 0) continue;
-        var att = m.launchAttempts[m.launchAttempts.length - 1];
-        if (!att.votes) continue;
-        blueVotes.push({ round: r, vote: att.votes[lancelotBlueIdx] || '?' });
-        redVotes.push({ round: r, vote: att.votes[lancelotRedIdx] || '?' });
-      }
-      // Simple check: if blue lancelot (now evil after flip) starts rejecting missions that succeed
-      // This is a nuanced check; we'll flag if pattern seems off
-      if (blueVotes.length >= 2 && redVotes.length >= 2) {
-        var lastBlue = blueVotes[blueVotes.length - 1].vote;
-        var lastRed = redVotes[redVotes.length - 1].vote;
-        // After flip, blue becomes evil (should tend to reject or at least not always approve)
-        // Red becomes good (should tend to approve good missions)
-        // This is suggestive, not definitive, so we note it
-      }
-    }
-  }
-
-  if (contradictions.length === 0) {
-    el.innerHTML = '<div class="sim-ok">当前假设与所有线索兼容，无矛盾</div>';
-  } else {
-    var h = '<div style="font-weight:700;color:var(--red-bright);margin-bottom:8px;font-size:14px">发现 ' + contradictions.length + ' 个矛盾：</div>';
-    for (var c = 0; c < contradictions.length; c++) {
-      h += '<div class="sim-contradiction danger">' + contradictions[c] + '</div>';
-    }
-    el.innerHTML = h;
-  }
-}
 
 /* ==================== LADY OF THE LAKE ==================== */
 function renderLadyLakeResults() {
@@ -1858,59 +1615,6 @@ function recordLadyCheck(targetIdx, result) {
 
 /* 湖中女神发言环节内联验人界面 */
 var _ladySpeechSelected = null; // 发言环节中选中的查验目标
-
-function buildLadySpeechSection() {
-  var pc = state.playerCount;
-  var round = state.currentRound;
-  
-  // 检查本轮是否已经验过人
-  var thisRoundCheck = null;
-  for (var i = state.ladyLakeChecks.length - 1; i >= 0; i--) {
-    if (state.ladyLakeChecks[i].round === round) {
-      thisRoundCheck = state.ladyLakeChecks[i];
-      break;
-    }
-  }
-
-  var h = '<div class="lady-speech-section">';
-  h += '<h3>湖中女神验人</h3>';
-
-  if (thisRoundCheck) {
-    // 已查验完毕，显示结果（不可撤销）
-    var cls = thisRoundCheck.result === 'good' ? 'good-done' : thisRoundCheck.result === 'evil' ? 'evil-done' : 'uncertain-done';
-    var label = thisRoundCheck.result === 'good' ? '好人' : thisRoundCheck.result === 'evil' ? '坏人' : '不报';
-    h += '<p class="lady-speech-hint">本轮查验已完成</p>';
-    h += '<div class="lady-speech-done ' + cls + '">';
-    var holderName = playerLabel(thisRoundCheck.holder !== undefined ? thisRoundCheck.holder : state.ladyLakeHolder);
-    h += holderName + '验' + playerLabel(thisRoundCheck.target) + ' → ' + label;
-    h += '</div>';
-  } else {
-    // 还未查验，显示选择界面
-    h += '<p class="lady-speech-hint">查验一名其他玩家的阵营（主持人操作，结果在发言环节公布）</p>';
-
-    if (_ladySpeechSelected === null) {
-      // 步骤1：选择查验目标
-      for (var i = 0; i < pc; i++) {
-        h += '<div class="lady-speech-target-btn" onclick="selectLadySpeechTarget(' + i + ')">' + playerLabel(i) + '</div>';
-      }
-    } else {
-      // 步骤2：选择查验结果
-      var target = _ladySpeechSelected;
-      h += '<p style="font-size:14px;color:var(--gold-light);margin-bottom:8px;text-align:center">查验目标：<strong>' + playerLabel(target) + '</strong></p>';
-      h += '<div class="lady-speech-result-row">';
-      h += '<button class="lady-speech-result-btn good-btn" onclick="doLadyCheckInline(\'good\')">好人方</button>';
-      h += '<button class="lady-speech-result-btn evil-btn" onclick="doLadyCheckInline(\'evil\')">反方</button>';
-      h += '<button class="lady-speech-result-btn uncertain-btn" onclick="doLadyCheckInline(\'uncertain\')">不确定</button>';
-      h += '</div>';
-      h += '<div style="text-align:center;margin-top:8px">';
-      h += '<button class="btn small" onclick="_ladySpeechSelected=null;renderStepPanel()">重新选择</button>';
-      h += '</div>';
-    }
-  }
-
-  h += '</div>';
-  return h;
-}
 
 function selectLadySpeechTarget(idx) {
   _ladySpeechSelected = idx;
@@ -2079,10 +1783,6 @@ function computePredictProbability(idx) {
   return { good: goodScore, evil: 100 - goodScore };
 }
 
-function renderIdentityPrediction() {
-  renderPredictPlayerDropdowns();
-}
-
 /* ==================== DEDUCTION PAGE ==================== */
 function computePriorGoodProb(i, pc, si, myRole, activeRoles) {
   // Known self
@@ -2108,156 +1808,6 @@ function computePriorGoodProb(i, pc, si, myRole, activeRoles) {
   // Unknown self role: flat prior
   return Math.round(goodCount / pc * 100);
 }
-
-function renderDeduction() {
-  var pc = state.playerCount;
-  var si = state.selfIndex;
-  var grid = $('deduction-grid');
-  var merlinCard = $('deduction-merlin');
-  var merlinList = $('deduction-merlin-list');
-
-  if (!grid) return;
-
-  // Check if there's any game data to work with
-  var hasData = false;
-  for (var i = 0; i < state.missions.length; i++) {
-    var m = state.missions[i];
-    if (m && m.team && m.team.length > 0) { hasData = true; break; }
-  }
-
-  if (!hasData) {
-    grid.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">正在进行中或尚无对局数据</p>';
-    if (merlinCard) merlinCard.style.display = 'none';
-    return;
-  }
-
-  // Compute good/evil probability for each player
-  var goodProbs = [];
-  var merlinProbs = [];
-  for (var i = 0; i < pc; i++) {
-    // Good/evil: blend tendency with Bayesian prior from role counts
-    var tendency = state.tendencies[i] || 50;
-    var prior = computePriorGoodProb(i, pc, si, state.myRole, state.activeRoles);
-    var pred = state.playerPredictions[i] || '';
-    var goodScore = Math.round(tendency * 0.5 + prior * 0.5);
-
-    // Adjust from prediction marks
-    if (pred === '正方') goodScore = Math.min(100, goodScore + 15);
-    else if (pred === '反方') goodScore = Math.max(0, goodScore - 15);
-    else if (pred === '梅林' || pred === '派西维尔') goodScore = Math.min(100, goodScore + 20);
-    else if (pred === '莫甘娜' || pred === '刺客' || pred === '莫德雷德' || pred === '奥伯伦') goodScore = Math.max(0, goodScore - 20);
-
-    // Vote analysis
-    var goodVotes = 0, badVotes = 0;
-    for (var r = 0; r < state.missions.length; r++) {
-      var m = state.missions[r];
-      if (!m || !m.result || !m.launchAttempts) continue;
-      for (var a = 0; a < m.launchAttempts.length; a++) {
-        var att = m.launchAttempts[a];
-        var vote = att.votes[i];
-        if (!vote) continue;
-        var attApproves = 0;
-        for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
-        if (attApproves <= Math.floor(pc / 2)) continue;
-        if (m.result === 'success' && vote === 'approve') goodVotes++;
-        else if (m.result === 'fail' && vote === 'reject') goodVotes++;
-        else badVotes++;
-      }
-    }
-    var totalVotes = goodVotes + badVotes;
-    if (totalVotes > 0) {
-      var voteAlign = Math.round(goodVotes / totalVotes * 100);
-      goodScore = Math.round(goodScore * 0.4 + voteAlign * 0.6);
-    }
-
-    goodScore = Math.max(5, Math.min(95, goodScore));
-    goodProbs.push(goodScore);
-
-    // Merlin probability: based on vote alignment with known good outcomes + tendency
-    var merlinScore = goodScore; // Base: higher good score = more likely merlin
-    // Bonus for consistently voting approve on success missions
-    if (totalVotes > 0 && goodVotes / totalVotes > 0.7) merlinScore += 10;
-    // Bonus for high tendency
-    if (tendency > 70) merlinScore += 8;
-    // Penalty for being on fail mission teams
-    for (var r = 0; r < state.missions.length; r++) {
-      var m = state.missions[r];
-      if (m && m.result === 'fail' && m.team && m.team.indexOf(i) !== -1) {
-        merlinScore -= 10;
-      }
-    }
-    merlinScore = Math.max(5, Math.min(95, merlinScore));
-    merlinProbs.push(merlinScore);
-  }
-
-  // Sort for Merlin ranking
-  var merlinSorted = [];
-  for (var i = 0; i < pc; i++) {
-    if (i === si) continue; // Skip self
-    merlinSorted.push({ idx: i, prob: merlinProbs[i] });
-  }
-  merlinSorted.sort(function(a, b) { return b.prob - a.prob; });
-
-  // Render player cards
-  var h = '';
-  for (var i = 0; i < pc; i++) {
-    var isSelf = (i === si);
-    var g = goodProbs[i];
-    var e = 100 - g;
-    var m = merlinProbs[i];
-    var gColor = g >= 60 ? 'var(--green-bright)' : g >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
-    var eColor = e >= 60 ? 'var(--red-bright)' : e >= 40 ? 'var(--gold-light)' : 'var(--green-bright)';
-    var mColor = m >= 60 ? 'var(--gold-light)' : 'var(--text-dim)';
-
-    h += '<div class="deduction-player-card' + (isSelf ? ' self-card' : '') + '">';
-    h += '<span class="deduction-name">' + (isSelf ? '<span class="deduction-self-star">★我</span>' : '') + playerLabel(i) + '</span>';
-    h += '<div class="deduction-bars">';
-    // Good bar
-    h += '<div class="deduction-bar-row">';
-    h += '<span class="deduction-bar-label">好人</span>';
-    h += '<div class="deduction-bar-track"><div class="deduction-bar-fill good" style="width:' + g + '%"></div></div>';
-    h += '<span class="deduction-pct" style="color:' + gColor + '">' + g + '%</span>';
-    h += '</div>';
-    // Evil bar
-    h += '<div class="deduction-bar-row">';
-    h += '<span class="deduction-bar-label">坏人</span>';
-    h += '<div class="deduction-bar-track"><div class="deduction-bar-fill evil" style="width:' + e + '%"></div></div>';
-    h += '<span class="deduction-pct" style="color:' + eColor + '">' + e + '%</span>';
-    h += '</div>';
-    // Merlin bar
-    h += '<div class="deduction-bar-row">';
-    h += '<span class="deduction-bar-label">梅林</span>';
-    h += '<div class="deduction-bar-track"><div class="deduction-bar-fill merlin" style="width:' + m + '%"></div></div>';
-    h += '<span class="deduction-pct" style="color:' + mColor + '">' + m + '%</span>';
-    h += '</div>';
-    h += '</div>';
-    h += '</div>';
-  }
-  grid.innerHTML = h;
-
-  // Render Merlin ranking
-  if (merlinCard && merlinList) {
-    merlinCard.style.display = 'block';
-    var mh = '';
-    for (var k = 0; k < merlinSorted.length; k++) {
-      var p = merlinSorted[k];
-      var topClass = '';
-      if (k === 0) topClass = ' top1';
-      else if (k === 1) topClass = ' top2';
-      else if (k === 2) topClass = ' top3';
-      mh += '<div class="deduction-merlin-row">';
-      mh += '<span class="deduction-merlin-rank' + topClass + '">' + (k + 1) + '</span>';
-      mh += '<span class="deduction-name">' + playerLabel(p.idx) + '</span>';
-      mh += '<span class="deduction-merlin-pct">' + p.prob + '%</span>';
-      mh += '</div>';
-    }
-    merlinList.innerHTML = mh;
-  }
-
-  // Also update nav button state
-  setActiveNav('tend');
-}
-
 
 /* ==================== 发言阶段信息：湖中女神 / 王者之剑 ==================== */
 function excaliburDirectionLabel(dir) {
@@ -2505,25 +2055,6 @@ function buildSpeechPhaseInfoPanel() {
   if (!cards.length) return '';
   var title = state.timerMode === 'all' ? '发言阶段信息记录' : '当前发言人信息记录';
   return '<div class="speech-info-panel"><div class="speech-info-panel-title">' + title + '（待处理 ' + cards.length + ' 项）</div>' + cards.join('') + '</div>';
-}
-
-function renderExcaliburHistorySummary() {
-  var arr = state.excaliburHistory || [];
-  if (!arr.length) return '';
-  var h = '<div style="font-size:12px;color:var(--text-dim);margin-top:6px">';
-  for (var i = 0; i < arr.length; i++) {
-    var e = arr[i];
-    h += '<div>第' + (e.round + 1) + '轮王者之剑：';
-    h += e.holder >= 0 ? playerLabel(e.holder) : '未指定';
-    if (e.used === false) h += '，未使用';
-    else if (e.used === true) {
-      h += '，对 ' + (e.target !== null ? playerLabel(e.target) : '未选目标') + ' 使用';
-      h += e.feedbackRecorded ? '，声明：' + excaliburDirectionLabel(e.claimedDirection) : '，待反馈';
-    } else h += '，待确认';
-    h += '</div>';
-  }
-  h += '</div>';
-  return h;
 }
 
 /* ==================== TIMER ==================== */
@@ -3563,29 +3094,6 @@ function showLancelotDrawToast(card, round) {
 }
 
 // Legacy: kept for backward compatibility but no longer called from game flow
-function showLancelotFlipModal(roundNum) {
-  applyLancelotAutoDraw(roundNum);
-}
-
-function applyLancelotFlip() {
-  closeModal();
-  checkGameEnd();
-  renderGame();
-}
-
-function skipLancelotFlip() {
-  closeModal();
-  checkGameEnd();
-  renderGame();
-}
-
-function setLancelotFlip(val) {
-  state.lancelotFlipped = val;
-  state._lancelotAsked = true;
-  renderEnd();
-  toast(val ? '兰斯洛特已反转' : '兰斯洛特未反转');
-}
-
 function resolveAssassin(isMerlin) {
   state.winner = isMerlin ? 'evil' : 'good';
   state.assassinFromMission = false;
@@ -4373,7 +3881,6 @@ function showGameDetail(idx) {
   }
 
 
-
   if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
     h += '<h3 style="margin-top:10px">王者之剑</h3>';
     for (var ei = 0; ei < rec.excaliburHistory.length; ei++) {
@@ -4667,14 +4174,6 @@ function showModal(html) {
 function closeModal() {
   var overlay = document.getElementById('dynamic-modal-overlay');
   if (overlay) overlay.remove();
-}
-
-function clearStats() {
-  var h = '<h2>确认清除</h2><p>确定要清除所有统计记录吗？此操作不可撤销。</p>';
-  h += '<div class="modal-actions">';
-  h += '<button class="btn danger" onclick="confirmClearStats()">确认清除</button>';
-  h += '<button class="btn" onclick="closeModal()">取消</button></div>';
-  showModal(h);
 }
 
 function confirmClearStats() {
@@ -5212,7 +4711,6 @@ function computeSuspectScores() {
   }
 
 
-
   // Step 2B: 王者之剑声明类证据
   var exHistory = state.excaliburHistory || [];
   for (var exi = 0; exi < exHistory.length; exi++) {
@@ -5535,7 +5033,6 @@ function computeSuspectScores() {
 
   return list;
 }
-
 
 
 /* ------- v7 Engine Info Panel (v102: 9-step visualizer) ------- */
