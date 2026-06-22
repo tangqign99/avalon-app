@@ -1108,8 +1108,9 @@ function renderTendencyItem(idx, score, merlinProb) {
   if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
   else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
   else { cls = 'suspect'; barCls = 'suspect'; }
+  var selfMark = (idx === state.selfIndex) ? ' &#9733;&#25105;' : '';
   var h = '<div class="tendency-item">';
-  h += '<span class="tend-name">' + playerLabel(idx) + '</span>';
+  h += '<span class="tend-name">' + playerLabel(idx) + '<span style="color:var(--gold-light);font-size:10px">' + selfMark + '</span></span>';
   h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
   h += '<span class="tend-score ' + cls + '">' + score + '</span>';
   if (merlinProb !== undefined) {
@@ -1697,7 +1698,7 @@ function hasLadyClaimThisRound() {
 }
 
 function shouldShowLadySpeechCard() {
-  if (!state.ladyOfLakeEnabled || state.currentRound <= 0 || state.ladyLakeHolder < 0 || hasLadyClaimThisRound()) return false;
+  if (!state.ladyOfLakeEnabled || state.currentRound < 2 || state.ladyLakeHolder < 0 || hasLadyClaimThisRound()) return false;
   if (state.timerMode === 'all') return state._teamConfirmedPending;
   if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
     return state.speakerOrder[state.currentSpeakerIdx] === state.ladyLakeHolder;
@@ -2210,9 +2211,6 @@ function confirmTeam() {
   if (state.excaliburEnabled && !getExcaliburRecord(state.currentRound)) {
     setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
   }
-  if (state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound()) {
-    setTimeout(function() { showLadyCheck(); }, 200);
-  }
 }
 
 function transitionToVotes() {
@@ -2226,6 +2224,10 @@ function transitionToVotes() {
   var el = $('timer-display');
   if (el) el.style.display = 'none';
   renderStepPanel();
+  // Lady of the Lake check: trigger after speech ends for round 2+ (third round onwards)
+  if (state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound()) {
+    setTimeout(function() { showLadyCheck(); }, 200);
+  }
 }
 
 function castVote(idx, type) {
@@ -5081,7 +5083,8 @@ function renderTendResult() {
     var labeled = label ? ' <span style="font-size:11px;color:var(--accent);background:rgba(201,168,76,0.15);padding:1px 6px;border-radius:3px">' + escapeHtml(label) + '</span>' : '';
 
     h += '<div class="tend-result-item">';
-    h += '<span class="tend-result-name">' + escapeHtml(state.playerNames[item.idx]) + labeled + '</span>';
+    var selfTag = (item.idx === state.selfIndex) ? ' <span style="color:var(--gold-light);font-size:10px">&#9733;&#25105;</span>' : '';
+    h += '<span class="tend-result-name">' + escapeHtml(state.playerNames[item.idx]) + labeled + selfTag + '</span>';
     h += '<div class="tend-bar-wrap">';
     h += '<div class="tend-bar-fill ' + cls + '" style="width:' + item.score + '%"></div>';
     h += '</div>';
