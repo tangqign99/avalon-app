@@ -1,11 +1,11 @@
-/* ==================== Service Worker v109 ==================== */
-// sw.js / service-worker.js - v109
-var CACHE_NAME = 'avalon-pwa-v109';
+/* ==================== Service Worker v111 ==================== */
+// sw.js / service-worker.js - v111
+var CACHE_NAME = 'avalon-pwa-v111';
 var ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js?v=v109',
+  './app.js?v=v110',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
@@ -40,9 +40,15 @@ self.addEventListener('message', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
+  var url = new URL(e.request.url);
+  var isAsset = ASSETS.some(function(a) {
+    return url.pathname.endsWith(a.replace('./', '/')) || url.pathname.endsWith(a);
+  });
+  if (!isAsset) return; // skip Supabase API and other dynamic requests
+
   e.respondWith(
     fetch(e.request).then(function(resp) {
-      if (resp && resp.status === 200 && e.request.method === 'GET') {
+      if (resp && resp.status === 200) {
         var clone = resp.clone();
         caches.open(CACHE_NAME).then(function(cache) {
           cache.put(e.request, clone);

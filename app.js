@@ -75,7 +75,6 @@ var state = {
   timerInterval: null,
   timerRemaining: 0,
   lancelotFlipped: false,
-  _lancelotAsked: false,
   lancelotDeck: null,
   lancelotDrawResults: [],
   roundTendencies: [],
@@ -105,7 +104,6 @@ function initState(n) {
   state._assassinPickTarget = null;
   state._assassinAfterRound = null;
   state.lancelotFlipped = false;
-  state._lancelotAsked = false;
   state.lancelotDeck = null;
   state.lancelotDrawResults = [];
   state._historyPage = 0;
@@ -456,22 +454,24 @@ function recordVisitor() {
   }
 }
 
-function renderVisitorLog() {
-  // 先从 localStorage 快速渲染，然后合并 Supabase 数据
+function renderVisitorLog(forceRefresh) {
+  // 统计页才需要访客列表，首屏设置页不再拉取 500 条远程记录
   var localVisitors = loadVisitors().slice().reverse();
-  console.log('[Visitors] local visitors count:', localVisitors.length);
-  renderVisitorList(localVisitors);
+  var now = Date.now();
+  if (!forceRefresh && _visitorListCache && (now - _visitorListFetchedAt < 60000)) {
+    renderVisitorList(_visitorListCache);
+    return;
+  }
+  renderVisitorList(_visitorListCache || localVisitors);
 
   var sb = getSupabase();
   if (sb) {
-    console.log('[Visitors] fetching from Supabase (all devices)...');
-    sb.from('visitors').select('*').order('visit_time', { ascending: false }).limit(500).then(function(r) {
+    console.log('[Visitors] fetching recent visitors from Supabase...');
+    sb.from('visitors').select('*').order('visit_time', { ascending: false }).limit(200).then(function(r) {
       if (r.error) {
         console.warn('[Visitors] Supabase query failed — code:', r.error.code, '| message:', r.error.message);
         return;
       }
-      console.log('[Visitors] Supabase returned', r.data.length, 'records');
-      // 合并去重：按时间+指纹联合键去重
       var merged = {};
       for (var i = 0; i < localVisitors.length; i++) {
         var key = localVisitors[i].time + '|' + (localVisitors[i].fingerprint || localVisitors[i].device);
@@ -483,24 +483,17 @@ function renderVisitorLog() {
         var visitTime = v.visit_time || v.created_at || '';
         var vkey = visitTime + '|' + (v.fingerprint || v.device);
         if (!merged[vkey]) {
-          remoteVisitors.push({
-            time: visitTime,
-            device: v.device,
-            model: v.model || '',
-            osVersion: v.os_version || '',
-            fingerprint: v.fingerprint || ''
-          });
+          remoteVisitors.push({ time: visitTime, device: v.device, model: v.model || '', osVersion: v.os_version || '', fingerprint: v.fingerprint || '' });
         }
       }
       var all = remoteVisitors.concat(localVisitors);
       all.sort(function(a, b) { return b.time.localeCompare(a.time); });
-      console.log('[Visitors] merged total:', all.length, '(remote only:', remoteVisitors.length, ')');
+      _visitorListCache = all;
+      _visitorListFetchedAt = Date.now();
       renderVisitorList(all);
     }).catch(function(e) {
       console.error('[Visitors] Supabase query exception:', e);
     });
-  } else {
-    console.log('[Visitors] Supabase not available, showing local visitors only');
   }
 }
 
@@ -577,20 +570,25 @@ function renderVisitorList(visitors) {
 function goVisitorPage(p) {
   if (p < 0) return;
   state._visitorPage = p;
-  renderVisitorLog();
+  renderVisitorLog(false);
 }
 
 /* ==================== ONLINE PRESENCE ==================== */
 var _onlineTimer = null;
 var _onlineCountEl = null;
+var _visitorListCache = null;
+var _visitorListFetchedAt = 0;
 
 function startOnlineTracking() {
   _onlineCountEl = document.getElementById('online-count');
+  if (!_onlineCountEl) return;
   updateOnlineCount();
-  _onlineTimer = setInterval(updateOnlineCount, 20000);
+  if (!_onlineTimer) _onlineTimer = setInterval(updateOnlineCount, 20000);
 }
 
 function updateOnlineCount() {
+  _onlineCountEl = document.getElementById('online-count');
+  if (!_onlineCountEl || state._currentPage !== 'stats') return;
   var sb = getSupabase();
   if (!sb) {
     if (_onlineCountEl) _onlineCountEl.textContent = '--';
@@ -691,7 +689,7 @@ function showPage(page) {
   if (page === 'game') {
     renderGame();
   }
-  if (page === 'setup') { renderSetup(); renderVisitorLog(); }
+  if (page === 'setup') { renderSetup(); }
   if (page === 'tend') {
     renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
   }
@@ -699,6 +697,8 @@ function showPage(page) {
   if (page === 'stats') {
     if (prevPage !== 'stats') state._historyPage = 0;
     renderStats();
+    renderVisitorLog(false);
+    startOnlineTracking();
   }
 }
 
@@ -1056,7 +1056,6 @@ function doStartGame() {
   state._assassinPickTarget = null;
   state._assassinAfterRound = null;
   state.lancelotFlipped = false;
-  state._lancelotAsked = false;
   state.lancelotFlipCount = 0;
   state.lancelotRoundFlips = [false, false, false, false, false];
   state.lancelotDrawResults = [false]; // index 0 = round 0, no draw before game starts
@@ -4544,10 +4543,6 @@ function makeRecordKey(record) {
 /* ==================== INIT ==================== */
 (function() {
   generateDeviceId();
-  recordVisitor();
-  startOnlineTracking();
-  // 建立 Supabase Realtime 订阅（仅同步对局记录与玩家管理，不再做游戏房间协同）
-  setupRealtimeSubscriptions();
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
   var initAudioOnce = function() {
     ensureAudioContext();
@@ -4573,6 +4568,12 @@ function makeRecordKey(record) {
     initState(7);
   }
   showPage('setup');
+
+  // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
+  setTimeout(function() {
+    recordVisitor();
+    setupRealtimeSubscriptions();
+  }, 1200);
 
 })();
 
