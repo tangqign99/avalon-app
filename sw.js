@@ -1,6 +1,6 @@
-/* ==================== Service Worker v112 ==================== */
-// sw.js / service-worker.js - v112
-var CACHE_NAME = 'avalon-pwa-v112';
+/* ==================== Service Worker v113 ==================== */
+// sw.js / service-worker.js - v113
+var CACHE_NAME = 'avalon-pwa-v113';
 var ASSETS = [
   './',
   './index.html',
@@ -42,7 +42,8 @@ self.addEventListener('message', function(e) {
 self.addEventListener('fetch', function(e) {
   var url = new URL(e.request.url);
   var isAsset = ASSETS.some(function(a) {
-    return url.pathname.endsWith(a.replace('./', '/')) || url.pathname.endsWith(a);
+    var clean = a.replace('./', '/').split('?')[0];
+    return url.pathname.endsWith(clean) || url.pathname === (clean);
   });
   if (!isAsset) return; // skip Supabase API and other dynamic requests
 
