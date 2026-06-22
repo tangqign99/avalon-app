@@ -61,8 +61,6 @@ var state = {
   _assassinPickTarget: null,
   _historyPage: 0,
   _historyPageSize: 5,
-  _visitorPage: 0,
-  _visitorPageSize: 5,
   _assassinTimerRemaining: 0,
   _assassinTimerInterval: null,
   ladyOfLakeEnabled: true,
@@ -107,7 +105,6 @@ function initState(n) {
   state.lancelotDeck = null;
   state.lancelotDrawResults = [];
   state._historyPage = 0;
-  state._visitorPage = 0;
   state._assassinTimerRemaining = 0;
   state._assassinTimerInterval = null;
   state.ladyOfLakeEnabled = true;
@@ -133,10 +130,6 @@ function initState(n) {
     state.consecutiveRejects[i] = 0;
   }
 }
-
-/* ==================== MULTIPLAYER STATE (REMOVED) ==================== */
-// v104: 多人游戏协同已删除。保留 _deviceId 给访客记录使用。
-var _deviceId = null;
 
 /* ==================== PLAYER LABEL ==================== */
 function playerLabel(idx) {
@@ -324,307 +317,6 @@ function loadLastGame() {
 }
 loadNamePool();
 
-/* ==================== VISITOR LOG ==================== */
-function getDeviceInfo() {
-  var ua = navigator.userAgent;
-  var w = screen.width;
-  var h = screen.height;
-  var result = { device: 'Unknown', model: '', osVersion: '', fingerprint: '' };
-
-  // Build fingerprint from device ID (first 6 chars)
-  var did = generateDeviceId();
-  result.fingerprint = did.slice(-6).toUpperCase();
-
-  // iPhone / iPod
-  if (/iPhone|iPod/.test(ua)) {
-    result.device = 'iPhone';
-    var iosMatch = ua.match(/OS (\d+)_(\d+)/);
-    result.osVersion = iosMatch ? 'iOS ' + iosMatch[1] + '.' + iosMatch[2] : '';
-
-    // iPhone model by resolution (logical pixels)
-    var r = w + 'x' + h;
-    var models = {
-      '320x568': 'SE/5s', '375x667': 'SE2/6/7/8', '414x736': '6+/7+/8+',
-      '375x812': 'X/XS/11 Pro', '414x896': 'XR/11/11 Pro Max',
-      '390x844': '12/13/14', '428x926': '12/13 Pro Max/14 Plus',
-      '393x852': '14 Pro/15/16', '430x932': '14 Pro Max/15 Plus/16 Plus',
-      '402x874': '15 Pro/16 Pro', '440x956': '15 Pro Max/16 Pro Max',
-    };
-    result.model = models[r] || 'Unknown';
-  }
-  // iPad
-  else if (/iPad/.test(ua)) {
-    result.device = 'iPad';
-    var iosM = ua.match(/OS (\d+)_(\d+)/);
-    result.osVersion = iosM ? 'iPadOS ' + iosM[1] + '.' + iosM[2] : '';
-    result.model = w + 'x' + h;
-  }
-  // Android
-  else if (/Android/.test(ua)) {
-    result.device = 'Android';
-    var andMatch = ua.match(/Android (\d+(\.\d+)?)/);
-    result.osVersion = andMatch ? 'Android ' + andMatch[1] : '';
-    // Try to extract model from UA
-    var modelMatch = ua.match(/; ([^;]+) Build/);
-    result.model = modelMatch ? modelMatch[1].trim() : (w + 'x' + h);
-  }
-  // Mac
-  else if (/Mac/.test(ua)) {
-    result.device = 'Mac';
-    var macMatch = ua.match(/Mac OS X (\d+[._]\d+)/);
-    result.osVersion = macMatch ? 'macOS ' + macMatch[1].replace('_', '.') : '';
-    result.model = w + 'x' + h;
-  }
-  // Windows
-  else if (/Windows/.test(ua)) {
-    result.device = 'Windows';
-    var winMatch = ua.match(/Windows NT (\d+\.\d+)/);
-    result.osVersion = winMatch ? 'Win' + ({'10.0':'10/11','6.3':'8.1','6.2':'8','6.1':'7'}[winMatch[1]]||winMatch[1]) : '';
-    result.model = w + 'x' + h;
-  }
-  // Linux
-  else if (/Linux/.test(ua)) {
-    result.device = 'Linux';
-    result.model = w + 'x' + h;
-  }
-
-  return result;
-}
-
-function generateDeviceId() {
-  if (_deviceId) return _deviceId;
-  var stored = localStorage.getItem('avalon_device_id');
-  if (stored) { _deviceId = stored; return stored; }
-  _deviceId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem('avalon_device_id', _deviceId);
-  return _deviceId;
-}
-
-function isIPad() {
-  return /iPad/.test(navigator.userAgent);
-}
-
-function hashStrToHue(str) {
-  var hash = 0;
-  for (var i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash) % 360;
-}
-
-function loadVisitors() {
-  try { return JSON.parse(localStorage.getItem('avalon_visitors') || '[]'); } catch(e) { return []; }
-}
-
-function saveVisitors(data) {
-  localStorage.setItem('avalon_visitors', JSON.stringify(data));
-}
-
-function recordVisitor() {
-  var visitors = loadVisitors();
-  var now = new Date();
-  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
-  var timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' '
-    + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-  var info = getDeviceInfo();
-  visitors.push({ time: timeStr, device: info.device, model: info.model, osVersion: info.osVersion, fingerprint: info.fingerprint });
-  if (visitors.length > 500) visitors = visitors.slice(-500);
-  saveVisitors(visitors);
-
-  // 同步推送到 Supabase
-  var sb = getSupabase();
-  if (sb) {
-    sb.from('visitors').insert([{
-      visit_time: timeStr,
-      device: info.device,
-      model: info.model,
-      os_version: info.osVersion,
-      fingerprint: info.fingerprint
-    }]).then(function(r) {
-      if (r.error) {
-        console.warn('[Visitors] Supabase insert failed — code:', r.error.code, '| message:', r.error.message, '| details:', r.error.details);
-      } else {
-        console.log('[Visitors] Supabase insert OK, fingerprint=' + info.fingerprint);
-      }
-    }).catch(function(e) {
-      console.error('[Visitors] Supabase insert exception:', e);
-    });
-  } else {
-    console.log('[Visitors] Supabase not available, visitor logged locally only');
-  }
-}
-
-function renderVisitorLog(forceRefresh) {
-  // 统计页才需要访客列表，首屏设置页不再拉取 500 条远程记录
-  var localVisitors = loadVisitors().slice().reverse();
-  var now = Date.now();
-  if (!forceRefresh && _visitorListCache && (now - _visitorListFetchedAt < 60000)) {
-    renderVisitorList(_visitorListCache);
-    return;
-  }
-  renderVisitorList(_visitorListCache || localVisitors);
-
-  var sb = getSupabase();
-  if (sb) {
-    console.log('[Visitors] fetching recent visitors from Supabase...');
-    sb.from('visitors').select('*').order('visit_time', { ascending: false }).limit(200).then(function(r) {
-      if (r.error) {
-        console.warn('[Visitors] Supabase query failed — code:', r.error.code, '| message:', r.error.message);
-        return;
-      }
-      var merged = {};
-      for (var i = 0; i < localVisitors.length; i++) {
-        var key = localVisitors[i].time + '|' + (localVisitors[i].fingerprint || localVisitors[i].device);
-        merged[key] = true;
-      }
-      var remoteVisitors = [];
-      for (var j = 0; j < r.data.length; j++) {
-        var v = r.data[j];
-        var visitTime = v.visit_time || v.created_at || '';
-        var vkey = visitTime + '|' + (v.fingerprint || v.device);
-        if (!merged[vkey]) {
-          remoteVisitors.push({ time: visitTime, device: v.device, model: v.model || '', osVersion: v.os_version || '', fingerprint: v.fingerprint || '' });
-        }
-      }
-      var all = remoteVisitors.concat(localVisitors);
-      all.sort(function(a, b) { return b.time.localeCompare(a.time); });
-      _visitorListCache = all;
-      _visitorListFetchedAt = Date.now();
-      renderVisitorList(all);
-    }).catch(function(e) {
-      console.error('[Visitors] Supabase query exception:', e);
-    });
-  }
-}
-
-function renderVisitorList(visitors) {
-  var ps = state._visitorPageSize;
-  var totalPages = Math.ceil(visitors.length / ps);
-  if (state._visitorPage >= totalPages && totalPages > 0) state._visitorPage = totalPages - 1;
-  if (state._visitorPage < 0) state._visitorPage = 0;
-  var start = state._visitorPage * ps;
-  var pageItems = visitors.slice(start, start + ps);
-
-  var h = '';
-  for (var i = 0; i < pageItems.length; i++) {
-    var v = pageItems[i];
-    h += '<div class="visitor-item">';
-    h += '<span class="v-time">' + v.time + '</span>';
-    h += '<span class="v-info">';
-    var model = v.model || '';
-    var osv = v.osVersion || '';
-    var display = model;
-    if (osv) display += (display ? ' (' + osv + ')' : osv);
-    if (!display) display = v.device;
-    h += '<span class="v-device">' + display + '</span>';
-    if (v.fingerprint) {
-      var hex = v.fingerprint.slice(0, 6);
-      var hue = hashStrToHue(hex);
-      h += '<span class="v-fingerprint" style="background:hsl(' + hue + ',60%,85%);color:hsl(' + hue + ',60%,25%)">#' + hex + '</span>';
-    }
-    h += '</span>';
-    h += '</div>';
-  }
-  if (pageItems.length === 0) {
-    h = '<div style="text-align:center;padding:16px;color:var(--text-dim)">暂无访客记录</div>';
-  }
-  var listEl = document.getElementById('visitor-list');
-  if (listEl) listEl.innerHTML = h;
-
-  // pagination
-  var pageArea = document.getElementById('visitor-pagination-area');
-  if (pageArea) {
-    if (totalPages <= 1) {
-      pageArea.innerHTML = '';
-    } else {
-      var ph = '<div class="visitor-pagination">';
-      ph += '<button class="page-btn" onclick="goVisitorPage(' + (state._visitorPage - 1) + ')"' + (state._visitorPage === 0 ? ' disabled' : '') + '>‹</button>';
-      var pageButtons = [];
-      if (totalPages <= 7) {
-        for (var p = 0; p < totalPages; p++) pageButtons.push(p);
-      } else {
-        pageButtons.push(0);
-        if (state._visitorPage > 3) pageButtons.push('...');
-        var pStart = Math.max(1, state._visitorPage - 1);
-        var pEnd = Math.min(totalPages - 2, state._visitorPage + 1);
-        for (var p = pStart; p <= pEnd; p++) pageButtons.push(p);
-        if (state._visitorPage < totalPages - 4) pageButtons.push('...');
-        pageButtons.push(totalPages - 1);
-      }
-      for (var k = 0; k < pageButtons.length; k++) {
-        var bp = pageButtons[k];
-        if (bp === '...') {
-          ph += '<span class="page-ellipsis">…</span>';
-        } else {
-          ph += '<button class="page-btn' + (bp === state._visitorPage ? ' active' : '') + '" onclick="goVisitorPage(' + bp + ')">' + (bp + 1) + '</button>';
-        }
-      }
-      ph += '<button class="page-btn" onclick="goVisitorPage(' + (state._visitorPage + 1) + ')"' + (state._visitorPage >= totalPages - 1 ? ' disabled' : '') + '>›</button>';
-      ph += '<span style="color:var(--text-dim);font-size:13px;margin-left:8px">第' + (state._visitorPage + 1) + '/' + totalPages + '页</span>';
-      ph += '</div>';
-      pageArea.innerHTML = ph;
-    }
-  }
-}
-
-function goVisitorPage(p) {
-  if (p < 0) return;
-  state._visitorPage = p;
-  renderVisitorLog(false);
-}
-
-/* ==================== ONLINE PRESENCE ==================== */
-var _onlineTimer = null;
-var _onlineCountEl = null;
-var _visitorListCache = null;
-var _visitorListFetchedAt = 0;
-
-function startOnlineTracking() {
-  _onlineCountEl = document.getElementById('online-count');
-  if (!_onlineCountEl) return;
-  updateOnlineCount();
-  if (!_onlineTimer) _onlineTimer = setInterval(updateOnlineCount, 20000);
-}
-
-function updateOnlineCount() {
-  _onlineCountEl = document.getElementById('online-count');
-  if (!_onlineCountEl || state._currentPage !== 'stats') return;
-  var sb = getSupabase();
-  if (!sb) {
-    if (_onlineCountEl) _onlineCountEl.textContent = '--';
-    return;
-  }
-  // Send heartbeat to keep this visitor in the online window
-  var info = getDeviceInfo();
-  sb.from('visitors').insert([{
-    visit_time: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    device: info.device,
-    model: info.model,
-    os_version: info.osVersion,
-    fingerprint: info.fingerprint
-  }]).then(function() { /* heartbeat sent */ }).catch(function() {});
-  // Query recent unique fingerprints (last 40 seconds)
-  var cutoff = new Date(Date.now() - 40000).toISOString();
-  sb.from('visitors').select('fingerprint').gt('created_at', cutoff).then(function(r) {
-    if (r.error || !r.data) {
-      if (_onlineCountEl) _onlineCountEl.textContent = '--';
-      return;
-    }
-    var fps = {};
-    for (var i = 0; i < r.data.length; i++) {
-      var fp = r.data[i].fingerprint;
-      if (fp) fps[fp] = true;
-    }
-    var count = Object.keys(fps).length;
-    if (_onlineCountEl) {
-      _onlineCountEl.textContent = count;
-      _onlineCountEl.style.color = count > 0 ? 'var(--green-bright)' : 'var(--text-dim)';
-    }
-  }).catch(function() {
-    if (_onlineCountEl) _onlineCountEl.textContent = '--';
-  });
-}
-
 /* ==================== ASSASSIN COUNTDOWN ==================== */
 function startAssassinTimer() {
   stopAssassinTimer();
@@ -697,8 +389,6 @@ function showPage(page) {
   if (page === 'stats') {
     if (prevPage !== 'stats') state._historyPage = 0;
     renderStats();
-    renderVisitorLog(false);
-    startOnlineTracking();
   }
 }
 
@@ -4542,7 +4232,6 @@ function makeRecordKey(record) {
 
 /* ==================== INIT ==================== */
 (function() {
-  generateDeviceId();
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
   var initAudioOnce = function() {
     ensureAudioContext();
@@ -4571,7 +4260,6 @@ function makeRecordKey(record) {
 
   // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
   setTimeout(function() {
-    recordVisitor();
     setupRealtimeSubscriptions();
   }, 1200);
 

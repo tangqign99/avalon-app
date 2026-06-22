@@ -1,6 +1,6 @@
-/* ==================== Service Worker v111 ==================== */
-// sw.js / service-worker.js - v111
-var CACHE_NAME = 'avalon-pwa-v111';
+/* ==================== Service Worker v112 ==================== */
+// sw.js / service-worker.js - v112
+var CACHE_NAME = 'avalon-pwa-v112';
 var ASSETS = [
   './',
   './index.html',
@@ -27,7 +27,7 @@ self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) {
-        return caches.delete(k);
+        if (k !== CACHE_NAME) return caches.delete(k);
       }));
     }).then(function() {
       return self.clients.claim();
@@ -47,16 +47,17 @@ self.addEventListener('fetch', function(e) {
   if (!isAsset) return; // skip Supabase API and other dynamic requests
 
   e.respondWith(
-    fetch(e.request).then(function(resp) {
-      if (resp && resp.status === 200) {
-        var clone = resp.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(e.request, clone);
-        });
-      }
-      return resp;
-    }).catch(function() {
-      return caches.match(e.request);
+    caches.match(e.request).then(function(cached) {
+      var fetchPromise = fetch(e.request).then(function(resp) {
+        if (resp && resp.status === 200) {
+          var clone = resp.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(e.request, clone);
+          });
+        }
+        return resp;
+      });
+      return cached || fetchPromise;
     })
   );
 });

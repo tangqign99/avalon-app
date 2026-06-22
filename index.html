@@ -249,15 +249,7 @@
     </div>
     <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
   </div>
-  <div class="card" id="visitor-card">
-    <h2>访客记录 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（每次打开页面自动记录）</span></h2>
-    <div class="visitor-list" id="visitor-list"></div>
-    <div id="visitor-pagination-area"></div>
-    <div style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:8px">
-      <span style="font-size:13px;color:var(--text-dim)">在线人数：<b id="online-count" style="color:var(--green-bright)">--</b></span>
-      <button class="btn small" onclick="state._visitorPage=0;renderVisitorLog(true)">刷新</button>
-    </div>
-  </div>
+
 
 </section>
 
@@ -278,7 +270,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v111';
+  var SW_VERSION = 'v112';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
