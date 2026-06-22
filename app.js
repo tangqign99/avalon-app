@@ -2709,6 +2709,65 @@ function toggleReview() {
   panel.innerHTML = buildReviewHTML();
 }
 
+
+function buildReviewSpecialInfo(round) {
+  var parts = [];
+  var ladyRecords = (state.ladyCheckHistory || []).filter(function(rec) {
+    return rec && rec.round === round;
+  });
+  if (ladyRecords.length > 0) {
+    var ladyHtml = '<div style="margin-top:8px;padding:8px;border:1px solid rgba(90,140,255,0.28);border-radius:8px;background:rgba(90,140,255,0.08)">';
+    ladyHtml += '<div style="font-weight:700;color:#99bbff;margin-bottom:4px">湖中女神</div>';
+    for (var li = 0; li < ladyRecords.length; li++) {
+      var lr = ladyRecords[li];
+      ladyHtml += '<div style="font-size:13px;line-height:1.6;color:var(--text)">';
+      ladyHtml += playerLabel(lr.holder) + ' 验 ' + playerLabel(lr.target) + '：<strong>' + ladyClaimLabel(lr.result) + '</strong>';
+      if (lr.recordedAtRound !== undefined && lr.recordedAtRound !== null && lr.recordedAtRound !== round) {
+        ladyHtml += ' <span style="color:var(--text-dim)">（第' + (lr.recordedAtRound + 1) + '轮发言记录）</span>';
+      }
+      if (lr.recordedAtSpeaker !== undefined && lr.recordedAtSpeaker !== null) {
+        ladyHtml += ' <span style="color:var(--text-dim)">发言人：' + playerLabel(lr.recordedAtSpeaker) + '</span>';
+      }
+      if (lr.note) ladyHtml += '<div style="font-size:12px;color:var(--text-dim)">备注：' + escapeHtml(lr.note) + '</div>';
+      ladyHtml += '</div>';
+    }
+    ladyHtml += '</div>';
+    parts.push(ladyHtml);
+  }
+
+  var ex = getExcaliburRecord(round);
+  if (ex) {
+    var exHtml = '<div style="margin-top:8px;padding:8px;border:1px solid rgba(201,168,76,0.32);border-radius:8px;background:rgba(201,168,76,0.08)">';
+    exHtml += '<div style="font-weight:700;color:var(--gold-light);margin-bottom:4px">王者之剑</div>';
+    exHtml += '<div style="font-size:13px;line-height:1.6;color:var(--text)">';
+    exHtml += '持剑者：<strong>' + (ex.holder >= 0 ? playerLabel(ex.holder) : '未指定') + '</strong>';
+    if (ex.used === false) {
+      exHtml += '；本轮确认<strong>不使用</strong>';
+    } else if (ex.used === true) {
+      exHtml += '；对 <strong>' + (ex.target !== null && ex.target !== undefined ? playerLabel(ex.target) : '未选择目标') + '</strong> 使用';
+      if (ex.feedbackRecorded) {
+        exHtml += '；口述改变：<strong>' + excaliburDirectionLabel(ex.claimedDirection) + '</strong>';
+        if (ex.feedbackRound !== null && ex.feedbackRound !== undefined) {
+          exHtml += ' <span style="color:var(--text-dim)">（第' + (ex.feedbackRound + 1) + '轮发言记录）</span>';
+        }
+        if (ex.feedbackSpeaker !== null && ex.feedbackSpeaker !== undefined) {
+          exHtml += ' <span style="color:var(--text-dim)">发言人：' + playerLabel(ex.feedbackSpeaker) + '</span>';
+        }
+      } else {
+        exHtml += '；<span style="color:var(--orange)">待持剑者反馈改变方向</span>';
+      }
+      if (ex.note) exHtml += '<div style="font-size:12px;color:var(--text-dim)">备注：' + escapeHtml(ex.note) + '</div>';
+    } else {
+      exHtml += '；<span style="color:var(--orange)">尚未确认是否使用</span>';
+    }
+    exHtml += '</div></div>';
+    parts.push(exHtml);
+  }
+
+  if (!parts.length) return '';
+  return '<div style="margin-top:8px"><strong>特殊信息：</strong>' + parts.join('') + '</div>';
+}
+
 function buildReviewHTML() {
   var h = '';
   var pc = state.playerCount;
@@ -2770,6 +2829,8 @@ function buildReviewHTML() {
       if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
       h += '</span></div>';
     }
+
+    h += buildReviewSpecialInfo(r);
 
     if (m.launchFailures > 0) {
       h += '<div style="margin-top:4px;color:var(--orange)">组队未通过 ' + m.launchFailures + ' 次</div>';

@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v104"></script>
+<script defer src="./app.js?v=v105"></script>
 </head>
 <body>
 
@@ -278,7 +278,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v104';
+  var SW_VERSION = 'v105';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
