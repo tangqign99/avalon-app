@@ -788,7 +788,7 @@ function renderLancelotFlipTracker() {
   var flipImg = '<img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
   var remaining = state.lancelotDeck ? state.lancelotDeck.length : 0;
 
-  var h = '';
+  var h = '<div class="lancelot-flip-row">';
   for (var i = 0; i < 5; i++) {
     var cls = 'lancelot-flip-dot';
     var inner = flipSVG;
@@ -826,6 +826,7 @@ function renderLancelotFlipTracker() {
 
     h += '<div class="lancelot-flip-col"><div class="' + cls + '">' + inner + '</div>' + drawInfo + '</div>';
   }
+  h += '</div>';
 
   // Remaining deck counter
   if (state.lancelotDeck && state.lancelotDeck.length > 0) {

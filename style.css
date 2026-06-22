@@ -231,6 +231,8 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .lancelot-draw-label{font-size:11px;font-weight:600;text-align:center;line-height:1.2;min-height:16px}
 .lancelot-draw-label.flip-label{color:var(--red-bright)}
 .lancelot-draw-label.blank-label{color:var(--text-dim)}
+/* 反转行容器：与 round-tracker 对齐 */
+.lancelot-flip-row{display:flex;gap:18px;justify-content:center}
 /* Deck counter */
 .lancelot-deck-counter{
   display:flex;align-items:center;gap:4px;padding:4px 10px;
@@ -252,6 +254,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   width:78px;height:78px;border-radius:50%;border:2px solid rgba(201,168,76,0.2);
   background:var(--parchment);display:flex;align-items:center;justify-content:center;
   font-size:28px;font-weight:700;color:var(--text-dim);transition:all 0.2s;position:relative;
+  flex-shrink:0;
 }
 .round-dot.current{border-color:var(--gold);background:radial-gradient(circle at 40% 35%,rgba(201,168,76,0.35),rgba(139,115,32,0.4));color:var(--gold-light);box-shadow:0 0 18px rgba(201,168,76,0.45)}
 .round-dot.success{background:linear-gradient(180deg,#1a3a1a,#102810);border-color:#449944;color:#99ff99}
@@ -635,6 +638,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .role-horizontal{gap:14px}
   .faction-label{font-size:12px;padding:2px 8px}
   .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px;max-width:100%}
+  /* 手机端轮次圆圈缩小，避免溢出变椭圆 */
+  .round-dot{width:56px;height:56px;font-size:20px}
+  .round-dot .badge{top:-4px;right:-4px;width:14px;height:14px;font-size:8px;line-height:14px}
+  .badge.flip{width:16px;height:16px;font-size:9px;line-height:16px}
+  .round-tracker{gap:12px}
+  .lancelot-flip-row{gap:12px}
+  .lancelot-flip-dot{width:56px;height:56px}
+  .lancelot-flip-dot svg{width:36px;height:36px}
+  .lancelot-flip-tracker{gap:0}
 }
 @media(min-width:481px) and (max-width:1024px){
   .role-checkbox-grid label{font-size:16px;padding:10px 14px;min-height:48px;min-width:74px}
