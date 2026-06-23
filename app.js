@@ -1284,6 +1284,23 @@ function renderLadyLakeHolderInfo() {
   el.innerHTML = h || '<span style="color:var(--text-dim)">湖中女神未分配</span>';
 }
 
+function showPerSpeakerModals() {
+  if (state.timerMode !== 'per' || state.currentSpeakerIdx < 0) return;
+  var speaker = state.speakerOrder[state.currentSpeakerIdx];
+  var m = state.missions[state.currentRound];
+  var isLeader = (speaker === m.leader);
+  var isLadyHolder = (speaker === state.ladyLakeHolder);
+  var needExcal = state.excaliburEnabled && !getExcaliburRecord(state.currentRound) && isLeader;
+  var needLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
+  if (needExcal && needLady) {
+    showExcaliburWithLady(state.currentRound);
+  } else if (needExcal) {
+    showExcaliburHolderModal(state.currentRound);
+  } else if (needLady) {
+    showLadyCheck();
+  }
+}
+
 function showExcaliburWithLady(round) {
   if (!state.excaliburEnabled || !state.ladyOfLakeEnabled) return;
   if (state.currentRound < 2) return;
@@ -1943,6 +1960,7 @@ function speakEnd() {
     if (btnRow) btnRow.hidden = false;
     renderTimerDisplay();
     renderStepPanel();
+    showPerSpeakerModals();
     startTimer();
   } else {
     state.currentSpeakerIdx = -1;
@@ -2263,14 +2281,18 @@ function confirmTeam() {
     startTimer();
   }
   renderStepPanel();
-  var _showExcal = state.excaliburEnabled && !getExcaliburRecord(state.currentRound);
-  var _showLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
-  if (_showExcal && _showLady) {
-    setTimeout(function() { showExcaliburWithLady(state.currentRound); }, 50);
-  } else if (_showExcal) {
-    setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
-  } else if (_showLady) {
-    setTimeout(function() { showLadyCheck(); }, 50);
+  if (state.timerMode === 'per') {
+    showPerSpeakerModals();
+  } else {
+    var _showExcal = state.excaliburEnabled && !getExcaliburRecord(state.currentRound);
+    var _showLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+    if (_showExcal && _showLady) {
+      setTimeout(function() { showExcaliburWithLady(state.currentRound); }, 50);
+    } else if (_showExcal) {
+      setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
+    } else if (_showLady) {
+      setTimeout(function() { showLadyCheck(); }, 50);
+    }
   }
 }
 
