@@ -1668,7 +1668,7 @@ function showExcaliburHolderModal(round) {
   for (var i = 0; i < m.team.length; i++) {
     var pi = m.team[i];
     if (pi === m.leader) continue;
-    h += '<button class="assassin-target-btn" onclick="onExcaliburInCombinedModal(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+    h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
   }
   h += '</div>';
   if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
