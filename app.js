@@ -2416,7 +2416,10 @@ function renderStepPanelWithResult() {
   h += '<div style="text-align:center;margin-top:10px"><button class="btn primary" id="btn-finalize" style="display:none" onclick="finalizeMission()">确认任务结果，进入下一轮</button></div>';
   c.innerHTML = h;
 
-  if (m.result === 'fail') showFailCountSelector();
+  if (m.result) {
+    document.getElementById('btn-finalize').style.display = 'inline-flex';
+    if (m.result === 'fail') showFailCountSelector();
+  }
 }
 
 function setMissionResult(result) {
