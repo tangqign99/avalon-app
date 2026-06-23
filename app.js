@@ -1297,7 +1297,7 @@ function showExcaliburWithLady(round) {
   for (var i = 0; i < m.team.length; i++) {
     var pi = m.team[i];
     if (pi === m.leader) continue;
-    h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+    h += '<button class="assassin-target-btn" onclick="onExcaliburInCombinedModal(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
   }
   h += '</div>';
   if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
@@ -1318,6 +1318,30 @@ function showExcaliburWithLady(round) {
   showModal(h);
 }
 
+
+// Combined modal: after Excalibur pick, transition to Lady check
+function onExcaliburInCombinedModal(round, pi) {
+  var rec = ensureExcaliburRecord(round);
+  rec.holder = pi;
+  rec.used = rec.used === undefined ? null : rec.used;
+  rec.target = (rec.target === pi) ? null : rec.target;
+  toast('王者之剑持剑者：' + playerLabel(pi));
+  renderGame();
+  // Replace modal content with Lady-only UI
+  var modal = document.getElementById('temp-modal');
+  if (!modal) return;
+  var h = '<h2>湖中女神验人</h2>';
+  h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  var pc = state.playerCount;
+  for (var j = 0; j < pc; j++) {
+    if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+    h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+  }
+  h += '</div>';
+  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+  modal.innerHTML = h;
+}
 function showLadyCheck() {
   if (!state.ladyOfLakeEnabled) return;
   var pc = state.playerCount;
@@ -1640,7 +1664,7 @@ function showExcaliburHolderModal(round) {
   for (var i = 0; i < m.team.length; i++) {
     var pi = m.team[i];
     if (pi === m.leader) continue;
-    h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+    h += '<button class="assassin-target-btn" onclick="onExcaliburInCombinedModal(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
   }
   h += '</div>';
   if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
@@ -4358,6 +4382,7 @@ function getRoleOptions() {
 /* ------- Tend Role Selector ------- */
 function setTendRole(role) {
   state.myRole = role;
+  state.knownIdentities[state.selfIndex] = role;
   renderTendRoleSelector();
   renderTendPerspective();
   renderKnownIdentityGrid();
@@ -4365,6 +4390,7 @@ function setTendRole(role) {
 }
 function clearTendRole() {
   state.myRole = null;
+  delete state.knownIdentities[state.selfIndex];
   renderTendRoleSelector();
   renderTendPerspective();
   renderKnownIdentityGrid();
