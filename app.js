@@ -32,7 +32,7 @@ function getSupabase() {
   }
   return _supabase;
 }
-var SW_VERSION = 'v118';
+var SW_VERSION = 'v119';
 
 
 var namePool = DEFAULT_NAME_POOL.slice();
@@ -1081,14 +1081,9 @@ function renderStepPanel() {
     h += '</div>';
 
     h += '<div style="text-align:center;margin-bottom:12px">';
-    var needExcalPre = state.excaliburEnabled && !getExcaliburRecord(state.currentRound);
-    if (needExcalPre && m.team.length === reqSize) {
-      h += '<button class="btn primary" onclick="preConfirmExcalibur()">指定持剑者并确认队伍</button>';
-    } else {
-      h += '<button class="btn primary" onclick="confirmTeam()"';
-      if (m.team.length !== reqSize) h += ' disabled';
-      h += '>确认队伍 (' + m.team.length + '/' + reqSize + ')</button>';
-    }
+    h += '<button class="btn primary" onclick="confirmTeam()"';
+    if (m.team.length !== reqSize) h += ' disabled';
+    h += '>确认队伍 (' + m.team.length + '/' + reqSize + ')</button>';
     h += '</div>';
   }
 
@@ -1307,7 +1302,7 @@ function showPerSpeakerModals() {
   var arr = state.excaliburHistory || [];
   for (var i = 0; i < arr.length; i++) {
     var e = arr[i];
-    if (e.used === true && e.target !== null && !e.feedbackRecorded && e.round < state.currentRound) {
+    if (e.used !== false && e.target !== null && !e.feedbackRecorded && e.round < state.currentRound) {
       if (e.holder === speaker) {
         needExcalFeedback = true;
         excalFeedbackRec = e;
@@ -1407,6 +1402,8 @@ function ackExcaliburFeedback(round) {
   var rec = getExcaliburRecord(round);
   if (rec) rec.feedbackRecorded = true;
   closeModal();
+  var btnRow = document.getElementById('timer-btns');
+  if (btnRow) btnRow.hidden = false;
 }
 
 // Combined modal: Excalibur feedback + Lady check
@@ -1439,12 +1436,16 @@ function onLadyCheckWithExcalFeedback(idx, excalRound) {
   var rec = getExcaliburRecord(excalRound);
   if (rec) rec.feedbackRecorded = true;
   doLadyCheck(idx);
+  var btnRow = document.getElementById('timer-btns');
+  if (btnRow) btnRow.hidden = false;
 }
 
 function skipLadyWithExcalFeedback(excalRound) {
   var rec = getExcaliburRecord(excalRound);
   if (rec) rec.feedbackRecorded = true;
   closeModal();
+  var btnRow = document.getElementById('timer-btns');
+  if (btnRow) btnRow.hidden = false;
 }
 
 function showLadyCheck() {
@@ -1757,13 +1758,6 @@ function ensureExcaliburRecord(round) {
   };
   state.excaliburHistory.push(rec);
   return rec;
-}
-
-function preConfirmExcalibur() {
-  var m = state.missions[state.currentRound];
-  if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
-  state._excaliburPreConfirm = true;
-  showExcaliburHolderModal(state.currentRound);
 }
 
 function showExcaliburHolderModal(round) {
@@ -2355,6 +2349,13 @@ function toggleTeamMember(idx) {
 function confirmTeam() {
   var m = state.missions[state.currentRound];
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
+
+  // 王者之剑：确认队伍前先指定持剑者（仅当本轮尚未指定时）
+  if (state.excaliburEnabled && !getExcaliburRecord(state.currentRound)) {
+    state._excaliburPreConfirm = true;
+    showExcaliburHolderModal(state.currentRound);
+    return;
+  }
 
   // 湖中女神：第一轮队长确认后自动设定持有者
   if (state.currentRound === 0 && state.ladyOfLakeEnabled && state.ladyLakeHolder === -1) {
