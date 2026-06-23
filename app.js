@@ -32,7 +32,7 @@ function getSupabase() {
   }
   return _supabase;
 }
-var SW_VERSION = 'v117';
+var SW_VERSION = 'v118';
 
 
 var namePool = DEFAULT_NAME_POOL.slice();
@@ -980,6 +980,11 @@ function switchRound(i) {
 function renderStepPanel() {
   var m = state.missions[state.currentRound];
   if (!m) return;
+  // 防御：若 _teamConfirmedPending 为 true 但队伍为空且非投票确认态，说明 flag 是脏数据，强制重置
+  if (state._teamConfirmedPending && m.team && m.team.length === 0 && Object.keys(m.votes || {}).length === 0) {
+    console.warn('[fix] _teamConfirmedPending stale, resetting');
+    state._teamConfirmedPending = false;
+  }
   var c = $('step-container');
   var reqSize = m.size;
   var pc = state.playerCount;
