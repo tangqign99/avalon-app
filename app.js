@@ -32,7 +32,7 @@ function getSupabase() {
   }
   return _supabase;
 }
-var SW_VERSION = 'v116';
+var SW_VERSION = 'v117';
 
 
 var namePool = DEFAULT_NAME_POOL.slice();
@@ -1110,8 +1110,9 @@ function renderTendencyItem(idx, score, merlinProb) {
   if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
   else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
   else { cls = 'suspect'; barCls = 'suspect'; }
+  var selfMark = (idx === state.selfIndex) ? ' <span style="color:var(--gold-light);font-size:10px">&#9733;&#25105;</span>' : '';
   var h = '<div class="tendency-item">';
-  h += '<span class="tend-name">' + playerLabel(idx) + '</span>';
+  h += '<span class="tend-name">' + playerLabel(idx) + selfMark + '</span>';
   h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
   h += '<span class="tend-score ' + cls + '">' + score + '</span>';
   if (merlinProb !== undefined) {
@@ -1281,6 +1282,40 @@ function renderLadyLakeHolderInfo() {
     h += '</div>';
   }
   el.innerHTML = h || '<span style="color:var(--text-dim)">湖中女神未分配</span>';
+}
+
+function showExcaliburWithLady(round) {
+  if (!state.excaliburEnabled || !state.ladyOfLakeEnabled) return;
+  var m = state.missions[round];
+  if (!m || !m.team || m.team.length === 0) return;
+  var rec = ensureExcaliburRecord(round);
+  var h = '';
+  // 王者之剑（上半部分）
+  h += '<h2>王者之剑</h2>';
+  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。后续若使用，只能对队伍中除持剑者外的玩家使用。</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  for (var i = 0; i < m.team.length; i++) {
+    var pi = m.team[i];
+    if (pi === m.leader) continue;
+    h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+  }
+  h += '</div>';
+  if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
+  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()">稍后指定</button></div>';
+  // 分隔线
+  h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+  // 湖中女神（下半部分）
+  h += '<h2>湖中女神验人</h2>';
+  h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  var pc = state.playerCount;
+  for (var j = 0; j < pc; j++) {
+    if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+    h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+  }
+  h += '</div>';
+  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+  showModal(h);
 }
 
 function showLadyCheck() {
@@ -1604,6 +1639,7 @@ function showExcaliburHolderModal(round) {
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
   for (var i = 0; i < m.team.length; i++) {
     var pi = m.team[i];
+    if (pi === m.leader) continue;
     h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
   }
   h += '</div>';
@@ -1689,7 +1725,7 @@ function hasLadyClaimThisRound() {
 }
 
 function shouldShowLadySpeechCard() {
-  if (!state.ladyOfLakeEnabled || state.currentRound <= 0 || state.ladyLakeHolder < 0 || hasLadyClaimThisRound()) return false;
+  if (!state.ladyOfLakeEnabled || state.currentRound < 2 || state.ladyLakeHolder < 0 || hasLadyClaimThisRound()) return false;
   if (state.timerMode === 'all') return state._teamConfirmedPending;
   if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
     return state.speakerOrder[state.currentSpeakerIdx] === state.ladyLakeHolder;
@@ -2199,7 +2235,11 @@ function confirmTeam() {
     startTimer();
   }
   renderStepPanel();
-  if (state.excaliburEnabled && !getExcaliburRecord(state.currentRound)) {
+  var _showExcal = state.excaliburEnabled && !getExcaliburRecord(state.currentRound);
+  var _showLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+  if (_showExcal && _showLady) {
+    setTimeout(function() { showExcaliburWithLady(state.currentRound); }, 50);
+  } else if (_showExcal) {
     setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
   }
 }
