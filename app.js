@@ -2265,6 +2265,8 @@ function confirmTeam() {
     setTimeout(function() { showExcaliburWithLady(state.currentRound); }, 50);
   } else if (_showExcal) {
     setTimeout(function() { showExcaliburHolderModal(state.currentRound); }, 50);
+  } else if (_showLady) {
+    setTimeout(function() { showLadyCheck(); }, 50);
   }
 }
 
@@ -4375,7 +4377,8 @@ function getRoleOptions() {
     { value: '莫德雷德', label: '莫德雷德' },
     { value: '奥伯伦', label: '奥伯伦' },
     { value: '爪牙', label: '爪牙' },
-    { value: '兰斯洛特', label: '兰斯洛特' }
+    { value: '兰斯洛特(蓝)', label: '兰斯洛特(蓝)' },
+    { value: '兰斯洛特(红)', label: '兰斯洛特(红)' }
   ];
 }
 
