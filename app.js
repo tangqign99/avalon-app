@@ -4317,9 +4317,9 @@ function escapeHtml(str) {
 }
 
 var ROLE_CATEGORY = {
-  '梅林': 'good', '派西维尔': 'good', '忠臣': 'good',
+  '梅林': 'good', '派西维尔': 'good', '忠臣': 'good', '兰斯洛特(蓝)': 'good',
   '莫甘娜': 'evil', '刺客': 'evil', '莫德雷德': 'evil',
-  '奥伯伦': 'evil', '爪牙': 'evil', '兰斯洛特': 'evil'
+  '奥伯伦': 'evil', '爪牙': 'evil', '兰斯洛特(红)': 'evil'
 };
 
 function isGoodRole(role) { return ROLE_CATEGORY[role] === 'good'; }
@@ -4327,6 +4327,10 @@ function isEvilRole(role) { return ROLE_CATEGORY[role] === 'evil'; }
 
 function getPerspective() {
   if (!state.myRole) return 'unknown';
+  // Lancelot: faction depends on flip count
+  if (state.myRole === '兰斯洛特(蓝)' || state.myRole === '兰斯洛特(红)') {
+    return (state.lancelotFlipCount % 2 === 0) ? isGoodRole(state.myRole) ? 'good' : 'evil' : isGoodRole(state.myRole) ? 'evil' : 'good';
+  }
   return isGoodRole(state.myRole) ? 'good' : 'evil';
 }
 
@@ -4498,7 +4502,18 @@ function computeSuspectScores() {
   // Evidence accumulation: good_ev / evil_ev with 10/10 smooth prior
   var ev = {};
   for (var i = 0; i < pc; i++) {
-    if (i === selfIdx) continue;
+    if (i === selfIdx) {
+      ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
+      var _myPersp = getPerspective();
+      if (_myPersp === 'good') {
+        ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
+        ev[i].lockReason = '自己（' + state.myRole + '）';
+      } else if (_myPersp === 'evil') {
+        ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
+        ev[i].lockReason = '自己（' + state.myRole + '）';
+      }
+      continue;
+    }
     ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
   }
 
@@ -4506,7 +4521,7 @@ function computeSuspectScores() {
 
   // Step 1: Lock known identities (hard anchors)
   for (var i = 0; i < pc; i++) {
-    if (i === selfIdx) continue;
+    if (i === selfIdx) continue;  // self handled above
     var label = knownIdentities[i];
     if (!label) continue;
     if (isGoodRole(label) || label === '正方' || label === '好人') {
