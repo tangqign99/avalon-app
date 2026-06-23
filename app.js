@@ -32,7 +32,7 @@ function getSupabase() {
   }
   return _supabase;
 }
-var SW_VERSION = 'v120';
+var SW_VERSION = 'v121';
 
 
 var namePool = DEFAULT_NAME_POOL.slice();
@@ -2429,7 +2429,7 @@ function confirmTeam() {
     var excalFeedbackList = [];
     for (var ei = 0; ei < excalRecords.length; ei++) {
       var er = excalRecords[ei];
-      if (er.used === true && er.target !== null && !er.feedbackRecorded && er.round < state.currentRound && er.holder >= 0) {
+      if (er.used !== false && er.target !== null && !er.feedbackRecorded && er.round < state.currentRound && er.holder >= 0) {
         excalFeedbackList.push(er);
       }
     }
