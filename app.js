@@ -32,7 +32,7 @@ function getSupabase() {
   }
   return _supabase;
 }
-var SW_VERSION = 'v119';
+var SW_VERSION = 'v120';
 
 
 var namePool = DEFAULT_NAME_POOL.slice();
@@ -1808,6 +1808,7 @@ function showExcaliburHolderModal(round) {
 
 function skipExcaliburHolder() {
   closeModal();
+  state._excaliburSkipped = true;
   if (state._excaliburPreConfirm) {
     state._excaliburPreConfirm = false;
     confirmTeam();
@@ -1985,7 +1986,9 @@ function saveExcaliburFeedback(round) {
 }
 
 function buildSpeechPhaseInfoPanel() {
-  if (!state._teamConfirmedPending || state.timerMode === 'off') return '';
+  if (!state._teamConfirmedPending) return '';
+  // 计时模式由弹窗处理，不渲染行内卡片
+  if (state.timerMode !== 'off') return '';
   var cards = [];
   if (shouldShowLadySpeechCard()) cards.push(buildLadySpeechCard());
   var exs = getPendingExcaliburFeedbacks();
@@ -2377,12 +2380,16 @@ function confirmTeam() {
   var m = state.missions[state.currentRound];
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
 
-  // 王者之剑：确认队伍前先指定持剑者（仅当本轮尚未指定时）
-  if (state.excaliburEnabled && !getExcaliburRecord(state.currentRound)) {
-    state._excaliburPreConfirm = true;
-    showExcaliburHolderModal(state.currentRound);
-    return;
+  // 王者之剑：确认队伍前先指定持剑者（当记录不存在或 holder 未设置时）
+  if (state.excaliburEnabled && !state._excaliburSkipped) {
+    var _excalRec = getExcaliburRecord(state.currentRound);
+    if (!_excalRec || _excalRec.holder < 0) {
+      state._excaliburPreConfirm = true;
+      showExcaliburHolderModal(state.currentRound);
+      return;
+    }
   }
+  state._excaliburSkipped = false;
 
   // 湖中女神：第一轮队长确认后自动设定持有者
   if (state.currentRound === 0 && state.ladyOfLakeEnabled && state.ladyLakeHolder === -1) {
