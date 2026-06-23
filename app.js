@@ -1286,6 +1286,7 @@ function renderLadyLakeHolderInfo() {
 
 function showExcaliburWithLady(round) {
   if (!state.excaliburEnabled || !state.ladyOfLakeEnabled) return;
+  if (state.currentRound < 2) return;
   var m = state.missions[round];
   if (!m || !m.team || m.team.length === 0) return;
   var rec = ensureExcaliburRecord(round);
@@ -1321,6 +1322,7 @@ function showExcaliburWithLady(round) {
 
 // Combined modal: after Excalibur pick, transition to Lady check
 function onExcaliburInCombinedModal(round, pi) {
+  if (state.currentRound < 2) { closeModal(); return; }
   var rec = ensureExcaliburRecord(round);
   rec.holder = pi;
   rec.used = rec.used === undefined ? null : rec.used;
@@ -1342,8 +1344,10 @@ function onExcaliburInCombinedModal(round, pi) {
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
   modal.innerHTML = h;
 }
+
 function showLadyCheck() {
   if (!state.ladyOfLakeEnabled) return;
+  if (state.currentRound < 2) return;
   var pc = state.playerCount;
   var h = '<h2>湖中女神验人</h2>';
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
