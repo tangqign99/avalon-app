@@ -2546,7 +2546,7 @@ function checkGameEnd() {
   if (failCount >= 3) {
     state.winner = 'evil';
     stopTimer();
-    toast('坏人方成功破坏 3 轮任务！游戏结束');
+    showPage('end');
     return;
   }
   if (successCount >= 3) {
