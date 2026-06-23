@@ -765,6 +765,8 @@ function doStartGame() {
   state.speakerOrder = [];
   state.currentSpeakerIdx = -1;
   state.speakTimes = {};
+  state._teamConfirmedPending = false;
+  state._excaliburPreConfirm = false;
   stopTimer();
   for (var i = 0; i < state.playerCount; i++) {
     state.tendencies[i] = 50;
