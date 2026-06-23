@@ -1314,11 +1314,29 @@ function showPerSpeakerModals() {
   var needLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
 
   if (needExcalFeedback && needLady) {
+    stopTimer();
+    state._modalPausedTimer = true;
     showExcaliburFeedbackWithLady(excalFeedbackRec);
-  } else if (needExcalFeedback) {
+    return;
+  }
+  if (needExcalFeedback) {
+    stopTimer();
+    state._modalPausedTimer = true;
     showExcaliburFeedbackModal(excalFeedbackRec);
-  } else if (needLady) {
+    return;
+  }
+  if (needLady) {
+    stopTimer();
+    state._modalPausedTimer = true;
     showLadyCheck();
+    return;
+  }
+}
+
+function resumePerSpeakerTimer() {
+  if (state._modalPausedTimer && state.timerMode === 'per') {
+    state._modalPausedTimer = false;
+    startTimer();
   }
 }
 
@@ -1404,6 +1422,7 @@ function ackExcaliburFeedback(round) {
   closeModal();
   var btnRow = document.getElementById('timer-btns');
   if (btnRow) btnRow.hidden = false;
+  resumePerSpeakerTimer();
 }
 
 // Combined modal: Excalibur feedback + Lady check
@@ -1438,6 +1457,7 @@ function onLadyCheckWithExcalFeedback(idx, excalRound) {
   doLadyCheck(idx);
   var btnRow = document.getElementById('timer-btns');
   if (btnRow) btnRow.hidden = false;
+  resumePerSpeakerTimer();
 }
 
 function skipLadyWithExcalFeedback(excalRound) {
@@ -1446,6 +1466,7 @@ function skipLadyWithExcalFeedback(excalRound) {
   closeModal();
   var btnRow = document.getElementById('timer-btns');
   if (btnRow) btnRow.hidden = false;
+  resumePerSpeakerTimer();
 }
 
 function showLadyCheck() {
@@ -1460,8 +1481,13 @@ function showLadyCheck() {
     h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + i + ')">' + playerLabel(i) + '</button>';
   }
   h += '</div>';
-  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+  h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="skipLadyCheck()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
   showModal(h);
+}
+
+function skipLadyCheck() {
+  closeModal();
+  resumePerSpeakerTimer();
 }
 
 function doLadyCheck(targetIdx) {
@@ -1508,6 +1534,7 @@ function recordLadyCheck(targetIdx, result) {
   var resultLabel = result === 'good' ? '好人' : result === 'evil' ? '坏人' : '不报';
   renderGame();
   toast(holderLabel + '验' + playerLabel(targetIdx) + ' → ' + resultLabel + '，头衔已传递');
+  resumePerSpeakerTimer();
 }
 
 /* 湖中女神发言环节内联验人界面 */
@@ -2390,10 +2417,37 @@ function confirmTeam() {
   if (state.timerMode === 'per') {
     showPerSpeakerModals();
   } else {
-    var _showLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
-    if (_showLady) {
-      setTimeout(function() { showLadyCheck(); }, 50);
+    // 全体模式：先处理王者之剑反馈，再处理湖中女神
+    var excalRecords = state.excaliburHistory || [];
+    var excalFeedbackList = [];
+    for (var ei = 0; ei < excalRecords.length; ei++) {
+      var er = excalRecords[ei];
+      if (er.used === true && er.target !== null && !er.feedbackRecorded && er.round < state.currentRound && er.holder >= 0) {
+        excalFeedbackList.push(er);
+      }
     }
+    var _showLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+    if (excalFeedbackList.length > 0 || _showLady) {
+      setTimeout(function() {
+        showAllModeExcaliburFeedback(excalFeedbackList, 0, _showLady);
+      }, 50);
+    }
+  }
+}
+
+function showAllModeExcaliburFeedback(list, idx, showLadyAfter) {
+  if (idx < list.length) {
+    var rec = list[idx];
+    showExcaliburFeedbackModal(rec);
+    // 覆写 ack 行为：关闭后继续显示下一条
+    var origAck = window.ackExcaliburFeedback;
+    window.ackExcaliburFeedback = function(r) {
+      if (origAck) origAck(r);
+      window.ackExcaliburFeedback = origAck;
+      setTimeout(function() { showAllModeExcaliburFeedback(list, idx + 1, showLadyAfter); }, 100);
+    };
+  } else if (showLadyAfter) {
+    setTimeout(function() { showLadyCheck(); }, 50);
   }
 }
 
