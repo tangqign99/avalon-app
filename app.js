@@ -4537,9 +4537,11 @@ function computeSuspectScores() {
       if (_myPersp === 'good') {
         ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
         ev[i].lockReason = '自己（' + state.myRole + '）';
+        ev[i].reasons.push(ev[i].lockReason);
       } else if (_myPersp === 'evil') {
         ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
         ev[i].lockReason = '自己（' + state.myRole + '）';
+        ev[i].reasons.push(ev[i].lockReason);
       }
       continue;
     }
@@ -4864,7 +4866,6 @@ function computeSuspectScores() {
   // Step 9: Convert to scores
   var list = [];
   for (var i = 0; i < pc; i++) {
-    if (i === selfIdx) continue;
     var e = ev[i];
     var score;
     if (e.locked) {
