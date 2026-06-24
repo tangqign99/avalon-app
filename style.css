@@ -588,6 +588,11 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .history-compact-item .hci-body .hci-missions{color:var(--text-dim);margin-top:4px}
 .history-compact-item .hci-actions{display:flex;gap:6px;margin-top:8px}
 .hci-right{display:flex;align-items:center;gap:6px;margin-left:auto}
+.hci-role-item{position:relative}
+.hci-role-item .hci-name-edit{display:none;cursor:pointer;font-size:10px;margin-left:2px;opacity:0.6;vertical-align:middle}
+.hci-role-item:hover .hci-name-edit{display:inline}
+.hci-role-item .hci-name-edit:hover{opacity:1}
+.hci-name-input{width:70px;font-size:12px;padding:1px 5px;border:1px solid var(--gold);border-radius:3px;background:var(--bg);color:var(--text-bright);outline:none}
 
 /* ===== 鍏€佽韩浠介娴嬫爣璁?===== */
 .predict-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;flex-wrap:wrap}

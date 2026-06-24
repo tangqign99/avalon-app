@@ -3633,7 +3633,7 @@ function renderStats() {
       h += '<div class="hci-roles">';
       for (var j = 0; j < rec.identities.length; j++) {
         var id = rec.identities[j];
-        h += '<span>' + id.name + '：' + (id.role || '--') + '</span>';
+        h += '<span class="hci-role-item"><span class="hci-name">' + id.name + '</span><button class="hci-name-edit" onclick="event.stopPropagation();startRenameHistoryPlayer(' + i + ',' + j + ')" title="改名">&#9998;</button>：' + (id.role || '--') + '</span>';
       }
       h += '</div>';
     }
@@ -4388,6 +4388,86 @@ function saveEditGameRecord(idx) {
   closeModal();
   toast('对局记录已更新');
   renderStats();
+}
+
+/* ===== 历史对局改玩家名 ===== */
+function startRenameHistoryPlayer(origIdx, playerIdx) {
+  var selector = '.hci-name-edit[onclick="event.stopPropagation();startRenameHistoryPlayer(' + origIdx + ',' + playerIdx + ')"]';
+  var editBtn = document.querySelector(selector);
+  if (!editBtn) {
+    // 备选：用 role-item 内找 name span
+    var items = document.querySelectorAll('.hci-role-item');
+    for (var k = 0; k < items.length; k++) {
+      var btn = items[k].querySelector('.hci-name-edit');
+      if (btn && btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf('startRenameHistoryPlayer(' + origIdx + ',' + playerIdx + ')') !== -1) {
+        editBtn = btn;
+        break;
+      }
+    }
+  }
+  if (!editBtn) return;
+  var roleItem = editBtn.parentElement;
+  var nameSpan = roleItem.querySelector('.hci-name');
+  if (!nameSpan) return;
+  var oldName = nameSpan.textContent;
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldName;
+  input.className = 'hci-name-input';
+  input.onblur = function() { finishRenameHistoryPlayer(origIdx, playerIdx, input.value, oldName); };
+  input.onkeydown = function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); finishRenameHistoryPlayer(origIdx, playerIdx, input.value, oldName); }
+    if (e.key === 'Escape') { renderStats(); }
+  };
+  nameSpan.replaceWith(input);
+  editBtn.style.display = 'none';
+  input.focus();
+  input.select();
+}
+
+function finishRenameHistoryPlayer(origIdx, playerIdx, newName, oldName) {
+  if (!newName || newName.trim() === '' || newName.trim() === oldName) return renderStats();
+  var trimmed = newName.trim();
+  var history = loadHistory();
+  var rec = history[origIdx];
+  if (rec && rec.ids && rec.ids[playerIdx]) {
+    var old = rec.ids[playerIdx].n;
+    rec.ids[playerIdx].n = trimmed;
+    // 同步更新记录中所有引用旧名的字段
+    _updateNameRefs(rec, old, trimmed);
+    saveHistory(history);
+    toast('「' + old + '」→「' + trimmed + '」已保存');
+  }
+  renderStats();
+}
+
+function _updateNameRefs(rec, oldName, newName) {
+  if (!rec || oldName === newName) return;
+  // excaliburHistory
+  if (rec.ex) {
+    for (var i = 0; i < rec.ex.length; i++) {
+      var e = rec.ex[i];
+      if (e.hn === oldName) e.hn = newName;
+      if (e.tn === oldName) e.tn = newName;
+      if (e.ldn === oldName) e.ldn = newName;
+    }
+  }
+  // ladyCheckHistory
+  if (rec.lch) {
+    for (var i = 0; i < rec.lch.length; i++) {
+      var l = rec.lch[i];
+      if (l.hn === oldName) l.hn = newName;
+      if (l.tn === oldName) l.tn = newName;
+    }
+  }
+  // identityMarks
+  if (rec.im) {
+    for (var i = 0; i < rec.im.length; i++) {
+      if (rec.im[i].tn === oldName) rec.im[i].tn = newName;
+    }
+  }
+  // assassinTarget
+  if (rec.at === oldName) rec.at = newName;
 }
 
 function deleteGameRecord(idx) {
