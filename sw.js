@@ -1,11 +1,11 @@
-﻿/* ==================== Service Worker v114 ==================== */
-// sw.js / service-worker.js - v114
-var CACHE_NAME = 'avalon-pwa-v123';
+/* ==================== Service Worker v99 ==================== */
+// SW strategy: stale-while-revalidate
+var CACHE_NAME = 'avalon-pwa-v99';
 var ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './app.js?v=v99',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
@@ -27,7 +27,7 @@ self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) {
-        if (k !== CACHE_NAME) return caches.delete(k);
+        return caches.delete(k);
       }));
     }).then(function() {
       return self.clients.claim();
@@ -40,25 +40,18 @@ self.addEventListener('message', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
-  var url = new URL(e.request.url);
-  var isAsset = ASSETS.some(function(a) {
-    var clean = a.replace('./', '/').split('?')[0];
-    return url.pathname.endsWith(clean) || url.pathname === (clean);
-  });
-  if (!isAsset) return; // skip Supabase API and other dynamic requests
-
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      var fetchPromise = fetch(e.request).then(function(resp) {
-        if (resp && resp.status === 200) {
-          var clone = resp.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(e.request, clone);
-          });
-        }
-        return resp;
+    caches.open(CACHE_NAME).then(function(cache) {
+      return cache.match(e.request).then(function(cached) {
+        var fetched = fetch(e.request).then(function(resp) {
+          if (resp && resp.status === 200) {
+            cache.put(e.request, resp.clone());
+          }
+          return resp;
+        });
+        return cached || fetched;
       });
-      return cached || fetchPromise;
     })
   );
 });
