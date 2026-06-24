@@ -60,6 +60,7 @@ var state = {
   _assassinTimerRemaining: 0,
   _assassinTimerInterval: null,
   ladyOfLakeEnabled: true,
+  excaliburEnabled: true,
   ladyLakeHolder: -1,
   ladyLakeChecks: [],
   timerMode: 'all',
@@ -786,6 +787,12 @@ function renderSetup() {
     if (state.ladyOfLakeEnabled) { ladyRow.classList.add('checked'); }
     else { ladyRow.classList.remove('checked'); }
   }
+  // Sync excalibur toggle button UI
+  var excaliburRow = document.getElementById('excalibur-row');
+  if (excaliburRow) {
+    if (state.excaliburEnabled) { excaliburRow.classList.add('checked'); }
+    else { excaliburRow.classList.remove('checked'); }
+  }
 }
 
 function setPlayerCount(n) {
@@ -982,6 +989,13 @@ function toggleLadyOfLake() {
   state.ladyOfLakeEnabled = !state.ladyOfLakeEnabled;
   var row = document.getElementById('lady-check-row');
   if (state.ladyOfLakeEnabled) { row.classList.add('checked'); }
+  else { row.classList.remove('checked'); }
+}
+
+function toggleExcalibur() {
+  state.excaliburEnabled = !state.excaliburEnabled;
+  var row = document.getElementById('excalibur-row');
+  if (state.excaliburEnabled) { row.classList.add('checked'); }
   else { row.classList.remove('checked'); }
 }
 

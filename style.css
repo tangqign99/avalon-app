@@ -638,6 +638,11 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .role-horizontal{gap:14px}
   .faction-label{font-size:12px;padding:2px 8px}
   .lady-toggle-btn{font-size:16px;padding:10px 14px;min-height:44px;max-width:100%}
+  /* 手机端步骤B队伍成员按钮紧凑排列 */
+  .team-member-btn{min-width:32px;min-height:34px;padding:4px 6px;font-size:11px;margin:0}
+  #step-container .btn-row{gap:3px;flex-wrap:nowrap}
+  /* 确保header标题不被压缩隐藏 */
+  header h1{flex-shrink:0;font-size:18px;letter-spacing:2px}
   /* 手机端轮次圆圈缩小，避免溢出变椭圆 */
   .round-dot{width:48px;height:48px;font-size:18px}
   .round-dot .badge{top:-3px;right:-3px;width:12px;height:12px;font-size:7px;line-height:12px}

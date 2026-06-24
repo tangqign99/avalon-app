@@ -1,6 +1,6 @@
 /* ==================== Service Worker v99 ==================== */
 // SW strategy: stale-while-revalidate
-var CACHE_NAME = 'avalon-pwa-v99';
+var CACHE_NAME = 'avalon-pwa-v115';
 var ASSETS = [
   './',
   './index.html',
