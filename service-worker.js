@@ -1,11 +1,11 @@
-/* ==================== Service Worker v109 ==================== */
-// sw.js / service-worker.js - v109
-var CACHE_NAME = 'avalon-pwa-v109';
+/* ==================== Service Worker v99 ==================== */
+// SW strategy: stale-while-revalidate
+var CACHE_NAME = 'avalon-pwa-v99';
 var ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js?v=v109',
+  './app.js?v=v99',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
@@ -40,17 +40,18 @@ self.addEventListener('message', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).then(function(resp) {
-      if (resp && resp.status === 200 && e.request.method === 'GET') {
-        var clone = resp.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(e.request, clone);
+    caches.open(CACHE_NAME).then(function(cache) {
+      return cache.match(e.request).then(function(cached) {
+        var fetched = fetch(e.request).then(function(resp) {
+          if (resp && resp.status === 200) {
+            cache.put(e.request, resp.clone());
+          }
+          return resp;
         });
-      }
-      return resp;
-    }).catch(function() {
-      return caches.match(e.request);
+        return cached || fetched;
+      });
     })
   );
 });
