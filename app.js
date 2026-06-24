@@ -32,7 +32,7 @@ function getSupabase() {
   }
   return _supabase;
 }
-var SW_VERSION = 'v125';
+var SW_VERSION = 'v128';
 
 
 var namePool = DEFAULT_NAME_POOL.slice();
