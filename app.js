@@ -979,6 +979,7 @@ function switchRound(i) {
 
 function renderStepPanel() {
   var m = state.missions[state.currentRound];
+  console.log('[debug-renderStep] round=' + state.currentRound + ' leader=' + (m ? m.leader : 'MISSING') + ' teamLen=' + (m && m.team ? m.team.length : '?') + ' teamPending=' + state._teamConfirmedPending + ' hasResult=' + (m && m.result ? 'yes' : 'no'));
   if (!m) return;
   // 防御：若 _teamConfirmedPending 为 true 但队伍为空且非投票确认态，说明 flag 是脏数据，强制重置
   if (state._teamConfirmedPending && m.team && m.team.length === 0 && Object.keys(m.votes || {}).length === 0) {
@@ -1456,7 +1457,9 @@ function showCombinedConfirmModal() {
   }
   var showPrevFeedback = prevRec !== null;
   var showLady = state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+  console.log('[debug-combinedModal] round=' + round + ' showHolder=' + showHolder + ' showPrevFeedback=' + showPrevFeedback + ' showLady=' + showLady + ' excalEnabled=' + state.excaliburEnabled + ' ladyEnabled=' + state.ladyOfLakeEnabled + ' ladyHolder=' + state.ladyLakeHolder);
   if (!showHolder && !showPrevFeedback && !showLady) {
+    console.log('[debug-combinedModal] ALL FALSE, early return (modal NOT shown)');
     startTimer();
     renderStepPanel();
     return;
@@ -2630,6 +2633,7 @@ function toggleTeamMember(idx) {
 
 function confirmTeam() {
   var m = state.missions[state.currentRound];
+  console.log('[debug-confirmTeam] round=' + state.currentRound + ' teamLen=' + m.team.length + ' size=' + m.size + ' excalEnabled=' + state.excaliburEnabled + ' teamPending=' + state._teamConfirmedPending + ' timerMode=' + state.timerMode);
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
 
   // 湖中女神：第一轮队长确认后自动设定持有者
@@ -2921,11 +2925,14 @@ function finalizeMission() {
   if (hasLancelot && state.currentRound >= 1) {
     var sc = state.missions.filter(function(mm) { return mm.result === 'success'; }).length;
     var fc = state.missions.filter(function(mm) { return mm.result === 'fail'; }).length;
+  console.log('[debug-finalizeMission] round=' + state.currentRound + ' hasLancelot=' + hasLancelot + ' sc=' + sc + ' fc=' + fc + ' excalEnabled=' + state.excaliburEnabled + ' timerMode=' + state.timerMode);
     if (sc >= 3 || fc >= 3) {
+      console.log('[debug-finalizeMission] game decided, skip Lancelot draw');
       // 已决定胜负，跳过抽卡直接推进游戏结束
       checkGameEnd();
       renderGame();
     } else {
+      console.log('[debug-finalizeMission] entering Lancelot auto-draw');
       applyLancelotAutoDraw(state.currentRound);
     }
   } else {
@@ -3296,7 +3303,9 @@ function lancelotDoAutoDraw(round) {
     state.lancelotRoundFlips[round] = true;
   }
   showLancelotDrawToast(card, round);
+  console.log('[debug-lancelotDraw] lancelot round=' + round + ' card=' + card + ' currentRound before checkGameEnd=' + state.currentRound);
   checkGameEnd();
+  console.log('[debug-lancelotDraw] after checkGameEnd: currentRound=' + state.currentRound + ' winner=' + state.winner);
   renderGame();
 }
 
