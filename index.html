@@ -27,6 +27,10 @@
 <main id="main-content">
 
 <section class="page active" id="page-setup">
+  <div style="text-align:center;margin-bottom:12px">
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌游</div>
+    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">全场唯一真亚瑟版</div>
+  </div>
   <div class="card">
     <h2>玩家人数</h2>
     <div class="count-grid" id="count-grid"></div>
@@ -270,7 +274,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v115';
+  var SW_VERSION = 'v123';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
@@ -299,5 +303,7 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
+
 
 
