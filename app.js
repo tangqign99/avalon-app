@@ -4436,6 +4436,8 @@ function finishRenameHistoryPlayer(origIdx, playerIdx, newName, oldName) {
     // 同步更新记录中所有引用旧名的字段
     _updateNameRefs(rec, old, trimmed);
     saveHistory(history);
+    // 新名字加入名称池
+    if (namePool.indexOf(trimmed) === -1) { namePool.push(trimmed); saveNamePool(); }
     toast('「' + old + '」→「' + trimmed + '」已保存');
   }
   renderStats();
