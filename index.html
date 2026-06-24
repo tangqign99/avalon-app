@@ -1,1 +1,320 @@
-77u/PCFET0NUWVBFIGh0bWw+DQo8aHRtbCBsYW5nPSJ6aC1DTiI+DQo8aGVhZD4NCjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4NCjxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wLCBtYXhpbXVtLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+DQo8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1jYXBhYmxlIiBjb250ZW50PSJ5ZXMiPg0KPG1ldGEgbmFtZT0iYXBwbGUtbW9iaWxlLXdlYi1hcHAtc3RhdHVzLWJhci1zdHlsZSIgY29udGVudD0iYmxhY2stdHJhbnNsdWNlbnQiPg0KPHRpdGxlPumYv+eTpumahui+heWKqTwvdGl0bGU+DQo8bGluayByZWw9Im1hbmlmZXN0IiBocmVmPSIuL21hbmlmZXN0Lmpzb24iPg0KPGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSIuL3N0eWxlLmNzcyI+DQo8c2NyaXB0IGRlZmVyIHNyYz0iLi92ZW5kb3Ivc3VwYWJhc2UubWluLmpzP3Y9Mi4xMDguMiI+PC9zY3JpcHQ+DQo8c2NyaXB0IGRlZmVyIHNyYz0iLi9hcHAuanM/dj12MTE3Ij48L3NjcmlwdD4NCjwvaGVhZD4NCjxib2R5Pg0KDQo8aGVhZGVyPg0KICA8aDE+6Zi/55Om6ZqGPC9oMT4NCiAgPGRpdiBjbGFzcz0ibmF2LWJ0bnMiPg0KICAgIDxidXR0b24gaWQ9Im5hdi1zZXR1cCIgY2xhc3M9ImFjdGl2ZSIgb25jbGljaz0ic2hvd1BhZ2UoJ3NldHVwJykiPuiuvue9rjwvYnV0dG9uPg0KICAgIDxidXR0b24gaWQ9Im5hdi1nYW1lIiBvbmNsaWNrPSJnb1RvR2FtZSgpIj7muLjmiI88L2J1dHRvbj4NCiAgICA8YnV0dG9uIGlkPSJuYXYtdGVuZCIgb25jbGljaz0ic2hvd1BhZ2UoJ3RlbmQnKSI+5YC+5ZCRPC9idXR0b24+DQogICAgPGJ1dHRvbiBpZD0ibmF2LWVuZCIgb25jbGljaz0ic2hvd1BhZ2UoJ2VuZCcpIj7nu5PmnZ88L2J1dHRvbj4NCiAgICA8YnV0dG9uIGlkPSJuYXYtc3RhdHMiIG9uY2xpY2s9InNob3dQYWdlKCdzdGF0cycpIj7nu5/orqE8L2J1dHRvbj4NCiAgPC9kaXY+DQo8L2hlYWRlcj4NCg0KPG1haW4gaWQ9Im1haW4tY29udGVudCI+DQoNCjxzZWN0aW9uIGNsYXNzPSJwYWdlIGFjdGl2ZSIgaWQ9InBhZ2Utc2V0dXAiPg0KICA8ZGl2IHN0eWxlPSJ0ZXh0LWFsaWduOmNlbnRlcjttYXJnaW4tYm90dG9tOjEycHgiPg0KICAgIDxkaXYgc3R5bGU9ImZvbnQtc2l6ZToyNnB4O2ZvbnQtd2VpZ2h0OjcwMDtjb2xvcjp2YXIoLS1nb2xkLWxpZ2h0KTtsZXR0ZXItc3BhY2luZzozcHg7bGluZS1oZWlnaHQ6MS41Ij7pmL/nk6bpmobmoYzmuLg8L2Rpdj4NCiAgICA8ZGl2IHN0eWxlPSJmb250LXNpemU6MTVweDtjb2xvcjp2YXIoLS1nb2xkKTtsZXR0ZXItc3BhY2luZzoycHgiPuWFqOWcuuWUr+S4gOecn+S6mueRn+eJiDwvZGl2Pg0KICA8L2Rpdj4NCiAgPGRpdiBjbGFzcz0iY2FyZCI+DQogICAgPGgyPueOqeWutuS6uuaVsDwvaDI+DQogICAgPGRpdiBjbGFzcz0iY291bnQtZ3JpZCIgaWQ9ImNvdW50LWdyaWQiPjwvZGl2Pg0KICA8L2Rpdj4NCiAgPGRpdiBjbGFzcz0iY2FyZCI+DQogICAgPGgyPueOqeWutuWQjeensCA8c3BhbiBzdHlsZT0iZm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pIj7vvIjkuIvmi4npgInmi6nvvIk8L3NwYW4+PC9oMj4NCiAgICA8ZGl2IGlkPSJwbGF5ZXItbmFtZXMiPjwvZGl2Pg0KICA8L2Rpdj4NCiAgPGRpdiBjbGFzcz0iY2FyZCI+DQogICAgPGgyPuacrOWxgOinkuiJsiA8c3BhbiBzdHlsZT0iZm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pO2ZvbnQtd2VpZ2h0OjQwMCI+77yI5Yu+6YCJ55qE5omN5Lya5Ye6546w5Zyo57uT5p2f6Z2i5p2/6Lqr5Lu96YCJ6aG55Lit77yJPC9zcGFuPjwvaDI+DQogICAgPGRpdiBjbGFzcz0icm9sZS1jaGVja2JveC1ncmlkIiBpZD0icm9sZS1jaGVja2JveC1ncmlkIj48L2Rpdj4NCiAgPC9kaXY+DQogIDxkaXYgY2xhc3M9ImNhcmQiPg0KICAgIDxoMiBzdHlsZT0idGV4dC1hbGlnbjpjZW50ZXIiPuWPr+mAieinhOWImTwvaDI+DQogICAgPGRpdiBzdHlsZT0iZGlzcGxheTpmbGV4O2p1c3RpZnktY29udGVudDpjZW50ZXI7Z2FwOjhweDtmbGV4LXdyYXA6d3JhcCI+PGJ1dHRvbiBpZD0ibGFkeS1jaGVjay1yb3ciIGNsYXNzPSJsYWR5LXRvZ2dsZS1idG4iIG9uY2xpY2s9InRvZ2dsZUxhZHlPZkxha2UoKSI+5rmW5Lit5aWz56WePC9idXR0b24+PGJ1dHRvbiBpZD0iZXhjYWxpYnVyLXJvdyIgY2xhc3M9ImxhZHktdG9nZ2xlLWJ0biIgb25jbGljaz0idG9nZ2xlRXhjYWxpYnVyKCkiPueOi+iAheS5i+WJkTwvYnV0dG9uPjwvZGl2Pg0KICAgIDxkaXYgY2xhc3M9InRpbWVyLXNldHVwIiBpZD0idGltZXItc2V0dXAiPg0KICAgICAgPGgzPuiuoeaXtuaooeW8jzwvaDM+DQogICAgICA8ZGl2IGNsYXNzPSJ0aW1lci1tb2RlLXJvdyI+DQogICAgICAgIDxidXR0b24gY2xhc3M9InRpbWVyLW1vZGUtYnRuIiBpZD0idGltZXItbW9kZS1vZmYiIG9uY2xpY2s9InNldFRpbWVyTW9kZSgnb2ZmJykiPuWFs+mXreiuoeaXtjwvYnV0dG9uPg0KICAgICAgICA8YnV0dG9uIGNsYXNzPSJ0aW1lci1tb2RlLWJ0biBzZWxlY3RlZCIgaWQ9InRpbWVyLW1vZGUtYWxsIiBvbmNsaWNrPSJzZXRUaW1lck1vZGUoJ2FsbCcpIj7lhajkvZPlj5HoqIA8L2J1dHRvbj4NCiAgICAgICAgPGJ1dHRvbiBjbGFzcz0idGltZXItbW9kZS1idG4iIGlkPSJ0aW1lci1tb2RlLXBlciIgb25jbGljaz0ic2V0VGltZXJNb2RlKCdwZXInKSI+6L2u5rWB5Y+R6KiAPC9idXR0b24+DQogICAgICA8L2Rpdj4NCiAgICAgIDxkaXYgY2xhc3M9InRpbWVyLW9wdGlvbnMtcm93IiBpZD0idGltZXItYWxsLW9wdGlvbnMiPg0KICAgICAgICA8c3BhbiBzdHlsZT0iY29sb3I6dmFyKC0tdGV4dC1kaW0pO2ZvbnQtc2l6ZToxM3B4O2Rpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpjZW50ZXIiPuaXtumVvzwvc3Bhbj4NCiAgICAgICAgPGJ1dHRvbiBjbGFzcz0idGltZXItb3B0LWJ0biIgaWQ9InRpbWVyLWFsbC1vcHQtMTgwIiBvbmNsaWNrPSJzZXRBbGxUaW1lclNlY29uZHMoMTgwKSI+M+WIhumSnzwvYnV0dG9uPg0KICAgICAgICA8YnV0dG9uIGNsYXNzPSJ0aW1lci1vcHQtYnRuIiBpZD0idGltZXItYWxsLW9wdC0yNDAiIG9uY2xpY2s9InNldEFsbFRpbWVyU2Vjb25kcygyNDApIj405YiG6ZKfPC9idXR0b24+DQogICAgICAgIDxidXR0b24gY2xhc3M9InRpbWVyLW9wdC1idG4gc2VsZWN0ZWQiIGlkPSJ0aW1lci1hbGwtb3B0LTMwMCIgb25jbGljaz0ic2V0QWxsVGltZXJTZWNvbmRzKDMwMCkiPjXliIbpkp88L2J1dHRvbj4NCiAgICAgIDwvZGl2Pg0KICAgICAgPGRpdiBjbGFzcz0idGltZXItb3B0aW9ucy1yb3ciIGlkPSJ0aW1lci1wZXItb3B0aW9ucyIgc3R5bGU9ImRpc3BsYXk6bm9uZSI+DQogICAgICAgIDxzcGFuIHN0eWxlPSJjb2xvcjp2YXIoLS10ZXh0LWRpbSk7Zm9udC1zaXplOjEzcHg7ZGlzcGxheTpmbGV4O2FsaWduLWl0ZW1zOmNlbnRlciI+5q+P5Lq6PC9zcGFuPg0KICAgICAgICA8YnV0dG9uIGNsYXNzPSJ0aW1lci1vcHQtYnRuIiBpZD0idGltZXItcGVyLW9wdC00NSIgb25jbGljaz0ic2V0VGltZXJTZWNvbmRzKDQ1KSI+NDVzPC9idXR0b24+DQogICAgICAgIDxidXR0b24gY2xhc3M9InRpbWVyLW9wdC1idG4gc2VsZWN0ZWQiIGlkPSJ0aW1lci1wZXItb3B0LTYwIiBvbmNsaWNrPSJzZXRUaW1lclNlY29uZHMoNjApIj42MHM8L2J1dHRvbj4NCiAgICAgICAgPGJ1dHRvbiBjbGFzcz0idGltZXItb3B0LWJ0biIgaWQ9InRpbWVyLXBlci1vcHQtNzUiIG9uY2xpY2s9InNldFRpbWVyU2Vjb25kcyg3NSkiPjc1czwvYnV0dG9uPg0KICAgICAgICA8YnV0dG9uIGNsYXNzPSJ0aW1lci1vcHQtYnRuIiBpZD0idGltZXItcGVyLW9wdC05MCIgb25jbGljaz0ic2V0VGltZXJTZWNvbmRzKDkwKSI+OTBzPC9idXR0b24+DQogICAgICAgIDxpbnB1dCB0eXBlPSJudW1iZXIiIGlkPSJ0aW1lci1zZWNvbmRzLWlucHV0IiB2YWx1ZT0iNjAiIG1pbj0iMTAiIG1heD0iMzAwIiBzdGVwPSI1Ig0KICAgICAgICAgIHN0eWxlPSJ3aWR0aDo2NHB4O3BhZGRpbmc6NnB4IDhweDtib3JkZXItcmFkaXVzOnZhcigtLXJhZGl1cy1zbSk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1ib3JkZXIpO2JhY2tncm91bmQ6dmFyKC0tYmctY2FyZCk7Y29sb3I6dmFyKC0tdGV4dCk7Zm9udC1zaXplOjE1cHg7dGV4dC1hbGlnbjpjZW50ZXI7bWluLWhlaWdodDo0MHB4O291dGxpbmU6bm9uZSINCiAgICAgICAgICBvbmNoYW5nZT0ic2V0VGltZXJTZWNvbmRzSW5wdXQoKSIgb25mb2N1cz0idGhpcy5zZWxlY3QoKSI+DQogICAgICAgIDxzcGFuIHN0eWxlPSJjb2xvcjp2YXIoLS10ZXh0LWRpbSk7Zm9udC1zaXplOjEzcHgiPuenkjwvc3Bhbj4NCiAgICAgIDwvZGl2Pg0KICAgIDwvZGl2Pg0KICA8L2Rpdj4NCiAgPGRpdiBjbGFzcz0iY2FyZCIgc3R5bGU9InRleHQtYWxpZ246Y2VudGVyIj4NCiAgICA8cCBzdHlsZT0iY29sb3I6dmFyKC0tdGV4dC1kaW0pO2ZvbnQtc2l6ZToxNHB4O21hcmdpbi1ib3R0b206OHB4Ij4NCiAgICAgIOS7u+WKoei9ruasoe+8mjxzcGFuIGlkPSJtaXNzaW9uLWluZm8iIHN0eWxlPSJjb2xvcjp2YXIoLS1nb2xkLWxpZ2h0KTtmb250LXdlaWdodDo2MDAiPuivt+WFiOmAieaLqeS6uuaVsDwvc3Bhbj4NCiAgICA8L3A+DQogICAgPGJ1dHRvbiBjbGFzcz0iYnRuIHByaW1hcnkiIG9uY2xpY2s9InN0YXJ0R2FtZSgpIiBzdHlsZT0iZm9udC1zaXplOjIwcHg7cGFkZGluZzoxNXB4IDQ4cHgiPuW8gOWni+a4uOaIjzwvYnV0dG9uPg0KICA8L2Rpdj4NCjwvc2VjdGlvbj4NCg0KPHNlY3Rpb24gY2xhc3M9InBhZ2UiIGlkPSJwYWdlLWdhbWUiPg0KICA8ZGl2IHN0eWxlPSJ0ZXh0LWFsaWduOmNlbnRlcjttYXJnaW4tYm90dG9tOjEycHgiIGlkPSJnYW1lLXRpdGxlIj4NCiAgICA8ZGl2IHN0eWxlPSJmb250LXNpemU6MjZweDtmb250LXdlaWdodDo3MDA7Y29sb3I6dmFyKC0tZ29sZC1saWdodCk7bGV0dGVyLXNwYWNpbmc6M3B4O2xpbmUtaGVpZ2h0OjEuNSI+6Zi/55Om6ZqG5qGM5ri4PC9kaXY+DQogICAgPGRpdiBzdHlsZT0iZm9udC1zaXplOjE1cHg7Y29sb3I6dmFyKC0tZ29sZCk7bGV0dGVyLXNwYWNpbmc6MnB4Ij7lhajlnLrllK/kuIDnnJ/kuprnkZ/niYg8L2Rpdj4NCiAgPC9kaXY+DQogIDxkaXYgY2xhc3M9InJvdW5kLXRyYWNrZXIiIGlkPSJyb3VuZC10cmFja2VyIj48L2Rpdj4NCiAgPGRpdiBjbGFzcz0ibGFuY2Vsb3QtZmxpcC10cmFja2VyIiBpZD0ibGFuY2Vsb3QtZmxpcC10cmFja2VyIiBzdHlsZT0iZGlzcGxheTpub25lIj48L2Rpdj4NCiAgPGRpdiBpZD0ibGF1bmNoLWZhaWwtYXJlYSI+PC9kaXY+DQogIDxkaXYgY2xhc3M9InRpbWVyLWRpc3BsYXkiIGlkPSJ0aW1lci1kaXNwbGF5IiBzdHlsZT0iZGlzcGxheTpub25lIj4NCiAgICA8ZGl2IGNsYXNzPSJ0aW1lci12YWx1ZSIgaWQ9InRpbWVyLXZhbHVlIj4wMTowMDwvZGl2Pg0KICAgIDxkaXYgY2xhc3M9InRpbWVyLWxhYmVsIiBpZD0idGltZXItbGFiZWwiPuWPkeiogOiuoeaXtjwvZGl2Pg0KICAgIDxkaXYgaWQ9InRpbWVyLXNwZWFrZXItbmFtZSIgc3R5bGU9ImZvbnQtc2l6ZToxNnB4O2NvbG9yOnZhcigtLWdvbGQtbGlnaHQpO21hcmdpbi10b3A6NHB4O2ZvbnQtd2VpZ2h0OjcwMCI+PC9kaXY+DQogICAgPGRpdiBjbGFzcz0iYnRuLXJvdyIgc3R5bGU9Imp1c3RpZnktY29udGVudDpjZW50ZXI7bWFyZ2luLXRvcDo2cHgiIGlkPSJ0aW1lci1idG5zIiBoaWRkZW4+DQogICAgICA8YnV0dG9uIGNsYXNzPSJidG4gc21hbGwgc3VjY2VzcyIgb25jbGljaz0ic3BlYWtFbmQoKSI+5Y+R6KiA57uT5p2fPC9idXR0b24+DQogICAgICA8YnV0dG9uIGNsYXNzPSJidG4gc21hbGwiIG9uY2xpY2s9InJlc2V0VGltZXIoKSI+6YeN572u5pe26Ze0PC9idXR0b24+DQogICAgICA8YnV0dG9uIGNsYXNzPSJidG4gc21hbGwgZGFuZ2VyIiBvbmNsaWNrPSJlbmRBbGxTcGVhaygpIj7nu5PmnZ/miYDmnInlj5HoqIA8L2J1dHRvbj4NCiAgICA8L2Rpdj4NCiAgPC9kaXY+DQogIDxkaXYgY2xhc3M9ImdhbWUtbGF5b3V0Ij4NCiAgICA8ZGl2IGNsYXNzPSJnYW1lLW1haW4iPg0KICAgICAgPGRpdiBjbGFzcz0iY2FyZCIgaWQ9InN0ZXAtY29udGFpbmVyIj48L2Rpdj4NCiAgICAgIDxkaXYgY2xhc3M9InJldmlldy1zZWN0aW9uIiBpZD0icmV2aWV3LXNlY3Rpb24iIHN0eWxlPSJkaXNwbGF5Om5vbmUiPg0KICAgICAgICA8YnV0dG9uIGNsYXNzPSJidG4iIG9uY2xpY2s9InRvZ2dsZVJldmlldygpIj7lpI3nm5g8L2J1dHRvbj4NCiAgICAgICAgPGRpdiBpZD0icmV2aWV3LXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lO21hcmdpbi10b3A6OHB4Ij48L2Rpdj4NCiAgICAgIDwvZGl2Pg0KICAgIDwvZGl2Pg0KICAgIDxkaXYgY2xhc3M9ImdhbWUtc2lkZSI+DQogICAgICA8ZGl2IGlkPSJsYWR5LWxha2UtaG9sZGVyLWluZm8iIHN0eWxlPSJkaXNwbGF5Om5vbmU7cGFkZGluZzo4cHggMTJweDtiYWNrZ3JvdW5kOmxpbmVhci1ncmFkaWVudCgxMzVkZWcscmdiYSg3NCwxNDQsMjE3LDAuMTIpLHJnYmEoNzQsMTQ0LDIxNywwLjAzKSk7Ym9yZGVyOjJweCBzb2xpZCB2YXIoLS1ibHVlKTtib3JkZXItcmFkaXVzOnZhcigtLXJhZGl1cyk7bWFyZ2luLWJvdHRvbTo4cHg7dGV4dC1hbGlnbjpjZW50ZXI7Zm9udC1zaXplOjE0cHg7Zm9udC13ZWlnaHQ6NzAwO2NvbG9yOnZhcigtLWJsdWUtbGlnaHQsICM5OWJiZmYpIj48L2Rpdj4NCiAgICAgIDxkaXYgY2xhc3M9ImNhcmQiIHN0eWxlPSJwYWRkaW5nOjEwcHgiPg0KICAgICAgICA8ZGl2IGlkPSJsYWR5LWxha2UtcmVzdWx0cyIgc3R5bGU9Im1hcmdpbi10b3A6NnB4Ij48L2Rpdj4NCiAgICAgIDwvZGl2Pg0KICAgICAgPGRpdiBpZD0ibGFkeS1sYWtlLWVudHJ5IiBzdHlsZT0iZGlzcGxheTpub25lIj4NCiAgICAgICAgPGRpdiBjbGFzcz0iY2FyZCBsYWR5LWNoZWNrLWVudHJ5Ij4NCiAgICAgICAgICA8YnV0dG9uIGNsYXNzPSJidG4iIG9uY2xpY2s9InNob3dMYWR5Q2hlY2soKSIgc3R5bGU9ImJvcmRlci1jb2xvcjp2YXIoLS1nb2xkKTtjb2xvcjp2YXIoLS1nb2xkKSI+5rmW5Lit5aWz56We6aqM5Lq6PC9idXR0b24+DQogICAgICAgIDwvZGl2Pg0KICAgICAgPC9kaXY+DQogICAgPC9kaXY+DQogIDwvZGl2Pg0KICANCjwvc2VjdGlvbj4NCg0KPHNlY3Rpb24gY2xhc3M9InBhZ2UiIGlkPSJwYWdlLXRlbmQiPg0KICANCiAgPGRpdiBjbGFzcz0iY2FyZCIgaWQ9InRlbmQtcm9sZS1jYXJkIj4NCiAgICA8aDI+5oiR55qE6Lqr5Lu9PC9oMj4NCiAgICA8ZGl2IGlkPSJ0ZW5kLXJvbGUtZ3JpZCI+PC9kaXY+DQogIDwvZGl2Pg0KDQogIDxkaXYgY2xhc3M9ImNhcmQiPg0KICAgIDxoMiBpZD0idGVuZC1wZXJzcGVjdGl2ZS10aXRsZSI+5YC+5ZCR5YiG5p6QPC9oMj4NCiAgICA8cCBzdHlsZT0iZm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pO21hcmdpbi1ib3R0b206NnB4IiBpZD0idGVuZC1wZXJzcGVjdGl2ZS1kZXNjIj48L3A+DQogIDwvZGl2Pg0KDQogIA0KICA8ZGl2IGNsYXNzPSJjYXJkIiBpZD0idjctZW5naW5lLWNhcmQiPg0KICAgIDxkaXYgY2xhc3M9InY3LWNhcmQtaGVhZGVyIj4NCiAgICAgIDxoMiBzdHlsZT0ibWFyZ2luOjAiPiYjOTg4Mzsgdjcg566X5rOV6Z2i5p2/PC9oMj4NCiAgICAgIDxzcGFuIGNsYXNzPSJ2Ny12ZXJzaW9uLWJhZGdlIj52MTEwPC9zcGFuPg0KICAgIDwvZGl2Pg0KDQogICAgPCEtLSDlhajlsYDnirbmgIHmnaEgLS0+DQogICAgPGRpdiBpZD0idjctZW5naW5lLXN0YXR1cyIgY2xhc3M9InY3LXN0YXR1cy1iYXIiPjwvZGl2Pg0KDQogICAgPCEtLSDnrpfms5UgOSDmraXlrp7ml7bnirbmgIEgLS0+DQogICAgPGRpdiBpZD0idjctZW5naW5lLXN0ZXBzIiBjbGFzcz0idjctc3RlcC1ncmlkIj48L2Rpdj4NCg0KICAgIDwhLS0g5YWs5byP6K+05piOIC0tPg0KICAgIDxkaXYgY2xhc3M9InY3LWZvcm11bGEiPg0KICAgICAgPHNwYW4gc3R5bGU9ImNvbG9yOnZhcigtLWFjY2VudCkiPiYjOTg4ODs8L3NwYW4+DQogICAgICA8c3Ryb25nPuivhOWIhuWFrOW8jzwvc3Ryb25nPu+8muWIhuaVsCA9IOWlveS6uuivgeaNriAvICjlpb3kurror4Hmja4gKyDlnY/kurror4Hmja4pICYjMjE1OyAxMDANCiAgICAgICZuYnNwO3wmbmJzcDsg5YWI6aqMIDEwOjEw77yM6ZqP6L2u5qyh5o6o6L+b6YCQ5q2l5pS25pWbDQogICAgPC9kaXY+DQogIDwvZGl2Pg0KDQogIDxkaXYgY2xhc3M9ImNhcmQiIGlkPSJrbm93bi1pZGVudGl0eS1jYXJkIj4NCiAgICA8aDI+5bey55+l6Lqr5Lu95qCH5rOoPC9oMj4NCiAgICA8cCBzdHlsZT0iZm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pO21hcmdpbi1ib3R0b206MTBweCI+5qCH6K6wMTAwJeehruiupOeahOeOqeWutui6q+S7ve+8iOWPr+maj+aXtuWinuaUue+8ie+8jOeUqOS6jue8qeWwj+WIhuaekOiMg+WbtDwvcD4NCiAgICA8ZGl2IGlkPSJrbm93bi1pZGVudGl0eS1ncmlkIj48L2Rpdj4NCiAgPC9kaXY+DQoNCiAgPGRpdiBjbGFzcz0iY2FyZCIgaWQ9InRlbmQtcmVzdWx0LWNhcmQiPg0KICAgIDxoMiBpZD0idGVuZC1yZXN1bHQtdGl0bGUiPuWIhuaekOe7k+aenDwvaDI+DQogICAgPHAgc3R5bGU9ImZvbnQtc2l6ZToxMnB4O2NvbG9yOnZhcigtLXRleHQtZGltKTttYXJnaW4tYm90dG9tOjhweCIgaWQ9InRlbmQtcmVzdWx0LWRlc2MiPjwvcD4NCiAgICA8ZGl2IGlkPSJ0ZW5kLXJlc3VsdC1saXN0Ij48L2Rpdj4NCiAgPC9kaXY+DQoNCiAgPGRpdiBjbGFzcz0iY2FyZCIgaWQ9InRlbmQtZXZpZGVuY2UtY2FyZCI+DQogICAgPGgyPuWFs+mUruivgeaNrjwvaDI+DQogICAgPGRpdiBpZD0idGVuZC1ldmlkZW5jZS1saXN0Ij48L2Rpdj4NCiAgPC9kaXY+DQo8L3NlY3Rpb24+DQoNCjxzZWN0aW9uIGNsYXNzPSJwYWdlIiBpZD0icGFnZS1lbmQiPg0KICA8ZGl2IGNsYXNzPSJjYXJkIiBpZD0iZW5kLWFzc2Fzc2luLWNhcmQiIHN0eWxlPSJkaXNwbGF5Om5vbmUiPg0KICAgIDxoMj7liLrlrqLliLrmnYDnjq/oioI8L2gyPg0KICAgIDxkaXYgaWQ9ImVuZC1hc3Nhc3Npbi1waWNrLWFyZWEiPjwvZGl2Pg0KICAgIDxkaXYgaWQ9ImVuZC1hc3Nhc3Npbi1yZXNvbHZlLWFyZWEiIHN0eWxlPSJkaXNwbGF5Om5vbmUiPg0KICAgICAgPHAgc3R5bGU9ImZvbnQtc2l6ZToxNHB4O21hcmdpbi1ib3R0b206OHB4Ij7liLrmnYDnm67moIfvvJo8c3Ryb25nIGlkPSJlbmQtdGFyZ2V0LW5hbWUiIHN0eWxlPSJjb2xvcjp2YXIoLS1yZWQtYnJpZ2h0KSI+PC9zdHJvbmc+PC9wPg0KICAgICAgPHAgc3R5bGU9ImZvbnQtc2l6ZToxNHB4O21hcmdpbi1ib3R0b206MTBweCI+5Yi65p2A55uu5qCH5piv5LiN5piv5qKF5p6X77yfPC9wPg0KICAgICAgPGRpdiBjbGFzcz0id2lubmVyLXRvZ2dsZSI+DQogICAgICAgIDxidXR0b24gY2xhc3M9Indpbm5lci1idG4gZ29vZCIgb25jbGljaz0icmVzb2x2ZUFzc2Fzc2luKHRydWUpIj4mIzk5ODk7IOaYr+aiheaelyDihpIg5Y+N5pa56IOcPC9idXR0b24+DQogICAgICAgIDxidXR0b24gY2xhc3M9Indpbm5lci1idG4gZXZpbCIgb25jbGljaz0icmVzb2x2ZUFzc2Fzc2luKGZhbHNlKSI+JiMxMDA2MDsg5LiN5piv5qKF5p6XIOKGkiDlpb3kurrmlrnog5w8L2J1dHRvbj4NCiAgICAgIDwvZGl2Pg0KICAgIDwvZGl2Pg0KICA8L2Rpdj4NCg0KICA8ZGl2IGNsYXNzPSJjYXJkIiBpZD0iZW5kLXJldmlldy1jYXJkIj4NCiAgICA8aDI+5a+55bGA5aSN55uYPC9oMj4NCiAgICA8ZGl2IGlkPSJlbmQtcmV2aWV3LWNvbnRlbnQiPjwvZGl2Pg0KICA8L2Rpdj4NCg0KICA8ZGl2IGNsYXNzPSJjYXJkIj4NCiAgICA8aDI+5ri45oiP57uT5p2fPC9oMj4NCiAgICA8cCBzdHlsZT0iZm9udC1zaXplOjEzcHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pO21hcmdpbi1ib3R0b206MTBweCI+5pys6L2u5Lu75Yqh57uT5p6c77yaPHNwYW4gaWQ9ImVuZC1yb3VuZC1zdW1tYXJ5IiBzdHlsZT0iY29sb3I6dmFyKC0tZ29sZC1saWdodCkiPjwvc3Bhbj48L3A+DQogICAgPGRpdiBjbGFzcz0id2lubmVyLXRvZ2dsZSIgaWQ9Indpbm5lci10b2dnbGUiPjwvZGl2Pg0KICA8L2Rpdj4NCiAgPGRpdiBjbGFzcz0iY2FyZCI+DQogICAgPGgyPuiusOW9lei6q+S7vSA8c3BhbiBzdHlsZT0iZm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pIj7vvIjmuLjmiI/lkI7loavlhaXlkITkurrnnJ/lrp7ouqvku73vvIk8L3NwYW4+PC9oMj4NCiAgICA8ZGl2IGlkPSJlbmQtaWRlbnRpdHktZ3JpZCI+PC9kaXY+DQogIDwvZGl2Pg0KICA8ZGl2IGNsYXNzPSJjYXJkIiBpZD0iZW5kLXJlbmFtZS10ZW1wLWNhcmQiIHN0eWxlPSJkaXNwbGF5Om5vbmUiPg0KICAgIDxoMj7kv67mlLnkuLTml7bnjqnlrrblkI3np7A8L2gyPg0KICAgIDxkaXYgaWQ9ImVuZC1yZW5hbWUtdGVtcC1ncmlkIj48L2Rpdj4NCiAgICA8ZGl2IHN0eWxlPSJ0ZXh0LWFsaWduOmNlbnRlcjttYXJnaW4tdG9wOjEwcHgiPg0KICAgICAgPGJ1dHRvbiBjbGFzcz0iYnRuIHByaW1hcnkiIG9uY2xpY2s9InNhdmVUZW1wUGxheWVyUmVuYW1lcygpIj7kv53lrZjkv67mlLk8L2J1dHRvbj4NCiAgICA8L2Rpdj4NCiAgPC9kaXY+DQogIDxkaXYgc3R5bGU9InRleHQtYWxpZ246Y2VudGVyIj4NCiAgICA8YnV0dG9uIGNsYXNzPSJidG4gcHJpbWFyeSIgb25jbGljaz0ic2F2ZUdhbWVSZWNvcmQoKSIgc3R5bGU9ImZvbnQtc2l6ZToxOHB4O3BhZGRpbmc6MTNweCA0MHB4Ij7kv53lrZjlr7nlsYDorrDlvZU8L2J1dHRvbj4NCiAgPC9kaXY+DQo8L3NlY3Rpb24+DQoNCjxzZWN0aW9uIGNsYXNzPSJwYWdlIiBpZD0icGFnZS1zdGF0cyI+DQogIDxkaXYgY2xhc3M9ImNhcmQiPg0KICAgIDxoMj7miJjnu6nmpoLop4g8L2gyPg0KICAgIDxkaXYgY2xhc3M9InN0YXQtZ3JpZCIgaWQ9InN0YXRzLW92ZXJ2aWV3Ij48L2Rpdj4NCiAgPC9kaXY+DQogIDxkaXYgY2xhc3M9ImNhcmQiPg0KICAgIDxoMj7ljoblj7Llr7nlsYAgPHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMnB4O2NvbG9yOnZhcigtLXRleHQtZGltKSI+77yI54K55Ye75bGV5byA6K+m5oOF77yJPC9zcGFuPjwvaDI+DQogICAgPGRpdiBjbGFzcz0iaGlzdG9yeS1maWx0ZXItYmFyIiBpZD0iaGlzdG9yeS1maWx0ZXItYmFyIj4NCiAgICAgIDxkaXYgY2xhc3M9ImZpbHRlci1yb3ciPg0KICAgICAgICA8bGFiZWwgY2xhc3M9ImZpbHRlci1sYWJlbCI+5pel5pyfPC9sYWJlbD4NCiAgICAgICAgPGlucHV0IHR5cGU9ImRhdGUiIGNsYXNzPSJmaWx0ZXItaW5wdXQiIGlkPSJmaWx0ZXItZGF0ZS1mcm9tIiBvbmNoYW5nZT0iYXBwbHlIaXN0b3J5RmlsdGVyKCkiIHRpdGxlPSLotbflp4vml6XmnJ8iPg0KICAgICAgICA8c3BhbiBjbGFzcz0iZmlsdGVyLXNlcCI+6IezPC9zcGFuPg0KICAgICAgICA8aW5wdXQgdHlwZT0iZGF0ZSIgY2xhc3M9ImZpbHRlci1pbnB1dCIgaWQ9ImZpbHRlci1kYXRlLXRvIiBvbmNoYW5nZT0iYXBwbHlIaXN0b3J5RmlsdGVyKCkiIHRpdGxlPSLnu5PmnZ/ml6XmnJ8iPg0KICAgICAgPC9kaXY+DQogICAgICA8ZGl2IGNsYXNzPSJmaWx0ZXItcm93Ij4NCiAgICAgICAgPGxhYmVsIGNsYXNzPSJmaWx0ZXItbGFiZWwiPuiDnOi0nzwvbGFiZWw+DQogICAgICAgIDxzZWxlY3QgY2xhc3M9ImZpbHRlci1zZWxlY3QiIGlkPSJmaWx0ZXItd2lubmVyIiBvbmNoYW5nZT0iYXBwbHlIaXN0b3J5RmlsdGVyKCkiPg0KICAgICAgICAgIDxvcHRpb24gdmFsdWU9IiI+5YWo6YOoPC9vcHRpb24+DQogICAgICAgICAgPG9wdGlvbiB2YWx1ZT0iZ29vZCI+5aW95Lq66IOcPC9vcHRpb24+DQogICAgICAgICAgPG9wdGlvbiB2YWx1ZT0iZXZpbCI+5Y+N5pa56IOcPC9vcHRpb24+DQogICAgICAgIDwvc2VsZWN0Pg0KICAgICAgICA8bGFiZWwgY2xhc3M9ImZpbHRlci1sYWJlbCI+546p5a62PC9sYWJlbD4NCiAgICAgICAgPHNlbGVjdCBjbGFzcz0iZmlsdGVyLXNlbGVjdCIgaWQ9ImZpbHRlci1wbGF5ZXIiIG9uY2hhbmdlPSJhcHBseUhpc3RvcnlGaWx0ZXIoKSI+DQogICAgICAgICAgPG9wdGlvbiB2YWx1ZT0iIj7lhajpg6g8L29wdGlvbj4NCiAgICAgICAgPC9zZWxlY3Q+DQogICAgICAgIDxidXR0b24gY2xhc3M9ImZpbHRlci1jbGVhci1idG4iIG9uY2xpY2s9ImNsZWFySGlzdG9yeUZpbHRlcigpIiB0aXRsZT0i5riF6Zmk562b6YCJIj7muIXpmaQ8L2J1dHRvbj4NCiAgICAgIDwvZGl2Pg0KICAgIDwvZGl2Pg0KICAgIDxkaXYgaWQ9Imhpc3RvcnktY29tcGFjdC1saXN0IiBjbGFzcz0iaGlzdG9yeS1jb21wYWN0LWxpc3QiPjwvZGl2Pg0KICAgIDxkaXYgaWQ9InBhZ2luYXRpb24tYXJlYSI+PC9kaXY+DQogICAgPGRpdiBjbGFzcz0iYnRuLXJvdyIgc3R5bGU9Imp1c3RpZnktY29udGVudDpjZW50ZXI7bWFyZ2luLXRvcDoxMHB4Ij4NCiAgICAgIDxidXR0b24gY2xhc3M9ImJ0biBzbWFsbCIgb25jbGljaz0iZXhwb3J0RGF0YSgpIj7lr7zlh7rmlbDmja48L2J1dHRvbj4NCiAgICAgIDxidXR0b24gY2xhc3M9ImJ0biBzbWFsbCIgb25jbGljaz0iaW1wb3J0RGF0YSgpIj7lr7zlhaXmlbDmja48L2J1dHRvbj4NCiAgICA8L2Rpdj4NCiAgICA8cCBpZD0ibm8taGlzdG9yeSIgc3R5bGU9ImNvbG9yOnZhcigtLXRleHQtZGltKTt0ZXh0LWFsaWduOmNlbnRlcjtwYWRkaW5nOjE2cHgiPuaaguaXoOWvueWxgOiusOW9lTwvcD4NCiAgPC9kaXY+DQogIDxkaXYgY2xhc3M9ImNhcmQiPg0KICAgIDxoMj7ku4rml6Xog5znjoc8L2gyPg0KICAgIDxkaXYgaWQ9Indpbi1yYXRlLWxlYWRlcmJvYXJkIiBjbGFzcz0id2luLXJhdGUtY2FyZHMiPjwvZGl2Pg0KICA8L2Rpdj4NCiAgPGRpdiBjbGFzcz0iY2FyZCIgc3R5bGU9ImRpc3BsYXk6bm9uZSI+DQogICAgPGgyPueOqeWutue7n+iuoSA8c3BhbiBzdHlsZT0iZm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tdGV4dC1kaW0pIj7vvIjngrnlh7vlsZXlvIDvvIk8L3NwYW4+PC9oMj4NCiAgICA8ZGl2IGNsYXNzPSJidG4tcm93IiBpZD0icGxheWVyLXN0YXQtYnRucyI+PC9kaXY+DQogICAgPGRpdiBpZD0icGxheWVyLXN0YXQtZGV0YWlsIj48L2Rpdj4NCiAgPC9kaXY+DQogIDxkaXYgY2xhc3M9ImNhcmQiIHN0eWxlPSJ0ZXh0LWFsaWduOmNlbnRlciI+DQogICAgPGRpdiBjbGFzcz0iYWRkLW5hbWUtcm93IiBzdHlsZT0ibWFyZ2luLWJvdHRvbTo4cHgiPg0KICAgICAgPGlucHV0IGNsYXNzPSJhZGQtbmFtZS1pbnB1dCIgaWQ9InN0YXRzLWFkZC1uYW1lLWlucHV0IiBwbGFjZWhvbGRlcj0i6L6T5YWl5paw546p5a625ZCN5a2X4oCmIiBtYXhsZW5ndGg9IjEwIiBzdHlsZT0iZm9udC1zaXplOjE2cHg7cGFkZGluZzo4cHggMTBweDt3aWR0aDoxNjBweDttYXgtd2lkdGg6NTV2dyI+DQogICAgICA8YnV0dG9uIGNsYXNzPSJidG4iIG9uY2xpY2s9InN0YXRzQWRkTmFtZSgpIiBzdHlsZT0icGFkZGluZzo0cHggOHB4O21pbi13aWR0aDoxOHB4Ij7mlrDlop7njqnlrrY8L2J1dHRvbj4NCiAgICA8L2Rpdj4NCiAgICA8YnV0dG9uIGNsYXNzPSJidG4iIG9uY2xpY2s9InNob3dOYW1lUG9vbE1vZGFsKCkiPueOqeWutuWnk+WQjeeuoeeQhjwvYnV0dG9uPg0KICA8L2Rpdj4NCg0KDQo8L3NlY3Rpb24+DQoNCjwvbWFpbj4NCg0KPGRpdiBjbGFzcz0idG9hc3QiIGlkPSJ0b2FzdCI+PC9kaXY+DQoNCg0KPGRpdiBjbGFzcz0ibW9kYWwtb3ZlcmxheSIgaWQ9Im5hbWUtcG9vbC1tb2RhbC1vdmVybGF5IiBvbmNsaWNrPSJjbG9zZU5hbWVQb29sTW9kYWwoZXZlbnQpIj4NCiAgPGRpdiBjbGFzcz0ibW9kYWwgbmFtZS1wb29sLW1vZGFsIiBvbmNsaWNrPSJldmVudC5zdG9wUHJvcGFnYXRpb24oKSI+DQogICAgPGgyPueOqeWutuWnk+WQjeeuoeeQhjwvaDI+DQogICAgPGRpdiBpZD0ibmFtZS1wb29sLWxpc3QiIHN0eWxlPSJtYXJnaW4tdG9wOjEwcHgiPjwvZGl2Pg0KICAgIDxkaXYgY2xhc3M9Im1vZGFsLWFjdGlvbnMiPg0KICAgICAgPGJ1dHRvbiBjbGFzcz0iYnRuIHNtYWxsIiBvbmNsaWNrPSJjbG9zZU5hbWVQb29sTW9kYWwoKSI+5YWz6ZetPC9idXR0b24+DQogICAgPC9kaXY+DQogIDwvZGl2Pg0KPC9kaXY+DQoNCjxzY3JpcHQ+DQppZignc2VydmljZVdvcmtlcicgaW4gbmF2aWdhdG9yKXsNCiAgdmFyIFNXX1ZFUlNJT04gPSAndjEyNSc7DQoNCiAgbmF2aWdhdG9yLnNlcnZpY2VXb3JrZXIucmVnaXN0ZXIoJy4vc3cuanM/dj0nICsgU1dfVkVSU0lPTiwge3Njb3BlOicuLyd9KS50aGVuKGZ1bmN0aW9uKHJlZyl7DQogICAgY29uc29sZS5sb2coJ1tTV10gJyArIFNXX1ZFUlNJT04gKyAnIHJlZ2lzdGVyZWQ6JywgcmVnLnNjb3BlKTsNCiAgICByZWcuYWRkRXZlbnRMaXN0ZW5lcigndXBkYXRlZm91bmQnLCBmdW5jdGlvbigpew0KICAgICAgdmFyIG5ld1dvcmtlciA9IHJlZy5pbnN0YWxsaW5nOw0KICAgICAgaWYgKCFuZXdXb3JrZXIpIHJldHVybjsNCiAgICAgIGNvbnNvbGUubG9nKCdbU1ddIHVwZGF0ZSBmb3VuZCcpOw0KICAgICAgbmV3V29ya2VyLmFkZEV2ZW50TGlzdGVuZXIoJ3N0YXRlY2hhbmdlJywgZnVuY3Rpb24oKXsNCiAgICAgICAgaWYgKG5ld1dvcmtlci5zdGF0ZSA9PT0gJ2luc3RhbGxlZCcgJiYgbmF2aWdhdG9yLnNlcnZpY2VXb3JrZXIuY29udHJvbGxlcikgew0KICAgICAgICAgIGNvbnNvbGUubG9nKCdbU1ddIG5ldyB2ZXJzaW9uIGluc3RhbGxlZCcpOw0KICAgICAgICAgIG5ld1dvcmtlci5wb3N0TWVzc2FnZSgnc2tpcFdhaXRpbmcnKTsNCiAgICAgICAgICAvLyBzaG93IHVwZGF0ZSBiYW5uZXIgaW5zdGVhZCBvZiBmb3JjZS1yZWxvYWRpbmcNCiAgICAgICAgICB2YXIgYmFubmVyID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7DQogICAgICAgICAgYmFubmVyLmlkID0gJ3N3LXVwZGF0ZS1iYW5uZXInOw0KICAgICAgICAgIGJhbm5lci5zdHlsZS5jc3NUZXh0ID0gJ3Bvc2l0aW9uOmZpeGVkO3RvcDowO2xlZnQ6MDtyaWdodDowO3otaW5kZXg6OTk5OTk7YmFja2dyb3VuZDojNENBRjUwO2NvbG9yOiNmZmY7dGV4dC1hbGlnbjpjZW50ZXI7cGFkZGluZzoxMHB4O2ZvbnQtc2l6ZToxNHB4O2N1cnNvcjpwb2ludGVyOyc7DQogICAgICAgICAgYmFubmVyLnRleHRDb250ZW50ID0gJ+aWsOeJiOacrOWPr+eUqO+8jOeCueWHu+WIt+aWsCc7DQogICAgICAgICAgYmFubmVyLm9uY2xpY2sgPSBmdW5jdGlvbigpeyB3aW5kb3cubG9jYXRpb24ucmVsb2FkKCk7IH07DQogICAgICAgICAgZG9jdW1lbnQuYm9keS5hcHBlbmRDaGlsZChiYW5uZXIpOw0KICAgICAgICB9DQogICAgICB9KTsNCiAgICB9KTsNCiAgfSkuY2F0Y2goZnVuY3Rpb24oZSl7DQogICAgY29uc29sZS53YXJuKCdbU1ddIHJlZ2lzdHJhdGlvbiBmYWlsZWQ6JywgZSk7DQogIH0pOw0KfQ0KPC9zY3JpcHQ+DQo8L2JvZHk+DQo8L2h0bWw+DQoNCg0KDQoNCg==
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>阿瓦隆辅助</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="stylesheet" href="./style.css">
+<script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
+<script defer src="./app.js?v=v117"></script>
+</head>
+<body>
+
+<header>
+  <h1>阿瓦隆</h1>
+  <div class="nav-btns">
+    <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
+    <button id="nav-game" onclick="goToGame()">游戏</button>
+    <button id="nav-tend" onclick="showPage('tend')">倾向</button>
+    <button id="nav-end" onclick="showPage('end')">结束</button>
+    <button id="nav-stats" onclick="showPage('stats')">统计</button>
+  </div>
+</header>
+
+<main id="main-content">
+
+<section class="page active" id="page-setup">
+  <div style="text-align:center;margin-bottom:12px">
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌游</div>
+    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">全场唯一真亚瑟版</div>
+  </div>
+  <div class="card">
+    <h2>玩家人数</h2>
+    <div class="count-grid" id="count-grid"></div>
+  </div>
+  <div class="card">
+    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择）</span></h2>
+    <div id="player-names"></div>
+  </div>
+  <div class="card">
+    <h2>本局角色 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（勾选的才会出现在结束面板身份选项中）</span></h2>
+    <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
+  </div>
+  <div class="card">
+    <h2 style="text-align:center">可选规则</h2>
+    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button><button id="excalibur-row" class="lady-toggle-btn" onclick="toggleExcalibur()">王者之剑</button></div>
+    <div class="timer-setup" id="timer-setup">
+      <h3>计时模式</h3>
+      <div class="timer-mode-row">
+        <button class="timer-mode-btn" id="timer-mode-off" onclick="setTimerMode('off')">关闭计时</button>
+        <button class="timer-mode-btn selected" id="timer-mode-all" onclick="setTimerMode('all')">全体发言</button>
+        <button class="timer-mode-btn" id="timer-mode-per" onclick="setTimerMode('per')">轮流发言</button>
+      </div>
+      <div class="timer-options-row" id="timer-all-options">
+        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">时长</span>
+        <button class="timer-opt-btn" id="timer-all-opt-180" onclick="setAllTimerSeconds(180)">3分钟</button>
+        <button class="timer-opt-btn" id="timer-all-opt-240" onclick="setAllTimerSeconds(240)">4分钟</button>
+        <button class="timer-opt-btn selected" id="timer-all-opt-300" onclick="setAllTimerSeconds(300)">5分钟</button>
+      </div>
+      <div class="timer-options-row" id="timer-per-options" style="display:none">
+        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">每人</span>
+        <button class="timer-opt-btn" id="timer-per-opt-45" onclick="setTimerSeconds(45)">45s</button>
+        <button class="timer-opt-btn selected" id="timer-per-opt-60" onclick="setTimerSeconds(60)">60s</button>
+        <button class="timer-opt-btn" id="timer-per-opt-75" onclick="setTimerSeconds(75)">75s</button>
+        <button class="timer-opt-btn" id="timer-per-opt-90" onclick="setTimerSeconds(90)">90s</button>
+        <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
+          style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
+          onchange="setTimerSecondsInput()" onfocus="this.select()">
+        <span style="color:var(--text-dim);font-size:13px">秒</span>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="text-align:center">
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:8px">
+      任务轮次：<span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
+    </p>
+    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游戏</button>
+  </div>
+</section>
+
+<section class="page" id="page-game">
+  <div style="text-align:center;margin-bottom:12px" id="game-title">
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌游</div>
+    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">全场唯一真亚瑟版</div>
+  </div>
+  <div class="round-tracker" id="round-tracker"></div>
+  <div class="lancelot-flip-tracker" id="lancelot-flip-tracker" style="display:none"></div>
+  <div id="launch-fail-area"></div>
+  <div class="timer-display" id="timer-display" style="display:none">
+    <div class="timer-value" id="timer-value">01:00</div>
+    <div class="timer-label" id="timer-label">发言计时</div>
+    <div id="timer-speaker-name" style="font-size:16px;color:var(--gold-light);margin-top:4px;font-weight:700"></div>
+    <div class="btn-row" style="justify-content:center;margin-top:6px" id="timer-btns" hidden>
+      <button class="btn small success" onclick="speakEnd()">发言结束</button>
+      <button class="btn small" onclick="resetTimer()">重置时间</button>
+      <button class="btn small danger" onclick="endAllSpeak()">结束所有发言</button>
+    </div>
+  </div>
+  <div class="game-layout">
+    <div class="game-main">
+      <div class="card" id="step-container"></div>
+      <div class="review-section" id="review-section" style="display:none">
+        <button class="btn" onclick="toggleReview()">复盘</button>
+        <div id="review-panel" style="display:none;margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="game-side">
+      <div id="lady-lake-holder-info" style="display:none;padding:8px 12px;background:linear-gradient(135deg,rgba(74,144,217,0.12),rgba(74,144,217,0.03));border:2px solid var(--blue);border-radius:var(--radius);margin-bottom:8px;text-align:center;font-size:14px;font-weight:700;color:var(--blue-light, #99bbff)"></div>
+      <div class="card" style="padding:10px">
+        <div id="lady-lake-results" style="margin-top:6px"></div>
+      </div>
+      <div id="lady-lake-entry" style="display:none">
+        <div class="card lady-check-entry">
+          <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">湖中女神验人</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</section>
+
+<section class="page" id="page-tend">
+  
+  <div class="card" id="tend-role-card">
+    <h2>我的身份</h2>
+    <div id="tend-role-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="tend-perspective-title">倾向分析</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
+  </div>
+
+  
+  <div class="card" id="v7-engine-card">
+    <div class="v7-card-header">
+      <h2 style="margin:0">&#9883; v7 算法面板</h2>
+      <span class="v7-version-badge">v110</span>
+    </div>
+
+    <!-- 全局状态条 -->
+    <div id="v7-engine-status" class="v7-status-bar"></div>
+
+    <!-- 算法 9 步实时状态 -->
+    <div id="v7-engine-steps" class="v7-step-grid"></div>
+
+    <!-- 公式说明 -->
+    <div class="v7-formula">
+      <span style="color:var(--accent)">&#9888;</span>
+      <strong>评分公式</strong>：分数 = 好人证据 / (好人证据 + 坏人证据) &#215; 100
+      &nbsp;|&nbsp; 先验 10:10，随轮次推进逐步收敛
+    </div>
+  </div>
+
+  <div class="card" id="known-identity-card">
+    <h2>已知身份标注</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范围</p>
+    <div id="known-identity-grid"></div>
+  </div>
+
+  <div class="card" id="tend-result-card">
+    <h2 id="tend-result-title">分析结果</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px" id="tend-result-desc"></p>
+    <div id="tend-result-list"></div>
+  </div>
+
+  <div class="card" id="tend-evidence-card">
+    <h2>关键证据</h2>
+    <div id="tend-evidence-list"></div>
+  </div>
+</section>
+
+<section class="page" id="page-end">
+  <div class="card" id="end-assassin-card" style="display:none">
+    <h2>刺客刺杀环节</h2>
+    <div id="end-assassin-pick-area"></div>
+    <div id="end-assassin-resolve-area" style="display:none">
+      <p style="font-size:14px;margin-bottom:8px">刺杀目标：<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
+      <p style="font-size:14px;margin-bottom:10px">刺杀目标是不是梅林？</p>
+      <div class="winner-toggle">
+        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅林 → 反方胜</button>
+        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="end-review-card">
+    <h2>对局复盘</h2>
+    <div id="end-review-content"></div>
+  </div>
+
+  <div class="card">
+    <h2>游戏结束</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果：<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
+    <div class="winner-toggle" id="winner-toggle"></div>
+  </div>
+  <div class="card">
+    <h2>记录身份 <span style="font-size:12px;color:var(--text-dim)">（游戏后填入各人真实身份）</span></h2>
+    <div id="end-identity-grid"></div>
+  </div>
+  <div class="card" id="end-rename-temp-card" style="display:none">
+    <h2>修改临时玩家名称</h2>
+    <div id="end-rename-temp-grid"></div>
+    <div style="text-align:center;margin-top:10px">
+      <button class="btn primary" onclick="saveTempPlayerRenames()">保存修改</button>
+    </div>
+  </div>
+  <div style="text-align:center">
+    <button class="btn primary" onclick="saveGameRecord()" style="font-size:18px;padding:13px 40px">保存对局记录</button>
+  </div>
+</section>
+
+<section class="page" id="page-stats">
+  <div class="card">
+    <h2>战绩概览</h2>
+    <div class="stat-grid" id="stats-overview"></div>
+  </div>
+  <div class="card">
+    <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情）</span></h2>
+    <div class="history-filter-bar" id="history-filter-bar">
+      <div class="filter-row">
+        <label class="filter-label">日期</label>
+        <input type="date" class="filter-input" id="filter-date-from" onchange="applyHistoryFilter()" title="起始日期">
+        <span class="filter-sep">至</span>
+        <input type="date" class="filter-input" id="filter-date-to" onchange="applyHistoryFilter()" title="结束日期">
+      </div>
+      <div class="filter-row">
+        <label class="filter-label">胜负</label>
+        <select class="filter-select" id="filter-winner" onchange="applyHistoryFilter()">
+          <option value="">全部</option>
+          <option value="good">好人胜</option>
+          <option value="evil">反方胜</option>
+        </select>
+        <label class="filter-label">玩家</label>
+        <select class="filter-select" id="filter-player" onchange="applyHistoryFilter()">
+          <option value="">全部</option>
+        </select>
+        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛选">清除</button>
+      </div>
+    </div>
+    <div id="history-compact-list" class="history-compact-list"></div>
+    <div id="pagination-area"></div>
+    <div class="btn-row" style="justify-content:center;margin-top:10px">
+      <button class="btn small" onclick="exportData()">导出数据</button>
+      <button class="btn small" onclick="importData()">导入数据</button>
+    </div>
+    <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
+  </div>
+  <div class="card">
+    <h2>今日胜率</h2>
+    <div id="win-rate-leaderboard" class="win-rate-cards"></div>
+  </div>
+  <div class="card" style="display:none">
+    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（点击展开）</span></h2>
+    <div class="btn-row" id="player-stat-btns"></div>
+    <div id="player-stat-detail"></div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div class="add-name-row" style="margin-bottom:8px">
+      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
+      <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">新增玩家</button>
+    </div>
+    <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
+  </div>
+
+
+</section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+
+<div class="modal-overlay" id="name-pool-modal-overlay" onclick="closeNamePoolModal(event)">
+  <div class="modal name-pool-modal" onclick="event.stopPropagation()">
+    <h2>玩家姓名管理</h2>
+    <div id="name-pool-list" style="margin-top:10px"></div>
+    <div class="modal-actions">
+      <button class="btn small" onclick="closeNamePoolModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+if('serviceWorker' in navigator){
+  var SW_VERSION = 'v125';
+
+  navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
+    console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
+    reg.addEventListener('updatefound', function(){
+      var newWorker = reg.installing;
+      if (!newWorker) return;
+      console.log('[SW] update found');
+      newWorker.addEventListener('statechange', function(){
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          console.log('[SW] new version installed');
+          newWorker.postMessage('skipWaiting');
+          // show update banner instead of force-reloading
+          var banner = document.createElement('div');
+          banner.id = 'sw-update-banner';
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#4CAF50;color:#fff;text-align:center;padding:10px;font-size:14px;cursor:pointer;';
+          banner.textContent = '新版本可用，点击刷新';
+          banner.onclick = function(){ window.location.reload(); };
+          document.body.appendChild(banner);
+        }
+      });
+    });
+  }).catch(function(e){
+    console.warn('[SW] registration failed:', e);
+  });
+}
+</script>
+</body>
+</html>
+
+
+
+
