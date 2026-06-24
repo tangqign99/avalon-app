@@ -1293,35 +1293,7 @@ function showPerSpeakerModals() {
   if (state.timerMode !== 'per' || state.currentSpeakerIdx < 0) return;
   var speaker = state.speakerOrder[state.currentSpeakerIdx];
   var isLadyHolder = (speaker === state.ladyLakeHolder);
-
-  var needExcalFeedback = false;
-  var excalFeedbackRec = null;
-  var arr = state.excaliburHistory || [];
-  for (var i = 0; i < arr.length; i++) {
-    var e = arr[i];
-    if (e.used !== false && e.target !== null && !e.feedbackRecorded && e.round < state.currentRound) {
-      if (e.holder === speaker) {
-        needExcalFeedback = true;
-        excalFeedbackRec = e;
-        break;
-      }
-    }
-  }
-
-  var needLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
-
-  if (needExcalFeedback && needLady) {
-    stopTimer();
-    state._modalPausedTimer = true;
-    showExcaliburFeedbackWithLady(excalFeedbackRec);
-    return;
-  }
-  if (needExcalFeedback) {
-    stopTimer();
-    state._modalPausedTimer = true;
-    showExcaliburFeedbackModal(excalFeedbackRec);
-    return;
-  }
+  var needLady = state.ladyOfLakeEnabled && state.currentRound >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
   if (needLady) {
     stopTimer();
     state._modalPausedTimer = true;
@@ -1464,6 +1436,161 @@ function skipLadyWithExcalFeedback(excalRound) {
   var btnRow = document.getElementById('timer-btns');
   if (btnRow) btnRow.hidden = false;
   resumePerSpeakerTimer();
+}
+
+// === 合并确认弹窗（持剑者 + 用剑反馈 + 女神验人）===
+
+function showCombinedConfirmModal() {
+  var round = state.currentRound;
+  var m = state.missions[round];
+  var showHolder = state.excaliburEnabled && m && m.team && m.team.length > 0;
+  var prevRec = null;
+  if (state.excaliburEnabled && round > 0 && state.excaliburHistory) {
+    for (var _k = 0; _k < state.excaliburHistory.length; _k++) {
+      var _pv = state.excaliburHistory[_k];
+      if (_pv.used !== false && _pv.target !== null && !_pv.feedbackRecorded && _pv.round < round && _pv.holder >= 0) {
+        prevRec = _pv;
+        break;
+      }
+    }
+  }
+  var showPrevFeedback = prevRec !== null;
+  var showLady = state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+  if (!showHolder && !showPrevFeedback && !showLady) {
+    if (state.timerMode === 'per') startTimer();
+    renderStepPanel();
+    return;
+  }
+  stopTimer();
+  if (state.timerMode === 'per') state._modalPausedTimer = true;
+  var h = '';
+  // ① 指定持剑者
+  if (showHolder) {
+    var rec = ensureExcaliburRecord(round);
+    h += '<h2>王者之剑 · 指定持剑者</h2>';
+    h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。</p>';
+    h += '<div style="display:flex;flex-direction:column;gap:8px">';
+    for (var i = 0; i < m.team.length; i++) {
+      var pi = m.team[i];
+      if (pi === m.leader) continue;
+      h += '<button class="assassin-target-btn" onclick="onCombinedSetHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+    }
+    h += '</div>';
+    h += '<p id="combined-holder-info" style="font-size:12px;color:var(--text-dim);margin-top:10px">' + (rec.holder >= 0 ? '当前持剑者：' + playerLabel(rec.holder) : '') + '</p>';
+  }
+  // ② 上轮用剑反馈
+  if (showPrevFeedback) {
+    if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+    h += '<h2>上轮王者之剑反馈</h2>';
+    h += '<p style="font-size:14px;margin-bottom:6px">第' + (prevRec.round + 1) + '轮持剑者 <b>' + playerLabel(prevRec.holder) + '</b> 对 <b>' + playerLabel(prevRec.target) + '</b> 使用了王者之剑。</p>';
+    var targetRole = state.playerRoles[prevRec.target];
+    if (targetRole === 'merlin' || targetRole === 'percival') {
+      h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
+    } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
+      h += '<p style="color:var(--evil);font-weight:700">该玩家是反方</p>';
+    }
+    h += '<label style="display:block;font-size:13px;color:var(--text-dim);margin-top:12px;margin-bottom:4px">持剑者口述改变方向</label>';
+    h += '<select id="combined-excal-dir-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px">';
+    h += '<option value="fail_to_success">失败 → 成功</option><option value="success_to_fail">成功 → 失败</option><option value="unknown" selected>未说明</option><option value="refused">拒绝说明</option>';
+    h += '</select>';
+    h += '<input id="combined-excal-note-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px" placeholder="备注：记录原话或简述">';
+  }
+  // ③ 湖中女神验人
+  if (showLady) {
+    if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+    h += '<h2>湖中女神验人</h2>';
+    h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营</p>';
+    h += '<div style="display:flex;flex-direction:column;gap:8px">';
+    var pc = state.playerCount;
+    for (var j = 0; j < pc; j++) {
+      if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+      h += '<button class="assassin-target-btn" onclick="onCombinedLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+    }
+    h += '</div>';
+  }
+  // 完成按钮
+  h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
+  showModal(h);
+}
+
+function onCombinedSetHolder(round, holderIdx) {
+  var rec = ensureExcaliburRecord(round);
+  rec.holder = holderIdx;
+  rec.used = null;
+  rec.target = null;
+  toast('王者之剑持剑者：' + playerLabel(holderIdx));
+  var infoEl = document.getElementById('combined-holder-info');
+  if (infoEl) infoEl.textContent = '当前持剑者：' + playerLabel(holderIdx);
+}
+
+function _saveCombinedFeedback() {
+  if (!state.excaliburHistory) return;
+  var round = state.currentRound;
+  for (var _k = 0; _k < state.excaliburHistory.length; _k++) {
+    var _pv = state.excaliburHistory[_k];
+    if (_pv.used !== false && _pv.target !== null && !_pv.feedbackRecorded && _pv.round < round && _pv.holder >= 0) {
+      var dirEl = document.getElementById('combined-excal-dir-' + _pv.round);
+      var noteEl = document.getElementById('combined-excal-note-' + _pv.round);
+      if (dirEl) { _pv.claimedDirection = dirEl.value; _pv.feedbackRecorded = true; _pv.feedbackRound = state.currentRound; _pv.feedbackAt = Date.now(); }
+      if (noteEl) _pv.note = noteEl.value;
+      break;
+    }
+  }
+}
+
+function onCombinedModalClose() {
+  _saveCombinedFeedback();
+  closeModal();
+  if (state.timerMode === 'per') {
+    state._modalPausedTimer = false;
+    startTimer();
+  }
+  renderStepPanel();
+}
+
+function onCombinedLadyCheck(targetIdx) {
+  _saveCombinedFeedback();
+  closeModal();
+  var h = '<h2>湖中女神验人结果</h2>';
+  h += '<p style="font-size:15px;margin-bottom:10px">查验目标：<strong style="color:var(--gold-light)">' + playerLabel(targetIdx) + '</strong></p>';
+  h += '<p style="font-size:14px;margin-bottom:14px">该玩家的阵营是？</p>';
+  h += '<div class="winner-toggle">';
+  h += '<button class="winner-btn good" onclick="onCombinedRecordLady(' + targetIdx + ',\'good\')">好人方</button>';
+  h += '<button class="winner-btn evil" onclick="onCombinedRecordLady(' + targetIdx + ',\'evil\')">反方</button>';
+  h += '</div>';
+  h += '<div style="text-align:center;margin-top:10px"><button class="btn" onclick="onCombinedRecordLady(' + targetIdx + ',\'skip\')" style="color:var(--text-dim);font-size:13px">不报</button></div>';
+  showModal(h);
+}
+
+function onCombinedRecordLady(targetIdx, result) {
+  closeModal();
+  var holderIdx = state.ladyLakeHolder;
+  state.ladyLakeChecks.push({
+    round: state.currentRound,
+    target: targetIdx,
+    result: result,
+    holder: holderIdx
+  });
+  state.ladyCheckHistory.push({
+    round: state.currentRound,
+    holder: holderIdx,
+    target: targetIdx,
+    result: result
+  });
+  state.ladyLakeHolder = targetIdx;
+  if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
+  if (result === 'good') {
+    state.tendencies[targetIdx] = Math.min(100, state.tendencies[targetIdx] + 15);
+  } else if (result === 'evil') {
+    state.tendencies[targetIdx] = Math.max(0, state.tendencies[targetIdx] - 15);
+  }
+  var resultLabel = result === 'good' ? '好人' : result === 'evil' ? '坏人' : '不报';
+  toast(playerLabel(holderIdx) + '验' + playerLabel(targetIdx) + ' → ' + resultLabel + '，头衔已传递');
+  if (state.timerMode === 'per') {
+    state._modalPausedTimer = false;
+    startTimer();
+  }
+  renderStepPanel();
 }
 
 function showLadyCheck() {
@@ -2509,17 +2636,6 @@ function confirmTeam() {
   var m = state.missions[state.currentRound];
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
 
-  // 王者之剑：确认队伍前先指定持剑者（当记录不存在或 holder 未设置时）
-  if (state.excaliburEnabled && !state._excaliburSkipped) {
-    var _excalRec = getExcaliburRecord(state.currentRound);
-    if (!_excalRec || _excalRec.holder < 0) {
-      state._excaliburPreConfirm = true;
-      showExcaliburHolderModal(state.currentRound);
-      return;
-    }
-  }
-  state._excaliburSkipped = false;
-
   // 湖中女神：第一轮队长确认后自动设定持有者
   if (state.currentRound === 0 && state.ladyOfLakeEnabled && state.ladyLakeHolder === -1) {
     var pc = state.playerCount;
@@ -2540,49 +2656,16 @@ function confirmTeam() {
     state.timerRemaining = state.timerSeconds;
     state.timerInterval = null;
     renderTimerDisplay();
-    // 持剑者指定后，立即检查上一轮王者之剑反馈
-    var _excalHist = state.excaliburHistory || [];
-    state._perExcalSeq = [];
-    for (var _ei = 0; _ei < _excalHist.length; _ei++) {
-      var _er = _excalHist[_ei];
-      if (_er.used !== false && _er.target !== null && !_er.feedbackRecorded && _er.round < state.currentRound && _er.holder >= 0) {
-        state._perExcalSeq.push(_er);
-      }
-    }
-    if (state._perExcalSeq.length > 0) {
-      console.log('[excal] per-src seq len=' + state._perExcalSeq.length + ' items=' + JSON.stringify(state._perExcalSeq.map(function(e){return e.round;})));
-      state._modalPausedTimer = true;
-      renderStepPanel();
-      setTimeout(function() { showPerExcalFeedbackSequence(0); }, 100);
-    } else {
-      console.log('[excal] per-src seq empty. hist entries=' + _excalHist.length + ' currentRound=' + state.currentRound);
-      startTimer();
-      renderStepPanel();
-      showPerSpeakerModals();
-    }
+    renderStepPanel();
+    showCombinedConfirmModal();
   } else if (state.timerMode === 'all') {
     state.timerRemaining = state.timerSeconds;
     state.timerInterval = null;
     state.speakerOrder = [];
     state.currentSpeakerIdx = -1;
     renderTimerDisplay();
-    startTimer();
     renderStepPanel();
-    // 全体模式：先处理王者之剑反馈，再处理湖中女神
-    var excalRecords = state.excaliburHistory || [];
-    var excalFeedbackList = [];
-    for (var ei = 0; ei < excalRecords.length; ei++) {
-      var er = excalRecords[ei];
-      if (er.used !== false && er.target !== null && !er.feedbackRecorded && er.round < state.currentRound && er.holder >= 0) {
-        excalFeedbackList.push(er);
-      }
-    }
-    var _showLady = state.ladyOfLakeEnabled && state.currentRound >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
-    if (excalFeedbackList.length > 0 || _showLady) {
-      setTimeout(function() {
-        showAllModeExcaliburFeedback(excalFeedbackList, 0, _showLady);
-      }, 50);
-    }
+    showCombinedConfirmModal();
   }
 }
 
