@@ -1457,7 +1457,7 @@ function showCombinedConfirmModal() {
   var showPrevFeedback = prevRec !== null;
   var showLady = state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
   if (!showHolder && !showPrevFeedback && !showLady) {
-    if (state.timerMode === 'per') startTimer();
+    startTimer();
     renderStepPanel();
     return;
   }
@@ -1541,10 +1541,8 @@ function _saveCombinedFeedback() {
 function onCombinedModalClose() {
   _saveCombinedFeedback();
   closeModal();
-  if (state.timerMode === 'per') {
-    state._modalPausedTimer = false;
-    startTimer();
-  }
+  if (state.timerMode === 'per') state._modalPausedTimer = false;
+  startTimer();
   renderStepPanel();
 }
 
@@ -1586,10 +1584,8 @@ function onCombinedRecordLady(targetIdx, result) {
   }
   var resultLabel = result === 'good' ? '好人' : result === 'evil' ? '坏人' : '不报';
   toast(playerLabel(holderIdx) + '验' + playerLabel(targetIdx) + ' → ' + resultLabel + '，头衔已传递');
-  if (state.timerMode === 'per') {
-    state._modalPausedTimer = false;
-    startTimer();
-  }
+  if (state.timerMode === 'per') state._modalPausedTimer = false;
+  startTimer();
   renderStepPanel();
 }
 
