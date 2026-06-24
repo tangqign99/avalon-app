@@ -1065,12 +1065,12 @@ function renderStepPanel() {
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
 
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div>';
-    h += '<div class="btn-row" style="gap:8px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px">';
+    h += '<div class="btn-row team-member-row" style="gap:8px;flex-wrap:wrap;justify-content:center">';
     for (var i = 0; i < pc; i++) {
       var inTeam = m.team.indexOf(i) !== -1;
       var cls = 'btn team-member-btn';
       if (inTeam) cls += ' selected team-member-highlight';
-      h += '<button class="' + cls + '" style="flex-shrink:0" onclick="toggleTeamMember(' + i + ')">';
+      h += '<button class="' + cls + '" onclick="toggleTeamMember(' + i + ')">';
       h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
       h += '</button>';
     }
