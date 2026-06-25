@@ -4591,6 +4591,7 @@ function showModal(html) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
   overlay.id = 'dynamic-modal-overlay';
+  overlay.setAttribute('style', 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center');
   overlay.innerHTML = '<div class="modal" id="temp-modal">' + html + '</div>';
   overlay.addEventListener('click', function(e) {
     if (e.target === overlay) overlay.remove();
