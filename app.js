@@ -112,6 +112,7 @@ function initState(n) {
   state.ladyOfLakeEnabled = true;
   state.excaliburEnabled = false;
   state.excaliburHistory = [];
+  state.playerRoles = [];
   state.ladyLakeHolder = -1;
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
@@ -767,6 +768,7 @@ function doStartGame() {
   state.speakTimes = {};
   state._teamConfirmedPending = false;
   state._excaliburPreConfirm = false;
+  state.playerRoles = state.playerRoles || [];
   stopTimer();
   for (var i = 0; i < state.playerCount; i++) {
     state.tendencies[i] = 50;
@@ -1376,7 +1378,7 @@ function showExcaliburFeedbackModal(rec) {
   if (!rec || rec.round < 0) return;
   var h = '<h2>上轮王者之剑使用反馈</h2>';
   h += '<p style="font-size:14px;margin-bottom:6px">第' + (rec.round + 1) + '轮持剑者 <b>' + playerLabel(rec.holder) + '</b> 对 <b>' + playerLabel(rec.target) + '</b> 使用了王者之剑。</p>';
-  var targetRole = state.playerRoles[rec.target];
+  var targetRole = (state.playerRoles && state.playerRoles[rec.target]) || null;
   if (targetRole === 'merlin' || targetRole === 'percival') {
     h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
   } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
@@ -1401,7 +1403,7 @@ function showExcaliburFeedbackWithLady(rec) {
   if (state.currentRound < 2) return;
   var h = '<h2>上轮王者之剑使用反馈</h2>';
   h += '<p style="font-size:14px;margin-bottom:6px">第' + (rec.round + 1) + '轮持剑者 <b>' + playerLabel(rec.holder) + '</b> 对 <b>' + playerLabel(rec.target) + '</b> 使用了王者之剑。</p>';
-  var targetRole = state.playerRoles[rec.target];
+  var targetRole = (state.playerRoles && state.playerRoles[rec.target]) || null;
   if (targetRole === 'merlin' || targetRole === 'percival') {
     h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
   } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
@@ -1457,13 +1459,7 @@ function showCombinedConfirmModal() {
   }
   var showPrevFeedback = prevRec !== null;
   var showLady = state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
-  // 可见调试：使用 toast 而非 console，解决移动端看不到日志的问题
-  var dbg = '[合弹] R' + (round+1) + ' 持剑=' + showHolder + ' 反=' + showPrevFeedback + ' 女=' + showLady + ' e=' + state.excaliburEnabled + ' tm=' + state.timerMode;
-  if (!showHolder && showPrevFeedback) dbg += ' ←只有反馈';
-  if (showHolder && !showPrevFeedback && round > 0) dbg += ' ←只有持剑(缺失上轮反馈?)';
-  console.log(dbg);
   if (!showHolder && !showPrevFeedback && !showLady) {
-    toast('[调试] 合并弹窗未弹出：持剑=' + showHolder + ' 反馈=' + showPrevFeedback + ' 女神=' + showLady + ' round=' + (round+1) + ' excal=' + state.excaliburEnabled + ' timer=' + state.timerMode);
     startTimer();
     renderStepPanel();
     return;
@@ -1491,7 +1487,7 @@ function showCombinedConfirmModal() {
       if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
       h += '<h2>上轮王者之剑反馈</h2>';
       h += '<p style="font-size:14px;margin-bottom:6px">第' + (prevRec.round + 1) + '轮持剑者 <b>' + playerLabel(prevRec.holder) + '</b> 对 <b>' + playerLabel(prevRec.target) + '</b> 使用了王者之剑。</p>';
-      var targetRole = state.playerRoles[prevRec.target];
+      var targetRole = (state.playerRoles && state.playerRoles[prevRec.target]) || null;
       if (targetRole === 'merlin' || targetRole === 'percival') {
         h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
       } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
@@ -1518,12 +1514,7 @@ function showCombinedConfirmModal() {
     }
     // 完成按钮
     h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
-    toast('[合弹] showModal前 R' + (round+1) + ' len=' + h.length + ' holder=' + showHolder + ' fb=' + showPrevFeedback);
     showModal(h);
-    setTimeout(function() {
-      var chk = document.getElementById('dynamic-modal-overlay');
-      if (!chk) toast('[合弹] 警告：showModal后100ms弹窗不存在！R' + (round+1));
-    }, 100);
   } catch (e) {
     console.error('[showCombinedConfirmModal] crash:', e);
     toast('[错误] 合并弹窗生成失败：' + (e.message || e));
@@ -1943,7 +1934,7 @@ function showExcaliburHolderModal(round, ladyTarget) {
       var _match = _pv.used !== false && _pv.target !== null && !_pv.feedbackRecorded && _pv.round < round && _pv.holder >= 0;
       console.log('[holder]   rec r=' + _pv.round + ' used=' + _pv.used + ' target=' + _pv.target + ' fbRec=' + _pv.feedbackRecorded + ' holder=' + _pv.holder + ' MATCH=' + _match);
       if (_match) {
-        var _pvRole = state.playerRoles[_pv.target];
+        var _pvRole = (state.playerRoles && state.playerRoles[_pv.target]) || null;
         var _pvVerdict = '';
         if (_pvRole === 'merlin' || _pvRole === 'percival') _pvVerdict = '<span style="color:var(--good);font-weight:700">好人方</span>';
         else if (_pvRole === 'morgana' || _pvRole === 'assassin' || _pvRole === 'mordred' || _pvRole === 'oberon' || _pvRole === 'bad') _pvVerdict = '<span style="color:var(--evil);font-weight:700">反方</span>';
