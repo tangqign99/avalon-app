@@ -1518,7 +1518,12 @@ function showCombinedConfirmModal() {
     }
     // 完成按钮
     h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
+    toast('[合弹] showModal前 R' + (round+1) + ' len=' + h.length + ' holder=' + showHolder + ' fb=' + showPrevFeedback);
     showModal(h);
+    setTimeout(function() {
+      var chk = document.getElementById('dynamic-modal-overlay');
+      if (!chk) toast('[合弹] 警告：showModal后100ms弹窗不存在！R' + (round+1));
+    }, 100);
   } catch (e) {
     console.error('[showCombinedConfirmModal] crash:', e);
     toast('[错误] 合并弹窗生成失败：' + (e.message || e));
