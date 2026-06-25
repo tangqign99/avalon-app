@@ -2338,6 +2338,10 @@ function startTimer() {
     var btnRow = document.getElementById('timer-btns');
     if (btnRow) btnRow.hidden = false;
   }
+  if (state.timerMode === 'all') {
+    var btnRowAll = document.getElementById('timer-btns');
+    if (btnRowAll) btnRowAll.hidden = false;
+  }
   state.timerInterval = setInterval(function() {
     state.timerRemaining--;
     renderTimerDisplay();
