@@ -1296,7 +1296,7 @@ function showPerSpeakerModals() {
   if (state.timerMode !== 'per' || state.currentSpeakerIdx < 0) return;
   var speaker = state.speakerOrder[state.currentSpeakerIdx];
   var isLadyHolder = (speaker === state.ladyLakeHolder);
-  var needLady = state.ladyOfLakeEnabled && state.currentRound >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
+  var needLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
   if (needLady) {
     stopTimer();
     state._modalPausedTimer = true;
@@ -1458,7 +1458,7 @@ function showCombinedConfirmModal() {
     }
   }
   var showPrevFeedback = prevRec !== null;
-  var showLady = state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+  var showLady = state.ladyOfLakeEnabled && round >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
   if (!showHolder && !showPrevFeedback && !showLady) {
     startTimer();
     renderStepPanel();
@@ -1514,7 +1514,7 @@ function showCombinedConfirmModal() {
     }
     // 完成按钮
     h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
-    showModal(h);
+    showModal(h, onCombinedModalClose);
   } catch (e) {
     console.error('[showCombinedConfirmModal] crash:', e);
     toast('[错误] 合并弹窗生成失败：' + (e.message || e));
@@ -1949,7 +1949,7 @@ function showExcaliburHolderModal(round, ladyTarget) {
   }
   h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。后续若使用，只能对队伍中除持剑者外的玩家使用。</p>';
   // 全体模式：湖中女神验人并入持剑者弹窗（第3轮起）
-  var _ladyCond = state.timerMode === 'all' && state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+  var _ladyCond = state.timerMode === 'all' && state.ladyOfLakeEnabled && round >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
   console.log('[holder] lady cond: timerAll=' + (state.timerMode==='all') + ' enabled=' + state.ladyOfLakeEnabled + ' round>=3=' + (round>=3) + ' holder=' + state.ladyLakeHolder + ' !claimed=' + (!hasLadyClaimThisRound()) + ' => ' + _ladyCond);
   if (_ladyCond) {
     h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
@@ -4578,14 +4578,17 @@ function confirmDeleteGame(idx) {
 }
 
 /* ==================== MODAL ==================== */
-function showModal(html) {
+function showModal(html, onClose) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
   overlay.id = 'dynamic-modal-overlay';
   overlay.setAttribute('style', 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center');
   overlay.innerHTML = '<div class="modal" id="temp-modal">' + html + '</div>';
   overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) {
+      if (onClose) onClose();
+      else overlay.remove();
+    }
   });
   document.body.appendChild(overlay);
 }
