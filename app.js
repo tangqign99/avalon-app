@@ -1457,9 +1457,13 @@ function showCombinedConfirmModal() {
   }
   var showPrevFeedback = prevRec !== null;
   var showLady = state.ladyOfLakeEnabled && round >= 3 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
-  console.log('[debug-combinedModal] round=' + round + ' showHolder=' + showHolder + ' showPrevFeedback=' + showPrevFeedback + ' showLady=' + showLady + ' excalEnabled=' + state.excaliburEnabled + ' ladyEnabled=' + state.ladyOfLakeEnabled + ' ladyHolder=' + state.ladyLakeHolder);
+  // 可见调试：使用 toast 而非 console，解决移动端看不到日志的问题
+  var dbg = '[合弹] R' + (round+1) + ' 持剑=' + showHolder + ' 反=' + showPrevFeedback + ' 女=' + showLady + ' e=' + state.excaliburEnabled + ' tm=' + state.timerMode;
+  if (!showHolder && showPrevFeedback) dbg += ' ←只有反馈';
+  if (showHolder && !showPrevFeedback && round > 0) dbg += ' ←只有持剑(缺失上轮反馈?)';
+  console.log(dbg);
   if (!showHolder && !showPrevFeedback && !showLady) {
-    console.log('[debug-combinedModal] ALL FALSE, early return (modal NOT shown)');
+    toast('[调试] 合并弹窗未弹出：持剑=' + showHolder + ' 反馈=' + showPrevFeedback + ' 女神=' + showLady + ' round=' + (round+1) + ' excal=' + state.excaliburEnabled + ' timer=' + state.timerMode);
     startTimer();
     renderStepPanel();
     return;
@@ -1467,58 +1471,60 @@ function showCombinedConfirmModal() {
   stopTimer();
   if (state.timerMode === 'per') state._modalPausedTimer = true;
   var h = '';
-  // ① 指定持剑者
-  if (showHolder) {
-    var rec = ensureExcaliburRecord(round);
-    h += '<h2>王者之剑 · 指定持剑者</h2>';
-    h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。</p>';
-    h += '<div style="display:flex;flex-direction:column;gap:8px">';
-    for (var i = 0; i < m.team.length; i++) {
-      var pi = m.team[i];
-      if (pi === m.leader) continue;
-      h += '<button class="assassin-target-btn" onclick="onCombinedSetHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
-    }
-    h += '</div>';
-    h += '<p id="combined-holder-info" style="font-size:12px;color:var(--text-dim);margin-top:10px">' + (rec.holder >= 0 ? '当前持剑者：' + playerLabel(rec.holder) : '') + '</p>';
-  }
-  // ② 上轮用剑反馈
-  if (showPrevFeedback) {
-    if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
-    h += '<h2>上轮王者之剑反馈</h2>';
-    h += '<p style="font-size:14px;margin-bottom:6px">第' + (prevRec.round + 1) + '轮持剑者 <b>' + playerLabel(prevRec.holder) + '</b> 对 <b>' + playerLabel(prevRec.target) + '</b> 使用了王者之剑。</p>';
-    var targetRole = state.playerRoles[prevRec.target];
-    if (targetRole === 'merlin' || targetRole === 'percival') {
-      h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
-    } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
-      h += '<p style="color:var(--evil);font-weight:700">该玩家是反方</p>';
-    }
-    h += '<label style="display:block;font-size:13px;color:var(--text-dim);margin-top:12px;margin-bottom:4px">持剑者口述改变方向</label>';
-    h += '<select id="combined-excal-dir-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px">';
-    h += '<option value="fail_to_success">失败 → 成功</option><option value="success_to_fail">成功 → 失败</option><option value="unknown" selected>未说明</option><option value="refused">拒绝说明</option>';
-    h += '</select>';
-    h += '<input id="combined-excal-note-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px" placeholder="备注：记录原话或简述">';
-  }
-  // ③ 湖中女神验人
-  if (showLady) {
-    if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
-    h += '<h2>湖中女神验人</h2>';
-    h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营</p>';
-    h += '<div style="display:flex;flex-direction:column;gap:8px">';
-    var pc = state.playerCount;
-    for (var j = 0; j < pc; j++) {
-      if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
-      h += '<button class="assassin-target-btn" onclick="onCombinedLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
-    }
-    h += '</div>';
-  }
-  // 完成按钮
-  h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
-  console.log('[DEBUG showCombinedConfirmModal] h length=' + h.length + ' preview=' + h.substring(0, 100));
   try {
+    // ① 指定持剑者
+    if (showHolder) {
+      var rec = ensureExcaliburRecord(round);
+      h += '<h2>王者之剑 · 指定持剑者</h2>';
+      h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。</p>';
+      h += '<div style="display:flex;flex-direction:column;gap:8px">';
+      for (var i = 0; i < m.team.length; i++) {
+        var pi = m.team[i];
+        if (pi === m.leader) continue;
+        h += '<button class="assassin-target-btn" onclick="onCombinedSetHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+      }
+      h += '</div>';
+      h += '<p id="combined-holder-info" style="font-size:12px;color:var(--text-dim);margin-top:10px">' + (rec.holder >= 0 ? '当前持剑者：' + playerLabel(rec.holder) : '') + '</p>';
+    }
+    // ② 上轮用剑反馈
+    if (showPrevFeedback) {
+      if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+      h += '<h2>上轮王者之剑反馈</h2>';
+      h += '<p style="font-size:14px;margin-bottom:6px">第' + (prevRec.round + 1) + '轮持剑者 <b>' + playerLabel(prevRec.holder) + '</b> 对 <b>' + playerLabel(prevRec.target) + '</b> 使用了王者之剑。</p>';
+      var targetRole = state.playerRoles[prevRec.target];
+      if (targetRole === 'merlin' || targetRole === 'percival') {
+        h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
+      } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
+        h += '<p style="color:var(--evil);font-weight:700">该玩家是反方</p>';
+      }
+      h += '<label style="display:block;font-size:13px;color:var(--text-dim);margin-top:12px;margin-bottom:4px">持剑者口述改变方向</label>';
+      h += '<select id="combined-excal-dir-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px">';
+      h += '<option value="fail_to_success">失败 → 成功</option><option value="success_to_fail">成功 → 失败</option><option value="unknown" selected>未说明</option><option value="refused">拒绝说明</option>';
+      h += '</select>';
+      h += '<input id="combined-excal-note-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px" placeholder="备注：记录原话或简述">';
+    }
+    // ③ 湖中女神验人
+    if (showLady) {
+      if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+      h += '<h2>湖中女神验人</h2>';
+      h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营</p>';
+      h += '<div style="display:flex;flex-direction:column;gap:8px">';
+      var pc = state.playerCount;
+      for (var j = 0; j < pc; j++) {
+        if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+        h += '<button class="assassin-target-btn" onclick="onCombinedLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+      }
+      h += '</div>';
+    }
+    // 完成按钮
+    h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
     showModal(h);
-    console.log('[DEBUG showCombinedConfirmModal] showModal returned OK');
   } catch (e) {
-    console.error('[DEBUG showCombinedConfirmModal] showModal threw:', e);
+    console.error('[showCombinedConfirmModal] crash:', e);
+    toast('[错误] 合并弹窗生成失败：' + (e.message || e));
+    if (state.timerMode === 'per') state._modalPausedTimer = false;
+    startTimer();
+    renderStepPanel();
   }
 }
 
@@ -2664,6 +2670,10 @@ function confirmTeam() {
     renderTimerDisplay();
     renderStepPanel();
     showCombinedConfirmModal();
+    // 兜底：如果弹窗未出现（被 early return 吞掉），尝试显示调试信息
+    if (!document.getElementById('dynamic-modal-overlay') && !state.winner) {
+      console.warn('[confirmTeam] modal overlay not found after showCombinedConfirmModal');
+    }
   } else if (state.timerMode === 'all') {
     state.timerRemaining = state.timerSeconds;
     state.timerInterval = null;
@@ -2672,6 +2682,9 @@ function confirmTeam() {
     renderTimerDisplay();
     renderStepPanel();
     showCombinedConfirmModal();
+    if (!document.getElementById('dynamic-modal-overlay') && !state.winner) {
+      console.warn('[confirmTeam] modal overlay not found after showCombinedConfirmModal');
+    }
   }
 }
 
