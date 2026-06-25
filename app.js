@@ -1051,6 +1051,9 @@ function renderStepPanel() {
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
     h += '</div>';
     h += buildSpeechPhaseInfoPanel();
+    if (state.timerMode !== 'off') {
+      h += '<div style="text-align:center;margin-top:8px"><button class="btn" onclick="reopenCombinedModal()" style="color:var(--gold-light);border-color:var(--gold);font-size:13px">&#9998; 填写反馈</button></div>';
+    }
 
     c.innerHTML = h;
     return;
@@ -1514,7 +1517,7 @@ function showCombinedConfirmModal() {
     }
     // 完成按钮
     h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
-    showModal(h, onCombinedModalClose);
+    showModal(h, onCombinedModalCancel);
   } catch (e) {
     console.error('[showCombinedConfirmModal] crash:', e);
     toast('[错误] 合并弹窗生成失败：' + (e.message || e));
@@ -1555,6 +1558,36 @@ function onCombinedModalClose() {
   if (state.timerMode === 'per') state._modalPausedTimer = false;
   startTimer();
   renderStepPanel();
+}
+
+function onCombinedModalCancel() {
+  closeModal();
+  if (state.timerMode === 'per') state._modalPausedTimer = false;
+  startTimer();
+  renderStepPanel();
+}
+
+function reopenCombinedModal() {
+  var round = state.currentRound;
+  var m = state.missions[round];
+  var showHolder = state.excaliburEnabled && m && m.team && m.team.length > 0;
+  var prevRec = null;
+  if (state.excaliburEnabled && round > 0 && state.excaliburHistory) {
+    for (var k = 0; k < state.excaliburHistory.length; k++) {
+      var pv = state.excaliburHistory[k];
+      if (pv.used !== false && pv.target !== null && !pv.feedbackRecorded && pv.round < round && pv.holder >= 0) {
+        prevRec = pv;
+        break;
+      }
+    }
+  }
+  var showPrevFeedback = prevRec !== null;
+  var showLady = state.ladyOfLakeEnabled && round >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+  if (!showHolder && !showPrevFeedback && !showLady) {
+    toast('当前没有待填写的反馈', 'info');
+    return;
+  }
+  showCombinedConfirmModal();
 }
 
 function onCombinedLadyCheck(targetIdx) {
