@@ -1513,7 +1513,13 @@ function showCombinedConfirmModal() {
   }
   // 完成按钮
   h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
-  showModal(h);
+  console.log('[DEBUG showCombinedConfirmModal] h length=' + h.length + ' preview=' + h.substring(0, 100));
+  try {
+    showModal(h);
+    console.log('[DEBUG showCombinedConfirmModal] showModal returned OK');
+  } catch (e) {
+    console.error('[DEBUG showCombinedConfirmModal] showModal threw:', e);
+  }
 }
 
 function onCombinedSetHolder(round, holderIdx) {
