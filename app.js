@@ -152,19 +152,74 @@ function invalidateHistoryCache() {
   _normalizedHistoryRawCache = null;
   _normalizedHistoryCache = null;
 }
+// 将旧格式 roundTendencies（纯数值对象数组）迁移为新格式（带 r/a 元数据）
+function migrateRoundTendenciesV2(v2) {
+  var rt = v2.rt;
+  if (!rt || !rt.length) return false;
+  // 已经是新格式：{ v: snap, r: round, a: attempt }
+  if (rt[0] && typeof rt[0].v === 'object') return false;
+
+  var missions = v2.ms || [];
+  var newRT = [];
+  var entryIdx = 0;
+
+  for (var ri = 0; ri < missions.length; ri++) {
+    var m = missions[ri];
+    var failedCount = 0;
+    if (m.la && m.la.length > 0) {
+      // 有 launchAttempts：最后一组投票通过则为 failedCount = attempts-1
+      if (m.res) {
+        failedCount = m.la.length - 1;
+      } else {
+        failedCount = m.la.length;
+      }
+    } else {
+      // 传统格式：直接取 launchFailures 计数
+      failedCount = m.lf2 || 0;
+    }
+
+    // 失败的组队投票快照（a 从 1 开始）
+    for (var a = 1; a <= failedCount; a++) {
+      if (entryIdx < rt.length) {
+        newRT.push({ v: rt[entryIdx], r: ri, a: a });
+        entryIdx++;
+      }
+    }
+
+    // 任务执行完成快照（a=0）
+    if (m.res) {
+      if (entryIdx < rt.length) {
+        newRT.push({ v: rt[entryIdx], r: ri, a: 0 });
+        entryIdx++;
+      }
+    }
+  }
+
+  // 兜底：剩余未匹配的条目按最后一轮处理
+  while (entryIdx < rt.length) {
+    newRT.push({ v: rt[entryIdx], r: missions.length, a: 0 });
+    entryIdx++;
+  }
+
+  v2.rt = newRT;
+  return true;
+}
+
 function loadHistory() {
   try {
     var rawText = localStorage.getItem('avalon_history_v2') || '[]';
     if (_historyRawCache === rawText && _historyCache) return _historyCache.slice();
     var raw = JSON.parse(rawText);
     var migrated = false;
+    var rtMigrated = false;
     for (var i = 0; i < raw.length; i++) {
       if (!isRecordV2(raw[i])) {
         raw[i] = toRecordV2(raw[i]);
         migrated = true;
       }
+      if (migrateRoundTendenciesV2(raw[i])) rtMigrated = true;
     }
-    if (migrated) {
+    if (migrated || rtMigrated) {
       rawText = JSON.stringify(raw);
       localStorage.setItem('avalon_history_v2', rawText);
     }
@@ -206,6 +261,7 @@ function toRecordV2(record) {
   if (record.assassinTarget !== undefined) v2.at = record.assassinTarget;
   if (record.assassinSuccess !== undefined) v2.as = record.assassinSuccess;
   if (record.assassinAfterRound != null) v2.aar = record.assassinAfterRound;
+  if (record.assassinFromMission) v2.afm = record.assassinFromMission;
   if (record.currentRound !== undefined) v2.cr = record.currentRound;
   if (record.identityMarks) v2.im = record.identityMarks.map(function(m) { return { t: m.target, tn: m.targetName, l: m.level, ts: m.timestamp }; });
   if (record.missions) v2.ms = record.missions.map(function(m) {
@@ -244,6 +300,7 @@ function fromRecordV2(v2) {
   rec.assassinTarget = v2.at || null;
   rec.assassinSuccess = v2.as || false;
   rec.assassinAfterRound = v2.aar != null ? v2.aar : null;
+  rec.assassinFromMission = v2.afm || false;
   rec.currentRound = v2.cr != null ? v2.cr : 0;
   rec.identityMarks = (v2.im || []).map(function(m) { return { target: m.t, targetName: m.tn, level: m.l, timestamp: m.ts }; });
   rec.missions = (v2.ms || []).map(function(m) {
@@ -2827,7 +2884,7 @@ function confirmVotes() {
     for (var i = 0; i < pc; i++) {
       snap[i] = state.tendencies[i] || 50;
     }
-    state.roundTendencies.push(snap);
+    state.roundTendencies.push({ v: snap, r: state.currentRound, a: m.launchFailures });
 
     if (m.launchFailures >= 5) {
       m.result = 'fail';
@@ -2857,16 +2914,15 @@ function applyLaunchTendencies() {
   var si = state.selfIndex;
   var lastAttempt = m.launchAttempts[m.launchAttempts.length - 1];
   var myVote = si >= 0 ? lastAttempt.votes[si] : null;
-  var weight = state.myRole ? 2 : 1;
 
   for (var i = 0; i < state.playerCount; i++) {
-    if (i === si) continue;
     if (!(i in state.tendencies)) state.tendencies[i] = 50;
     var vote = lastAttempt.votes[i];
 
-    if (myVote) {
-      if (vote === myVote) state.tendencies[i] += 2 * weight;
-      else state.tendencies[i] -= 2 * weight;
+    // 客观评分：基于投票一致性，不参考本人身份
+    if (myVote && i !== si) {
+      if (vote === myVote) state.tendencies[i] += 2;
+      else state.tendencies[i] -= 2;
     }
 
     if (state.tendencies[i] < 0) state.tendencies[i] = 0;
@@ -2971,7 +3027,7 @@ function finalizeMission() {
   for (var i = 0; i < state.playerCount; i++) {
     snap[i] = state.tendencies[i] || 50;
   }
-  state.roundTendencies.push(snap);
+  state.roundTendencies.push({ v: snap, r: state.currentRound, a: 0 });
 
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
   if (hasLancelot && state.currentRound >= 1) {
@@ -2998,10 +3054,8 @@ function updateFinalTendencies() {
   var si = state.selfIndex;
   var myVote = si >= 0 ? m.votes[si] : null;
   var result = m.result;
-  var weight = state.myRole ? 2 : 1;
 
   for (var i = 0; i < state.playerCount; i++) {
-    if (i === si) continue;
     if (!(i in state.tendencies)) state.tendencies[i] = 50;
 
     var vote = m.votes[i];
@@ -3019,9 +3073,10 @@ function updateFinalTendencies() {
       if (inTeam) state.tendencies[i] -= 3;
     }
 
-    if (myVote) {
-      if (vote === myVote) state.tendencies[i] += 2 * weight;
-      else state.tendencies[i] -= 2 * weight;
+    // 客观评分：基于投票一致性，不参考本人身份
+    if (myVote && i !== si) {
+      if (vote === myVote) state.tendencies[i] += 2;
+      else state.tendencies[i] -= 2;
     }
 
     if (state.tendencies[i] < 0) state.tendencies[i] = 0;
@@ -3505,6 +3560,7 @@ function saveGameRecord() {
     assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
     assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
     assassinAfterRound: state._assassinAfterRound !== null ? state._assassinAfterRound : null,
+    assassinFromMission: !!state.assassinFromMission,
     currentRound: state._assassinAfterRound !== null ? state._assassinAfterRound : state.currentRound,
     identityMarks: state.identityMarks.map(function(m) {
       return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
@@ -4061,9 +4117,15 @@ function showGameDetail(idx) {
   var h = '<h2>对局详情</h2>';
   h += '<p><strong>日期：</strong>' + rec.date + ' | <strong>人数：</strong>' + rec.playerCount + '人 | <strong>胜方：</strong>' + (rec.winner === 'good' ? '好人方' : '反方') + '</p>';
   if (rec.assassinTarget) {
-    h += '<p><strong>拍刀：</strong>';
-    if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
-      h += '第' + (rec.assassinAfterRound + 1) + '轮任务后反方拍刀 | ';
+    if (rec.assassinFromMission) {
+      // 游戏内拍刀
+      h += '<p><strong>反方拍刀：</strong>';
+      if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+        h += '第' + (rec.assassinAfterRound + 1) + '轮任务后 | ';
+      }
+    } else {
+      // 正常流程结束后的刺杀环节
+      h += '<p><strong>刺杀环节：</strong>';
     }
     h += '<strong>目标：</strong>' + rec.assassinTarget + ' | <strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中梅林，反方胜</span>' : '<span style="color:#99ff99">未命中，好人方胜</span>') + '</p>';
   }
@@ -4119,7 +4181,9 @@ function showGameDetail(idx) {
   var totalRounds = hasAssassin ? Math.max(rec.missions.length, assassinCutoff + 1) : rec.missions.length;
   for (var i = 0; i < totalRounds; i++) {
     if (hasAssassin && i === assassinCutoff) {
-      h += '<div style="margin-bottom:4px;padding:8px 12px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)"><span style="font-weight:700">第' + (i + 1) + '轮：</span><span style="color:#ff9999;font-weight:700">反方拍刀</span> — 游戏在此轮终止</div>';
+      var isGameAssassin = rec.assassinFromMission === true;
+      var assassinLabel = isGameAssassin ? '反方拍刀' : '刺杀环节';
+      h += '<div style="margin-bottom:4px;padding:8px 12px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)"><span style="font-weight:700">第' + (i + 1) + '轮：</span><span style="color:#ff9999;font-weight:700">' + assassinLabel + '</span> — 游戏在此轮终止</div>';
       continue;
     }
     if (hasAssassin && i > assassinCutoff) break;
@@ -4237,7 +4301,7 @@ function showGameDetail(idx) {
     }
   }
   if (hasAssassin && assassinCutoff < totalRounds - 1) {
-    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (totalRounds - assassinCutoff - 1) + '轮未进行，游戏在拍刀环节终止）</div>';
+    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (totalRounds - assassinCutoff - 1) + '轮未进行，游戏在' + (rec.assassinFromMission ? '拍刀' : '刺杀') + '环节终止）</div>';
   }
 
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
@@ -4278,14 +4342,34 @@ function showGameDetail(idx) {
     h += '<h3 style="margin-top:10px">倾向值变化</h3>';
     h += '<table style="font-size:12px;width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid var(--border)"><th style="padding:4px 6px;text-align:left">玩家</th>';
     for (var r = 0; r < rec.roundTendencies.length; r++) {
-      h += '<th style="padding:4px 6px;text-align:center">第' + (r + 1) + '轮</th>';
+      var entry = rec.roundTendencies[r];
+      var label;
+      if (entry && typeof entry.v === 'object') {
+        // 新格式：{ v: snap, r: round, a: attempt }
+        var roundNum = (entry.r || 0) + 1;
+        if (entry.a > 0) {
+          label = '第' + roundNum + '轮（第' + entry.a + '车队）';
+        } else {
+          label = '第' + roundNum + '轮';
+        }
+      } else {
+        // 旧格式兼容
+        label = '第' + (r + 1) + '轮';
+      }
+      h += '<th style="padding:4px 6px;text-align:center">' + label + '</th>';
     }
     h += '</tr>';
     for (var i = 0; i < rec.identities.length; i++) {
       var id = rec.identities[i];
       h += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 6px;font-weight:600">' + (id.index + 1) + '号 ' + id.name + '</td>';
       for (var r = 0; r < rec.roundTendencies.length; r++) {
-        var val = rec.roundTendencies[r][id.index];
+        var entry = rec.roundTendencies[r];
+        var val;
+        if (entry && typeof entry.v === 'object') {
+          val = entry.v[id.index];
+        } else {
+          val = entry[id.index];
+        }
         if (val !== undefined) {
           var color = val >= 50 ? 'var(--green-bright)' : 'var(--red-bright)';
           h += '<td style="padding:4px 6px;text-align:center;color:' + color + ';font-weight:700">' + val + '</td>';
@@ -4321,7 +4405,8 @@ function showEditGameRecord(idx) {
   h += '</div>';
 
   if (rec.assassinTarget) {
-    h += '<h3 style="margin-top:8px">拍刀</h3>';
+    var editAssassinTitle = rec.assassinFromMission ? '拍刀' : '刺杀环节';
+    h += '<h3 style="margin-top:8px">' + editAssassinTitle + '</h3>';
     h += '<p style="font-size:13px">目标：' + rec.assassinTarget;
     if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
       h += ' | 第' + (rec.assassinAfterRound + 1) + '轮任务后';
