@@ -1,10 +1,11 @@
 /* ==================== DATA ==================== */
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
 var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
-var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)'];
+var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
 var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
+var NEUTRAL_ROLES = ['混子'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
 
 /* ==================== SUPABASE ==================== */
@@ -64,7 +65,9 @@ var state = {
   _historyPage: 0,
   _historyPageSize: 5,
   _assassinTimerRemaining: 0,
+  _assassinTimerEnd: 0,
   _assassinTimerInterval: null,
+  _huntFollowTarget: undefined,
   ladyOfLakeEnabled: true,
   excaliburEnabled: false,
   excaliburHistory: [],
@@ -109,7 +112,9 @@ function initState(n) {
   state.lancelotDrawResults = [];
   state._historyPage = 0;
   state._assassinTimerRemaining = 0;
+  state._assassinTimerEnd = 0;
   state._assassinTimerInterval = null;
+  state._huntFollowTarget = undefined;
   state.ladyOfLakeEnabled = true;
   state.excaliburEnabled = false;
   state.excaliburHistory = [];
@@ -266,6 +271,7 @@ function toRecordV2(record) {
   if (record.assassinSuccess !== undefined) v2.as = record.assassinSuccess;
   if (record.assassinAfterRound != null) v2.aar = record.assassinAfterRound;
   if (record.assassinFromMission) v2.afm = record.assassinFromMission;
+  if (record.huntFollow != null) v2.hf = record.huntFollow;
   if (record.currentRound !== undefined) v2.cr = record.currentRound;
   if (record.identityMarks) v2.im = record.identityMarks.map(function(m) { return { t: m.target, tn: m.targetName, l: m.level, ts: m.timestamp }; });
   if (record.missions) v2.ms = record.missions.map(function(m) {
@@ -308,6 +314,7 @@ function fromRecordV2(v2) {
   rec.assassinSuccess = v2.as || false;
   rec.assassinAfterRound = v2.aar != null ? v2.aar : null;
   rec.assassinFromMission = v2.afm || false;
+  rec.huntFollow = v2.hf != null ? v2.hf : null;
   rec.currentRound = v2.cr != null ? v2.cr : 0;
   rec.identityMarks = (v2.im || []).map(function(m) { return { target: m.t, targetName: m.tn, level: m.l, timestamp: m.ts }; });
   rec.missions = (v2.ms || []).map(function(m) {
@@ -388,16 +395,18 @@ loadNamePool();
 function startAssassinTimer() {
   stopAssassinTimer();
   ensureAudioContext();
-  state._assassinTimerRemaining = 3 * 60; // 3 minutes
+  state._assassinTimerEnd = Date.now() + 3 * 60 * 1000; // wall-clock end time
+  state._assassinTimerRemaining = 3 * 60;
   renderAssassinTimer();
   state._assassinTimerInterval = setInterval(function() {
-    state._assassinTimerRemaining--;
+    var remaining = Math.max(0, Math.ceil((state._assassinTimerEnd - Date.now()) / 1000));
+    state._assassinTimerRemaining = remaining;
     renderAssassinTimer();
-    if (state._assassinTimerRemaining <= 0) {
+    if (remaining <= 0) {
       stopAssassinTimer();
       playBeepSound();
     }
-  }, 1000);
+  }, 250); // more frequent refresh for wall-clock accuracy
 }
 
 function stopAssassinTimer() {
@@ -405,6 +414,7 @@ function stopAssassinTimer() {
     clearInterval(state._assassinTimerInterval);
     state._assassinTimerInterval = null;
   }
+  state._assassinTimerEnd = 0;
   var el = document.getElementById('assassin-countdown-display');
   if (el) el.innerHTML = '';
 }
@@ -522,6 +532,15 @@ function renderSetup() {
   h += '<div class="role-group">';
   for (var i = 0; i < EVIL_ROLES.length; i++) {
     var r = EVIL_ROLES[i];
+    var checked = state.activeRoles.indexOf(r) !== -1;
+    h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
+  }
+  h += '</div></div>';
+  h += '<div class="neutral-section">';
+  h += '<span class="faction-label neutral">中立方</span>';
+  h += '<div class="role-group">';
+  for (var i = 0; i < NEUTRAL_ROLES.length; i++) {
+    var r = NEUTRAL_ROLES[i];
     var checked = state.activeRoles.indexOf(r) !== -1;
     h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
   }
@@ -3548,6 +3567,16 @@ function saveGameRecord() {
   }
   if (!allFilled) { toast('请为所有玩家选择身份', 'warn'); return; }
 
+  // 混子：检查是否需要选择跟随目标
+  var huntIndex = -1;
+  for (var i = 0; i < identities.length; i++) {
+    if (identities[i].role === '混子') { huntIndex = i; break; }
+  }
+  if (huntIndex >= 0 && state._huntFollowTarget === undefined) {
+    showHuntFollowModal(huntIndex, identities);
+    return;
+  }
+
   var lancelotFlips = {};
   for (var i = 0; i < state.playerCount; i++) {
     var role = identities[i].role;
@@ -3571,6 +3600,7 @@ function saveGameRecord() {
     assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
     assassinAfterRound: state._assassinAfterRound !== null ? state._assassinAfterRound : null,
     assassinFromMission: !!state.assassinFromMission,
+    huntFollow: state._huntFollowTarget !== undefined ? state._huntFollowTarget : null,
     currentRound: state._assassinAfterRound !== null ? state._assassinAfterRound : state.currentRound,
     identityMarks: state.identityMarks.map(function(m) {
       return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
@@ -3676,6 +3706,31 @@ function saveGameRecord() {
   } else {
     finishSave();
   }
+}
+
+/* ==================== 混子跟随选择 ==================== */
+function showHuntFollowModal(huntIndex, identities) {
+  var huntName = state.playerNames[huntIndex];
+  var h = '<h2>混子选择跟随目标</h2>';
+  h += '<p style="color:var(--text-dim);font-size:14px;margin-bottom:12px">';
+  h += '<strong style="color:var(--gold-light)">' + huntName + '</strong>（' + (huntIndex + 1) + '号）是混子，请选择本轮跟随的玩家：</p>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  for (var i = 0; i < state.playerCount; i++) {
+    // 跳过自己
+    if (i === huntIndex) continue;
+    h += '<button class="assassin-target-btn" onclick="onHuntFollowSelect(' + i + ')">';
+    h += (i + 1) + '号 ' + escapeHtml(state.playerNames[i]);
+    h += '</button>';
+  }
+  h += '</div>';
+  showModal(h);
+}
+
+function onHuntFollowSelect(targetIdx) {
+  state._huntFollowTarget = targetIdx;
+  closeModal();
+  toast('混子跟随：' + (targetIdx + 1) + '号 ' + state.playerNames[targetIdx]);
+  saveGameRecord();
 }
 
 /* ==================== STATS PANEL ==================== */
@@ -3844,7 +3899,8 @@ function renderStats() {
         winner: rec.winner,
         role: id.role,
         flipped: rec.lancelotFlips && rec.lancelotFlips[id.index],
-        recIndex: i
+        recIndex: i,
+        huntFollow: rec.huntFollow || null
       });
     }
   }
@@ -3909,7 +3965,9 @@ function renderStats() {
       todayPlayerSet[nm].push({
         winner: rec.winner,
         role: id.role,
-        flipped: rec.lancelotFlips && rec.lancelotFlips[id.index]
+        flipped: rec.lancelotFlips && rec.lancelotFlips[id.index],
+        huntFollow: rec.huntFollow || null,
+        recIndex: i
       });
     }
   }
@@ -3921,8 +3979,13 @@ function renderStats() {
     var goodCount = 0, evilCount = 0, wins = 0;
     for (var g = 0; g < items.length; g++) {
       var faction = getFinalFaction(items[g].role, items[g].flipped);
+      // 混子：根据跟随目标解析阵营
+      if (items[g].role === '混子' && items[g].huntFollow != null && items[g].recIndex < history.length) {
+        var rec_ = history[items[g].recIndex];
+        faction = resolveHuntFaction(rec_, items[g].huntFollow);
+      }
       if (faction === 'good') goodCount++;
-      else evilCount++;
+      else if (faction === 'evil') evilCount++;
       if (items[g].winner === faction) wins++;
     }
     var rate = totalGames > 0 ? wins / totalGames : 0;
@@ -4047,7 +4110,17 @@ function clearHistoryFilter() {
 function getFinalFaction(role, flipped) {
   if (role === '兰斯洛特(蓝)') return flipped ? 'evil' : 'good';
   if (role === '兰斯洛特(红)') return flipped ? 'good' : 'evil';
+  if (role === '混子') return 'neutral';
   return GOOD_ROLES.indexOf(role) !== -1 ? 'good' : 'evil';
+}
+
+// 根据跟随目标解析混子的阵营
+function resolveHuntFaction(rec, huntTargetIdx) {
+  if (huntTargetIdx == null || rec.identities.length === 0) return 'neutral';
+  var target = rec.identities.find(function(id) { return id.index === huntTargetIdx; });
+  if (!target) return 'neutral';
+  var flipped = rec.lancelotFlips ? rec.lancelotFlips[huntTargetIdx] : false;
+  return getFinalFaction(target.role, flipped);
 }
 
 function togglePlayerStat(name) {
@@ -4073,17 +4146,23 @@ function togglePlayerStat(name) {
   var gamesGood = 0, winsGood = 0;
   var gamesEvil = 0, winsEvil = 0;
   var roleStats = {};
+  var history = loadNormalizedHistory();
 
   for (var i = 0; i < data.length; i++) {
     var d = data[i];
     var role = d.role;
     var flipped = d.flipped || false;
     var finalFaction = getFinalFaction(role, flipped);
+    // 混子：根据跟随目标解析阵营
+    if (role === '混子' && d.huntFollow != null && d.recIndex < history.length) {
+      var rec = history[d.recIndex];
+      finalFaction = resolveHuntFaction(rec, d.huntFollow);
+    }
 
     if (finalFaction === 'good') {
       gamesGood++;
       if (d.winner === 'good') winsGood++;
-    } else {
+    } else if (finalFaction === 'evil') {
       gamesEvil++;
       if (d.winner === 'evil') winsEvil++;
     }
@@ -4092,7 +4171,7 @@ function togglePlayerStat(name) {
 
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
     roleStats[role].total++;
-    if (d.winner === getFinalFaction(role, d.flipped)) roleStats[role].wins++;
+    if (d.winner === finalFaction) roleStats[role].wins++;
   }
 
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
@@ -4125,7 +4204,9 @@ function togglePlayerStat(name) {
 function showPlayerProfilePopup() {
   var playerSet = state._playerSetCache;
   var history = loadNormalizedHistory();
-  var names = Object.keys(playerSet || {}).sort();
+  var names = Object.keys(playerSet || {}).sort(function(a, b) {
+    return playerSet[b].length - playerSet[a].length;
+  });
   if (names.length === 0) { toast('暂无对局记录', 'warn'); return; }
 
   // Step 1: select player
@@ -4165,13 +4246,18 @@ function renderPlayerProfile() {
     var d = sortedData[i];
     var flipped = d.flipped || false;
     var finalFaction = getFinalFaction(d.role, flipped);
+    // 混子：根据跟随目标解析阵营
+    if (d.role === '混子' && d.huntFollow != null && d.recIndex < history.length) {
+      var rec = history[d.recIndex];
+      finalFaction = resolveHuntFaction(rec, d.huntFollow);
+    }
     var isWin = d.winner === finalFaction;
     if (isWin) totalWins++;
 
     if (finalFaction === 'good') {
       gamesGood++;
       if (d.winner === 'good') winsGood++;
-    } else {
+    } else if (finalFaction === 'evil') {
       gamesEvil++;
       if (d.winner === 'evil') winsEvil++;
     }
@@ -4201,22 +4287,27 @@ function renderPlayerProfile() {
 
   // Simpler streak calculation
   streak = 0; maxStreak = 0; streakType = '';
+  var prevSW = null;
   for (var s = 0; s < sortedData.length; s++) {
     var sd = sortedData[s];
     var sf = getFinalFaction(sd.role, sd.flipped);
+    if (sd.role === '混子' && sd.huntFollow != null && sd.recIndex < history.length) {
+      sf = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
+    }
     var sw = sd.winner === sf;
     if (s === 0) {
       streak = 1;
       maxStreak = 1;
       streakType = sw ? 'W' : 'L';
     } else {
-      if (sw === (sortedData[s-1].winner === getFinalFaction(sortedData[s-1].role, sortedData[s-1].flipped))) {
+      if (sw === prevSW) {
         streak++;
       } else {
         streak = 1;
       }
       if (streak > maxStreak) maxStreak = streak;
     }
+    prevSW = sw;
   }
 
   // Recent: 7/15/30 days
@@ -4231,6 +4322,9 @@ function renderPlayerProfile() {
     var rec = history[rd.recIndex];
     var gameDate = new Date(rec.date);
     var rf = getFinalFaction(rd.role, rd.flipped);
+    if (rd.role === '混子' && rd.huntFollow != null && rd.recIndex < history.length) {
+      rf = resolveHuntFaction(history[rd.recIndex], rd.huntFollow);
+    }
     var rw = rd.winner === rf;
     var buckets = [];
     if (gameDate >= d7) buckets.push('d7');
@@ -4371,6 +4465,10 @@ function showGameDetail(idx) {
   // Sort by faction (good first, then evil), then by index within each faction
   var sortedIds = rec.identities.slice().map(function(id) {
     var final = getFinalFaction(id.role, rec.lancelotFlips && rec.lancelotFlips[id.index]);
+    // 混子：根据跟随目标解析阵营
+    if (id.role === '混子' && rec.huntFollow != null) {
+      final = resolveHuntFaction(rec, rec.huntFollow);
+    }
     return { id: id, faction: final };
   });
   sortedIds.sort(function(a, b) {
@@ -4385,12 +4483,20 @@ function showGameDetail(idx) {
     if (final === 'evil') {
       evilStyle = ' style="background:rgba(255,80,80,0.08);padding:2px 8px;border-radius:4px;margin-bottom:2px"';
       factionBadge = ' <span style="display:inline-block;padding:0 8px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);border-radius:10px;color:#ff6b6b;font-size:11px;font-weight:700">反方</span>';
+    } else if (final === 'neutral') {
+      factionBadge = ' <span style="display:inline-block;padding:0 8px;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);border-radius:10px;color:#c9a84c;font-size:11px;font-weight:700">中立</span>';
     }
     var flipNote = '';
     if (rec.lancelotFlips && rec.lancelotFlips[id.index]) {
       flipNote = ' <span style="color:var(--orange);font-size:11px">[反转→' + (final === 'good' ? '好人方' : '反方') + ']</span>';
     }
-    h += '<div' + evilStyle + '>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + factionBadge + flipNote + '</div>';
+    // 混子跟随信息
+    var huntNote = '';
+    if (id.role === '混子' && rec.huntFollow != null && rec.huntFollow >= 0 && rec.huntFollow < rec.playerCount) {
+      var followedName = rec.identities.find(function(x) { return x.index === rec.huntFollow; });
+      huntNote = ' <span style="color:var(--gold-light);font-size:11px">→ 混' + (rec.huntFollow + 1) + '号' + (followedName ? followedName.name : '') + '</span>';
+    }
+    h += '<div' + evilStyle + '>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + factionBadge + flipNote + huntNote + '</div>';
   }
 
   h += '<h3 style="margin-top:10px">任务记录</h3>';
@@ -4401,6 +4507,9 @@ function showGameDetail(idx) {
     var idt = rec.identities[ii];
     nameByIndex[idt.index] = idt.name;
     var faction = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
+    if (idt.role === '混子' && rec.huntFollow != null) {
+      faction = resolveHuntFaction(rec, rec.huntFollow);
+    }
     nameToFaction[idt.name] = faction;
     nameToFaction[(idt.index + 1) + '号 ' + idt.name] = faction;
     nameToFaction['玩家' + (idt.index + 1)] = faction;
