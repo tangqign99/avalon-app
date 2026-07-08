@@ -261,6 +261,7 @@ function toRecordV2(record) {
   if (record.lancelotFlips) v2.lf = record.lancelotFlips;
   if (record.activeRoles) v2.ar = record.activeRoles;
   if (record.roundTendencies) v2.rt = record.roundTendencies;
+  if (record.v7Scores) v2.v7s = record.v7Scores;
   if (record.assassinTarget !== undefined) v2.at = record.assassinTarget;
   if (record.assassinSuccess !== undefined) v2.as = record.assassinSuccess;
   if (record.assassinAfterRound != null) v2.aar = record.assassinAfterRound;
@@ -302,6 +303,7 @@ function fromRecordV2(v2) {
   rec.lancelotFlips = v2.lf || {};
   rec.activeRoles = v2.ar || [];
   rec.roundTendencies = v2.rt || [];
+  rec.v7Scores = v2.v7s || null;
   rec.assassinTarget = v2.at || null;
   rec.assassinSuccess = v2.as || false;
   rec.assassinAfterRound = v2.aar != null ? v2.aar : null;
@@ -4625,13 +4627,19 @@ function showGameDetail(idx) {
 
   // v7 算法客观分析
   _v7DetailRec = rec;
-  h += '<h3 style="margin-top:10px">v7算法分析</h3>';
+  _v7DetailHistIdx = idx;
+  var hasSavedV7 = rec.v7Scores && Object.keys(rec.v7Scores).length > 0;
+  var savedBadge = hasSavedV7 ? ' <span style="font-size:10px;color:#4caf50;background:rgba(76,175,80,0.15);padding:1px 6px;border-radius:3px">已保存</span>' : '';
+  h += '<h3 style="margin-top:10px">v7算法分析' + savedBadge + '</h3>';
   h += '<p style="font-size:11px;color:var(--text-dim);margin-bottom:4px">选择玩家视角，v7评分引擎基于该玩家在游戏过程中可获得的信息进行客观评分（仅知自身身份）</p>';
-  h += '<select id="v7-detail-persp" onchange="refreshV7DetailAnalysis()" style="margin-bottom:6px;font-size:12px;padding:2px 6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px">';
+  h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">';
+  h += '<select id="v7-detail-persp" onchange="refreshV7DetailAnalysis()" style="font-size:12px;padding:2px 6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;flex:1">';
   for (var i = 0; i < rec.identities.length; i++) {
     h += '<option value="' + i + '">' + (i + 1) + '号 ' + rec.identities[i].name + '（' + rec.identities[i].role + '）</option>';
   }
   h += '</select>';
+  h += '<button class="btn small" onclick="saveV7AnalysisToHistory()" style="font-size:11px;white-space:nowrap">保存v7分析</button>';
+  h += '</div>';
   h += '<div id="v7-detail-table"></div>';
 
   h += '<div class="modal-actions">';
@@ -5898,6 +5906,7 @@ function computeSuspectScores() {
 
 /* ------- v7 Historical Record Analysis ------- */
 var _v7DetailRec = null;
+var _v7DetailHistIdx = -1;
 
 function computeRecordSuspectScores(rec, perspIdx) {
   var pc = rec.playerCount;
@@ -5997,7 +6006,17 @@ function refreshV7DetailAnalysis() {
   var selEl = document.getElementById('v7-detail-persp');
   if (!selEl) return;
   var sel = parseInt(selEl.value);
-  var scores = computeRecordSuspectScores(_v7DetailRec, sel);
+
+  // Use stored scores if available
+  var scores = null;
+  if (_v7DetailRec.v7Scores && _v7DetailRec.v7Scores[sel]) {
+    scores = _v7DetailRec.v7Scores[sel].scores;
+    scores._dataQuality = _v7DetailRec.v7Scores[sel].quality;
+    scores._totalRounds = _v7DetailRec.v7Scores[sel].totalRounds || 0;
+  } else {
+    scores = computeRecordSuspectScores(_v7DetailRec, sel);
+  }
+
   var t = document.getElementById('v7-detail-table');
   if (!t) return;
 
@@ -6072,6 +6091,40 @@ function refreshV7DetailAnalysis() {
   h += '<p style="font-size:10px;color:var(--text-dim);margin-top:4px">准确率：' + accCount + '/' + totalJudged + '（' + accPct + '%）</p>';
 
   t.innerHTML = h;
+}
+
+function saveV7AnalysisToHistory() {
+  if (!_v7DetailRec || _v7DetailHistIdx < 0) return;
+  var history = loadHistory();
+  var v2 = history[_v7DetailHistIdx];
+  if (!v2) return;
+  var rec = normalizeRecord(v2);
+
+  var v7Scores = {};
+  var totalPersp = rec.playerCount;
+  for (var p = 0; p < totalPersp; p++) {
+    var scores = computeRecordSuspectScores(rec, p);
+    if (!scores || scores.length === 0) continue;
+    v7Scores[p] = {
+      scores: scores.map(function(s) { return { idx: s.idx, score: s.score, evidence: s.evidence }; }),
+      quality: scores._dataQuality || 'unknown',
+      totalRounds: scores._totalRounds || 0,
+      savedAt: new Date().toISOString()
+    };
+  }
+
+  v2.v7s = v7Scores;
+  // Persist
+  var raw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
+  raw[_v7DetailHistIdx].v7s = v7Scores;
+  localStorage.setItem('avalon_history_v2', JSON.stringify(raw));
+  _historyRawCache = null;
+  _normalizedHistoryRawCache = null;
+  _normalizedHistoryCache = null;
+
+  _v7DetailRec.v7Scores = v7Scores;
+  toast('v7分析已保存到历史记录（' + totalPersp + '个视角）', 'ok');
+  refreshV7DetailAnalysis();
 }
 
 /* ------- v7 Engine Info Panel (v102: 9-step visualizer) ------- */
