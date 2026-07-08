@@ -101,6 +101,7 @@ function initState(n) {
   state.assassinTarget = null;
   state.assassinFromMission = false;
   state.assassinMode = false;
+  state.gameStartTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
   state._assassinPickTarget = null;
   state._assassinAfterRound = null;
   state.lancelotFlipped = false;
@@ -252,6 +253,8 @@ function saveHistory(data) {
 function toRecordV2(record) {
   var v2 = {};
   if (record.date !== undefined) v2.d = record.date;
+  if (record.startTime !== undefined) v2.st = record.startTime;
+  if (record.endTime !== undefined) v2.et = record.endTime;
   if (record.playerCount !== undefined) v2.pc = record.playerCount;
   if (record.winner !== undefined) v2.w = record.winner;
   if (record.identities) v2.ids = record.identities.map(function(id) { return { n: id.name, r: id.role, i: id.index }; });
@@ -291,6 +294,8 @@ function toRecordV2(record) {
 function fromRecordV2(v2) {
   var rec = {};
   rec.date = v2.d || '';
+  rec.startTime = v2.st || '';
+  rec.endTime = v2.et || '';
   rec.playerCount = v2.pc || 0;
   rec.winner = v2.w || '';
   rec.identities = (v2.ids || []).map(function(id) { return { name: id.n, role: id.r, index: id.i }; });
@@ -803,6 +808,7 @@ function doStartGame() {
   state.assassinTarget = null;
   state.assassinFromMission = false;
   state.assassinMode = false;
+  state.gameStartTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
   state._assassinPickTarget = null;
   state._assassinAfterRound = null;
   state.lancelotFlipped = false;
@@ -3551,6 +3557,8 @@ function saveGameRecord() {
   var history = loadHistory();
   var record = {
     date: new Date().toISOString().slice(0, 10),
+    startTime: state.gameStartTime || '',
+    endTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
     playerCount: state.playerCount,
     winner: state.winner,
     identities: identities,
@@ -3855,6 +3863,7 @@ function renderStats() {
     h += '<option value="' + names[i] + '">' + names[i] + '</option>';
   }
   h += '</select>';
+  h += '<button class="btn" style="width:100%;margin-top:8px" onclick="showPlayerProfilePopup()">&#128100; 个人主页</button>';
   $('player-stat-btns').innerHTML = h;
   state._playerSetCache = playerSet;
 
@@ -4108,6 +4117,228 @@ function togglePlayerStat(name) {
   detailEl.appendChild(div);
 }
 
+function showPlayerProfilePopup() {
+  var playerSet = state._playerSetCache;
+  var history = loadNormalizedHistory();
+  var names = Object.keys(playerSet || {}).sort();
+  if (names.length === 0) { toast('暂无对局记录', 'warn'); return; }
+
+  // Step 1: select player
+  var h = '<h2>&#128100; 个人主页</h2><p style="color:var(--text-dim)">选择玩家查看详细数据</p>';
+  h += '<select id="profile-player-sel" onchange="renderPlayerProfile()" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;cursor:pointer;min-height:48px">';
+  h += '<option value="">-- 选择玩家 --</option>';
+  for (var i = 0; i < names.length; i++) {
+    h += '<option value="' + names[i] + '">' + names[i] + '</option>';
+  }
+  h += '</select>';
+  h += '<div id="profile-content" style="margin-top:12px"></div>';
+  h += '<div class="modal-actions"><button class="btn" onclick="closeModal()">关闭</button></div>';
+  showModal(h);
+}
+
+function renderPlayerProfile() {
+  var sel = document.getElementById('profile-player-sel');
+  if (!sel || !sel.value) return;
+  var name = sel.value;
+
+  var playerSet = state._playerSetCache;
+  var history = loadNormalizedHistory();
+  var data = playerSet[name];
+  if (!data) return;
+
+  var total = data.length;
+  var totalWins = 0, winsGood = 0, winsEvil = 0;
+  var gamesGood = 0, gamesEvil = 0;
+  var roleStats = {}; // role -> { good: {total,wins}, evil: {total,wins} }
+  var streak = 0, maxStreak = 0, streakType = '';
+  var recentResults = []; // for streak calc: ordered by recIndex desc
+
+  // Sort data by recIndex desc for streak calculation
+  var sortedData = data.slice().sort(function(a, b) { return b.recIndex - a.recIndex; });
+
+  for (var i = 0; i < sortedData.length; i++) {
+    var d = sortedData[i];
+    var flipped = d.flipped || false;
+    var finalFaction = getFinalFaction(d.role, flipped);
+    var isWin = d.winner === finalFaction;
+    if (isWin) totalWins++;
+
+    if (finalFaction === 'good') {
+      gamesGood++;
+      if (d.winner === 'good') winsGood++;
+    } else {
+      gamesEvil++;
+      if (d.winner === 'evil') winsEvil++;
+    }
+
+    // Role stats by faction
+    var rn = d.role;
+    if (!roleStats[rn]) roleStats[rn] = { good: { total: 0, wins: 0 }, evil: { total: 0, wins: 0 } };
+    if (finalFaction === 'good') {
+      roleStats[rn].good.total++;
+      if (d.winner === 'good') roleStats[rn].good.wins++;
+    } else {
+      roleStats[rn].evil.total++;
+      if (d.winner === 'evil') roleStats[rn].evil.wins++;
+    }
+
+    // Streak calculation
+    var factionTag = finalFaction === 'good' ? 'G' : 'E';
+    if (i === 0) {
+      streak = 1;
+      maxStreak = 1;
+      streakType = isWin ? factionTag : 'L';
+    } else if (finalFaction === getFinalFaction(sortedData[i-1].role, sortedData[i-1].flipped) && d.winner === sortedData[i-1].winner) {
+      // same faction + same result
+      // Actually this isn't right. Let me recalculate streak differently.
+    }
+  }
+
+  // Simpler streak calculation
+  streak = 0; maxStreak = 0; streakType = '';
+  for (var s = 0; s < sortedData.length; s++) {
+    var sd = sortedData[s];
+    var sf = getFinalFaction(sd.role, sd.flipped);
+    var sw = sd.winner === sf;
+    if (s === 0) {
+      streak = 1;
+      maxStreak = 1;
+      streakType = sw ? 'W' : 'L';
+    } else {
+      if (sw === (sortedData[s-1].winner === getFinalFaction(sortedData[s-1].role, sortedData[s-1].flipped))) {
+        streak++;
+      } else {
+        streak = 1;
+      }
+      if (streak > maxStreak) maxStreak = streak;
+    }
+  }
+
+  // Recent: 7/15/30 days
+  var now = new Date();
+  var d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+  var d15 = new Date(now); d15.setDate(d15.getDate() - 15);
+  var d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+
+  var recent = { d7: { total: 0, wins: 0 }, d15: { total: 0, wins: 0 }, d30: { total: 0, wins: 0 } };
+  for (var ri = 0; ri < data.length; ri++) {
+    var rd = data[ri];
+    var rec = history[rd.recIndex];
+    var gameDate = new Date(rec.date);
+    var rf = getFinalFaction(rd.role, rd.flipped);
+    var rw = rd.winner === rf;
+    var buckets = [];
+    if (gameDate >= d7) buckets.push('d7');
+    if (gameDate >= d15) buckets.push('d15');
+    if (gameDate >= d30) buckets.push('d30');
+    for (var b = 0; b < buckets.length; b++) {
+      recent[buckets[b]].total++;
+      if (rw) recent[buckets[b]].wins++;
+    }
+  }
+
+  var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
+  var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
+  var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
+
+  var streakLabel = streakType === 'W' ? '连胜' : (streakType === 'L' ? '连败' : '');
+  var streakColor = streakType === 'W' ? 'var(--green-bright)' : 'var(--red-bright)';
+
+  var initial = name.charAt(0);
+
+  var ph = '<div style="text-align:center;margin-bottom:16px">';
+  ph += '<div style="display:inline-block;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8b6914);line-height:60px;font-size:28px;font-weight:700;color:#fff;margin-bottom:8px">' + initial + '</div>';
+  ph += '<div style="font-size:20px;font-weight:700">' + name + '</div>';
+  ph += '</div>';
+
+  // Total win rate card
+  ph += '<div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-radius:var(--radius-sm);padding:16px;text-align:center;margin-bottom:12px">';
+  ph += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">总胜率</div>';
+  ph += '<div style="font-size:42px;font-weight:700;color:var(--gold-light);line-height:1">' + totalRate + '%</div>';
+  ph += '<div style="margin-top:8px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">';
+  ph += '<div style="height:100%;width:' + totalRate + '%;background:var(--gold-light);border-radius:3px"></div></div>';
+  ph += '</div>';
+
+  // Stats grid 2x2
+  ph += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+  ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">总场次</div><div style="font-size:24px;font-weight:700">' + total + '</div></div>';
+  ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">当前' + streakLabel + '</div><div style="font-size:24px;font-weight:700;color:' + streakColor + '">' + streak + '</div><div style="font-size:10px;color:var(--text-dim)">最高' + maxStreak + '</div></div>';
+  ph += '<div style="background:rgba(153,255,153,0.04);border:1px solid rgba(153,255,153,0.15);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">蓝方胜率</div><div style="font-size:24px;font-weight:700;color:var(--green-bright)">' + goodRate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + gamesGood + '场</div></div>';
+  ph += '<div style="background:rgba(255,153,153,0.04);border:1px solid rgba(255,153,153,0.15);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">红方胜率</div><div style="font-size:24px;font-weight:700;color:var(--red-bright)">' + evilRate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + gamesEvil + '场</div></div>';
+  ph += '</div>';
+
+  // Recent performance
+  ph += '<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">近期表现</div>';
+  ph += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  var periods = [
+    { key: 'd7', label: '7天' },
+    { key: 'd15', label: '15天' },
+    { key: 'd30', label: '30天' }
+  ];
+  for (var pi = 0; pi < periods.length; pi++) {
+    var prd = periods[pi];
+    var r = recent[prd.key];
+    var rate = r.total > 0 ? Math.round(r.wins / r.total * 100) : 0;
+    ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">' + prd.label + '</div><div style="font-size:20px;font-weight:700;color:var(--gold-light)">' + rate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + r.total + '场</div></div>';
+  }
+  ph += '</div></div>';
+
+  // Role performance tabs
+  var goodRoles = [], evilRoles = [];
+  for (var rn in roleStats) {
+    var rs = roleStats[rn];
+    var goodAll = rs.good.total + rs.good.wins; // actually total is correct
+    if (rs.good.total > 0) goodRoles.push({ role: rn, total: rs.good.total, wins: rs.good.wins });
+    if (rs.evil.total > 0) evilRoles.push({ role: rn, total: rs.evil.total, wins: rs.evil.wins });
+  }
+  goodRoles.sort(function(a, b) { return b.total - a.total; });
+  evilRoles.sort(function(a, b) { return b.total - a.total; });
+
+  var activeTab = state._profileRoleTab || 'good';
+  ph += '<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">角色表现</div>';
+  ph += '<div style="display:flex;gap:4px;margin-bottom:8px">';
+  ph += '<button class="btn small" style="' + (activeTab === 'good' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="switchProfileTab(\'good\')">蓝方</button>';
+  ph += '<button class="btn small" style="' + (activeTab === 'evil' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="switchProfileTab(\'evil\')">红方</button>';
+  ph += '</div>';
+
+  var tabRoles = activeTab === 'good' ? goodRoles : evilRoles;
+  if (tabRoles.length === 0) {
+    ph += '<div style="text-align:center;color:var(--text-dim);padding:20px">暂无数据</div>';
+  } else {
+    for (var tr = 0; tr < tabRoles.length; tr++) {
+      var t = tabRoles[tr];
+      var tRate = Math.round(t.wins / t.total * 100);
+      var tColor = tRate >= 60 ? 'var(--green-bright)' : tRate >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
+      ph += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm)">';
+      ph += '<span>' + t.role + ' <span style="font-size:11px;color:var(--text-dim)">' + t.wins + '/' + t.total + '</span></span>';
+      ph += '<span style="font-weight:700;color:' + tColor + '">' + tRate + '%</span>';
+      ph += '</div>';
+    }
+  }
+  ph += '</div>';
+
+  // Bottom buttons
+  ph += '<div style="display:flex;gap:8px;margin-top:16px">';
+  ph += '<button class="btn" style="flex:1" onclick="closeModal();goToPlayerHistory(\'' + name + '\')">查看历史战绩 &#8594;</button>';
+  ph += '</div>';
+
+  var contentEl = document.getElementById('profile-content');
+  if (contentEl) contentEl.innerHTML = ph;
+}
+
+function switchProfileTab(tab) {
+  state._profileRoleTab = tab;
+  renderPlayerProfile();
+}
+
+function goToPlayerHistory(name) {
+  var fpSel = document.getElementById('filter-player');
+  if (fpSel) {
+    fpSel.value = name;
+    renderStats();
+  }
+}
+
 /* ==================== GAME DETAIL & EDIT ==================== */
 function showGameDetail(idx) {
   var history = loadHistory();
@@ -4116,16 +4347,14 @@ function showGameDetail(idx) {
 
   var h = '<h2>对局详情</h2>';
   h += '<p><strong>日期：</strong>' + rec.date + ' | <strong>人数：</strong>' + rec.playerCount + '人 | <strong>胜方：</strong>' + (rec.winner === 'good' ? '好人方' : '反方') + '</p>';
-  if (rec.assassinTarget) {
-    if (rec.assassinFromMission) {
-      // 游戏内拍刀
-      h += '<p><strong>反方拍刀：</strong>';
-      if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
-        h += '第' + (rec.assassinAfterRound + 1) + '轮任务后 | ';
-      }
-    } else {
-      // 正常流程结束后的刺杀环节
-      h += '<p><strong>刺杀环节：</strong>';
+  if (rec.startTime) {
+    h += '<p><strong>开始时间：</strong>' + rec.startTime + ' | <strong>结束时间：</strong>' + (rec.endTime || '--') + '</p>';
+  }
+  if (rec.assassinFromMission && rec.assassinTarget) {
+    // 游戏内拍刀 - 仅在顶部简要显示
+    h += '<p><strong>反方拍刀：</strong>';
+    if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+      h += '第' + (rec.assassinAfterRound + 1) + '轮任务后 | ';
     }
     h += '<strong>目标：</strong>' + rec.assassinTarget + ' | <strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中梅林，反方胜</span>' : '<span style="color:#99ff99">未命中，好人方胜</span>') + '</p>';
   }
@@ -4176,19 +4405,18 @@ function showGameDetail(idx) {
     return n;
   };
   var namesToHtml = function(arr) { return arr.map(evilSpan).join(' / '); };
-  var hasAssassin = (rec.assassinTarget && rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined);
-  var assassinCutoff = hasAssassin ? rec.assassinAfterRound : rec.missions.length;
-  var totalRounds = hasAssassin ? Math.max(rec.missions.length, assassinCutoff + 1) : rec.missions.length;
-  for (var i = 0; i < totalRounds; i++) {
-    if (hasAssassin && i === assassinCutoff) {
-      var isGameAssassin = rec.assassinFromMission === true;
-      var assassinLabel = isGameAssassin ? '反方拍刀' : '刺杀环节';
-      h += '<div style="margin-bottom:4px;padding:8px 12px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)"><span style="font-weight:700">第' + (i + 1) + '轮：</span><span style="color:#ff9999;font-weight:700">' + assassinLabel + '</span> — 游戏在此轮终止</div>';
+  var isGameAssassin = rec.assassinFromMission === true && rec.assassinTarget;
+  var isEndGameAssassin = !rec.assassinFromMission && rec.assassinTarget;
+  var assassinCutoff = isGameAssassin ? rec.assassinAfterRound : null;
+  for (var i = 0; i < rec.missions.length; i++) {
+    // 反方拍刀：到达拍刀轮次后截断
+    if (isGameAssassin && assassinCutoff !== null && i > assassinCutoff) break;
+    // 反方拍刀：在拍刀轮次显示拍刀事件
+    if (isGameAssassin && i === assassinCutoff) {
+      h += '<div style="margin-bottom:4px;padding:8px 12px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)"><span style="font-weight:700">第' + (i + 1) + '轮：</span><span style="color:#ff9999;font-weight:700">反方拍刀</span> — 游戏在此轮终止</div>';
       continue;
     }
-    if (hasAssassin && i > assassinCutoff) break;
-    if (i < rec.missions.length) {
-      var m = rec.missions[i];
+    var m = rec.missions[i];
       // 游戏已结束，本轮未进行（result 为 null 表示该轮未实际执行）
       if (!m.result && (m.launchAttempts ? m.launchAttempts.length === 0 : true)) {
         h += '<div style="margin-bottom:3px;padding:6px 10px;color:var(--text-dim);font-size:13px;font-style:italic">';
@@ -4298,10 +4526,22 @@ function showGameDetail(idx) {
         }
         h += '</div>';
       }
-    }
   }
-  if (hasAssassin && assassinCutoff < totalRounds - 1) {
-    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (totalRounds - assassinCutoff - 1) + '轮未进行，游戏在' + (rec.assassinFromMission ? '拍刀' : '刺杀') + '环节终止）</div>';
+  // 反方拍刀后的剩余轮次提示
+  if (isGameAssassin && assassinCutoff !== null && assassinCutoff + 1 < rec.missions.length) {
+    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (rec.missions.length - assassinCutoff - 1) + '轮未进行，游戏在反方拍刀后终止）</div>';
+  }
+
+  // 正常流程结束后的刺杀环节（独立于轮次之外）
+  if (isEndGameAssassin) {
+    h += '<h3 style="margin-top:10px">刺杀环节</h3>';
+    h += '<div style="padding:10px 14px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)">';
+    h += '<strong>目标：</strong>' + rec.assassinTarget + ' | ';
+    if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+      h += '<strong>时机：</strong>第' + (rec.assassinAfterRound + 1) + '轮任务后 | ';
+    }
+    h += '<strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中梅林，反方胜</span>' : '<span style="color:#99ff99">未命中，好人方胜</span>');
+    h += '</div>';
   }
 
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
