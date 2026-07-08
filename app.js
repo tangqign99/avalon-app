@@ -4417,10 +4417,8 @@ function showGameDetail(idx) {
       continue;
     }
     var m = rec.missions[i];
-      // 游戏已结束，本轮未进行（result 为 null 表示该轮未实际执行）
+      // 游戏已结束，本轮未实际执行（result 为 null 且无组队尝试）→ 静默跳过
       if (!m.result && (m.launchAttempts ? m.launchAttempts.length === 0 : true)) {
-        h += '<div style="margin-bottom:3px;padding:6px 10px;color:var(--text-dim);font-size:13px;font-style:italic">';
-        h += '<span style="font-weight:700">第' + (i + 1) + '轮：</span>游戏已结束，本轮未进行</div>';
         continue;
       }
       // Show launch attempts (including failures) before the final mission result
@@ -4580,7 +4578,7 @@ function showGameDetail(idx) {
 
   if (rec.roundTendencies && rec.roundTendencies.length > 0) {
     h += '<h3 style="margin-top:10px">倾向值变化</h3>';
-    h += '<table style="font-size:12px;width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid var(--border)"><th style="padding:4px 6px;text-align:left">玩家</th>';
+    h += '<table style="font-size:11px;width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid var(--border)"><th style="padding:2px 4px;text-align:left;white-space:nowrap">玩家</th>';
     for (var r = 0; r < rec.roundTendencies.length; r++) {
       var entry = rec.roundTendencies[r];
       var label;
@@ -4588,20 +4586,20 @@ function showGameDetail(idx) {
         // 新格式：{ v: snap, r: round, a: attempt }
         var roundNum = (entry.r || 0) + 1;
         if (entry.a > 0) {
-          label = '第' + roundNum + '轮（第' + entry.a + '车队）';
+          label = 'R' + roundNum + '(' + entry.a + ')';
         } else {
-          label = '第' + roundNum + '轮';
+          label = 'R' + roundNum;
         }
       } else {
         // 旧格式兼容
-        label = '第' + (r + 1) + '轮';
+        label = 'R' + (r + 1);
       }
-      h += '<th style="padding:4px 6px;text-align:center">' + label + '</th>';
+      h += '<th style="padding:2px 4px;text-align:center;white-space:nowrap">' + label + '</th>';
     }
     h += '</tr>';
     for (var i = 0; i < rec.identities.length; i++) {
       var id = rec.identities[i];
-      h += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 6px;font-weight:600">' + (id.index + 1) + '号 ' + id.name + '</td>';
+      h += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:2px 4px;font-weight:600;white-space:nowrap">' + (id.index + 1) + '号 ' + id.name + '</td>';
       for (var r = 0; r < rec.roundTendencies.length; r++) {
         var entry = rec.roundTendencies[r];
         var val;
@@ -4612,9 +4610,9 @@ function showGameDetail(idx) {
         }
         if (val !== undefined) {
           var color = val >= 50 ? 'var(--green-bright)' : 'var(--red-bright)';
-          h += '<td style="padding:4px 6px;text-align:center;color:' + color + ';font-weight:700">' + val + '</td>';
+          h += '<td style="padding:2px 4px;text-align:center;color:' + color + ';font-weight:700;white-space:nowrap">' + val + '</td>';
         } else {
-          h += '<td style="padding:4px 6px;text-align:center;color:var(--text-dim)">-</td>';
+          h += '<td style="padding:2px 4px;text-align:center;color:var(--text-dim)">-</td>';
         }
       }
       h += '</tr>';
