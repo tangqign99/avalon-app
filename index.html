@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v132"></script>
+<script defer src="./app.js?v=v133"></script>
 </head>
 <body>
 
@@ -77,6 +77,14 @@
       任务轮次：<span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
     </p>
     <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游戏</button>
+  </div>
+  <div class="card" style="text-align:center">
+    <h2>玩家姓名管理</h2>
+    <div class="add-name-row" style="margin-bottom:8px">
+      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
+      <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">新增玩家</button>
+    </div>
+    <button class="btn" onclick="showNamePoolModal()">管理所有姓名</button>
   </div>
 </section>
 
@@ -258,13 +266,6 @@
     <div class="btn-row" id="player-stat-btns"></div>
     <div id="player-stat-detail"></div>
   </div>
-  <div class="card" style="text-align:center">
-    <div class="add-name-row" style="margin-bottom:8px">
-      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
-      <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">新增玩家</button>
-    </div>
-    <button class="btn" onclick="showNamePoolModal()">玩家姓名管理</button>
-  </div>
 
 
 </section>
@@ -286,7 +287,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v130';
+  var SW_VERSION = 'v131';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);

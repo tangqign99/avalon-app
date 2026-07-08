@@ -77,6 +77,7 @@ var state = {
   timerSeconds: 300,
   timerInterval: null,
   timerRemaining: 0,
+  _undoStack: [],
   lancelotFlipped: false,
   lancelotDeck: null,
   lancelotDrawResults: [],
@@ -842,6 +843,7 @@ function doStartGame() {
   state.ladyLakeChecks = [];
   state.ladyCheckHistory = [];
   state.ladyLakeHolder = -1;
+  state._undoStack = [];
   state._ladyCheckTriggeredThisRound = false;
   _swapSeatFirst = null;
   state.roundTendencies = [];
@@ -938,6 +940,7 @@ function renderGame() {
   renderTimerDisplay();
   renderReviewEntry();
   renderAssassinButton();
+  renderUndoButton();
   $('launch-fail-area').innerHTML = '';
  ;
 }
@@ -962,6 +965,70 @@ function renderAssassinButton() {
     var gamePage = document.getElementById('page-game');
     if (gamePage) gamePage.appendChild(btn);
   }
+}
+
+/* ==================== UNDO SYSTEM ==================== */
+
+// Replacer for JSON serialization: exclude timer interval references (non-serializable)
+function _undoReplacer(key, val) {
+  if (key === '_assassinTimerInterval' || key === 'timerInterval' ||
+      key === '_assassinTimerRemaining' || key === '_assassinTimerEnd') return undefined;
+  return val;
+}
+
+function saveUndo() {
+  var snap = JSON.parse(JSON.stringify(state, _undoReplacer));
+  state._undoStack.push(snap);
+  if (state._undoStack.length > 60) state._undoStack.shift();
+  renderUndoButton();
+}
+
+function performUndo() {
+  if (state._undoStack.length === 0) { toast('没有可撤销的操作', 'warn'); return; }
+  if (state.winner) { toast('游戏已结束，无法撤销', 'warn'); return; }
+  var snap = state._undoStack.pop();
+  // Deep restore: copy each key from snapshot
+  var keys = Object.keys(snap);
+  for (var i = 0; i < keys.length; i++) {
+    state[keys[i]] = snap[keys[i]];
+  }
+  // Fix non-serializable fields
+  state._assassinTimerInterval = null;
+  state._assassinTimerEnd = 0;
+  state.timerInterval = null;
+  state.assassinMode = false;
+  state._assassinPickTarget = null;
+  // Exit any assassin overlay
+  var ao = document.getElementById('assassin-overlay');
+  if (ao) ao.remove();
+  stopTimer();
+  renderGame();
+  renderUndoButton();
+  renderTimerDisplay();
+  toast('已撤销', 'info');
+}
+
+function renderUndoButton() {
+  var existing = document.getElementById('undo-float-btn');
+  if (state.winner) {
+    if (existing) existing.style.display = 'none';
+    return;
+  }
+  if (!existing) {
+    var btn = document.createElement('button');
+    btn.id = 'undo-float-btn';
+    btn.className = 'undo-float-btn';
+    btn.innerHTML = '&#8630;';
+    btn.title = '撤销上一步操作';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      performUndo();
+    });
+    var gamePage = document.getElementById('page-game');
+    if (gamePage) gamePage.appendChild(btn);
+  }
+  var btn2 = document.getElementById('undo-float-btn');
+  if (btn2) btn2.style.display = state._undoStack.length > 0 ? '' : 'none';
 }
 
 function enterAssassinMode() {
@@ -1010,6 +1077,7 @@ function pickAssassinTarget(idx) {
 }
 
 function confirmAssassinAction() {
+  saveUndo();
   stopAssassinTimer();
   if (state._assassinPickTarget === null) return;
   var targetIdx = state._assassinPickTarget;
@@ -1755,6 +1823,7 @@ function doLadyCheck(targetIdx) {
 }
 
 function recordLadyCheck(targetIdx, result) {
+  saveUndo();
   closeModal();
   var holderIdx = state.ladyLakeHolder;
   var holderLabel = playerLabel(holderIdx);
@@ -2156,6 +2225,7 @@ function skipExcaliburHolder() {
 }
 
 function setExcaliburHolder(round, holderIdx) {
+  saveUndo();
   var rec = ensureExcaliburRecord(round);
   rec.holder = holderIdx;
   rec.used = null;
@@ -2189,6 +2259,7 @@ function showExcaliburTargetModal(round) {
 }
 
 function onExcaliburTargetPicked(round, targetIdx) {
+  saveUndo();
   var rec = getExcaliburRecord(round);
   if (!rec) { closeModal(); confirmTeam(); return; }
   rec.target = targetIdx;
@@ -2201,6 +2272,7 @@ function onExcaliburTargetPicked(round, targetIdx) {
 }
 
 function closeExcaliburTargetModal(round) {
+  saveUndo();
   var rec = getExcaliburRecord(round);
   if (rec) { rec.used = false; rec.feedbackRecorded = true; rec.target = null; }
   closeModal();
@@ -2209,6 +2281,7 @@ function closeExcaliburTargetModal(round) {
 }
 
 function setExcaliburUsed(round, used) {
+  saveUndo();
   var rec = ensureExcaliburRecord(round);
   if (rec.holder < 0) { toast('请先指定王者之剑持剑者', 'warn'); return; }
   rec.used = !!used;
@@ -2714,6 +2787,7 @@ function toggleReviewCard(header) {
 
 /* ==================== GAME ACTIONS ==================== */
 function selectLeader(idx) {
+  saveUndo();
   var m = state.missions[state.currentRound];
   m.leader = idx;
   m.team = [];
@@ -2744,6 +2818,7 @@ function randomFirstLeader() {
 }
 
 function reSelectLeader() {
+  saveUndo();
   var m = state.missions[state.currentRound];
   m.leader = null;
   m.team = [];
@@ -2753,6 +2828,7 @@ function reSelectLeader() {
 }
 
 function toggleTeamMember(idx) {
+  saveUndo();
   var m = state.missions[state.currentRound];
   var pos = m.team.indexOf(idx);
   if (pos !== -1) m.team.splice(pos, 1);
@@ -2761,6 +2837,7 @@ function toggleTeamMember(idx) {
 }
 
 function confirmTeam() {
+  saveUndo();
   var m = state.missions[state.currentRound];
   console.log('[debug-confirmTeam] round=' + state.currentRound + ' teamLen=' + m.team.length + ' size=' + m.size + ' excalEnabled=' + state.excaliburEnabled + ' teamPending=' + state._teamConfirmedPending + ' timerMode=' + state.timerMode);
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
@@ -2860,12 +2937,14 @@ function transitionToVotes() {
 }
 
 function castVote(idx, type) {
+  saveUndo();
   var m = state.missions[state.currentRound];
   m.votes[idx] = type;
   renderStepPanel();
 }
 
 function allApprove() {
+  saveUndo();
   var m = state.missions[state.currentRound];
   for (var i = 0; i < state.playerCount; i++) {
     m.votes[i] = 'approve';
@@ -2874,6 +2953,7 @@ function allApprove() {
 }
 
 function allReject() {
+  saveUndo();
   var m = state.missions[state.currentRound];
   for (var i = 0; i < state.playerCount; i++) {
     m.votes[i] = 'reject';
@@ -2882,6 +2962,7 @@ function allReject() {
 }
 
 function confirmVotes() {
+  saveUndo();
   var m = state.missions[state.currentRound];
   var pc = state.playerCount;
 
@@ -2994,6 +3075,7 @@ function renderStepPanelWithResult() {
 }
 
 function setMissionResult(result) {
+  saveUndo();
   var m = state.missions[state.currentRound];
   m.result = result;
   if (result === 'fail') {
@@ -3018,6 +3100,7 @@ function showFailCountSelector() {
 }
 
 function setFailCount(n) {
+  saveUndo();
   var m = state.missions[state.currentRound];
   m.failCount = n;
   var btns = document.querySelectorAll('#fail-count-btns .fail-count-btn');
@@ -3027,6 +3110,7 @@ function setFailCount(n) {
 }
 
 function finalizeMission() {
+  saveUndo();
   var m = state.missions[state.currentRound];
   if (!m.result) { toast('请选择任务结果', 'warn'); return; }
   if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
