@@ -77,6 +77,7 @@ var state = {
   timerSeconds: 300,
   timerInterval: null,
   timerRemaining: 0,
+  _timerEnd: 0,
   _undoStack: [],
   lancelotFlipped: false,
   lancelotDeck: null,
@@ -972,7 +973,8 @@ function renderAssassinButton() {
 // Replacer for JSON serialization: exclude timer interval references (non-serializable)
 function _undoReplacer(key, val) {
   if (key === '_assassinTimerInterval' || key === 'timerInterval' ||
-      key === '_assassinTimerRemaining' || key === '_assassinTimerEnd') return undefined;
+      key === '_assassinTimerRemaining' || key === '_assassinTimerEnd' ||
+      key === '_undoStack' || key === '_timerEnd') return undefined;
   return val;
 }
 
@@ -995,6 +997,7 @@ function performUndo() {
   // Fix non-serializable fields
   state._assassinTimerInterval = null;
   state._assassinTimerEnd = 0;
+  state._timerEnd = 0;
   state.timerInterval = null;
   state.assassinMode = false;
   state._assassinPickTarget = null;
@@ -1018,7 +1021,7 @@ function renderUndoButton() {
     var btn = document.createElement('button');
     btn.id = 'undo-float-btn';
     btn.className = 'undo-float-btn';
-    btn.innerHTML = '&#8630;';
+    btn.textContent = '撤销';
     btn.title = '撤销上一步操作';
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -2490,6 +2493,7 @@ function startTimer() {
   if (state._modalPausedTimer) return;
   stopTimer();
   if (state.timerMode === 'off') return;
+  state._timerEnd = Date.now() + state.timerSeconds * 1000; // wall-clock end time
   state.timerRemaining = state.timerSeconds;
   if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
     var btnRow = document.getElementById('timer-btns');
@@ -2500,9 +2504,10 @@ function startTimer() {
     if (btnRowAll) btnRowAll.hidden = false;
   }
   state.timerInterval = setInterval(function() {
-    state.timerRemaining--;
+    var remaining = Math.max(0, Math.ceil((state._timerEnd - Date.now()) / 1000));
+    state.timerRemaining = remaining;
     renderTimerDisplay();
-    if (state.timerRemaining <= 0) {
+    if (remaining <= 0) {
       stopTimer();
       playBeepSound();
       toast('计时结束！', 'warn');
@@ -2512,7 +2517,7 @@ function startTimer() {
         setTimeout(function() { transitionToVotes(); }, 800);
       }
     }
-  }, 1000);
+  }, 250);
   renderTimerDisplay();
 }
 
@@ -2521,6 +2526,7 @@ function stopTimer() {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
+  state._timerEnd = 0;
   var el = $('timer-display');
   if (el) el.style.display = 'none';
   var btnRow = document.getElementById('timer-btns');
