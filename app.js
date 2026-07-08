@@ -3767,6 +3767,7 @@ function renderStats() {
       h += '<div class="hci-missions">任务：';
       for (var j = 0; j < rec.missions.length; j++) {
         var m = rec.missions[j];
+        if (!m.result) continue;
         h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
         h += 'R' + (j + 1) + (m.result === 'success' ? '✓' : '✕') + '</span> ';
       }
@@ -3845,7 +3846,9 @@ function renderStats() {
       });
     }
   }
-  var names = Object.keys(playerSet).sort();
+  var names = Object.keys(playerSet).sort(function(a, b) {
+    return playerSet[b].length - playerSet[a].length;
+  });
   // Populate filter-player dropdown
   var fpSel = document.getElementById('filter-player');
   if (fpSel) {
@@ -4437,7 +4440,7 @@ function showGameDetail(idx) {
           var bg = isSucceeded ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
           var borderColor = isSucceeded ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
           var labelColor = isSucceeded ? 'var(--green-bright)' : 'var(--red-bright)';
-          h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);font-size:13px">';
+          h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);font-size:14px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
           h += '| 队长 ' + evilSpan(nameByIndex[att.leader] || att.leader) + ' | 队伍 ' + att.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
@@ -4453,7 +4456,7 @@ function showGameDetail(idx) {
           if (approveNames.length || rejectNames.length) {
             var totalVotes = approveNames.length + rejectNames.length;
             var allApprove = (rejectNames.length === 0);
-            h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
+            h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:13px">';
             if (allApprove) {
               h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + totalVotes + '人)</span></div>';
             } else {
@@ -4483,14 +4486,14 @@ function showGameDetail(idx) {
           }
         }
         for (var f = 0; f < lf; f++) {
-          h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:13px">';
+          h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:14px">';
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
           h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
           h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
           if (m.votes && (lgc + lbc > 0)) {
             var ltotal = lgc + lbc;
             var lall = (lbc === 0);
-            h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
+            h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:13px">';
             if (lall) {
               h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
             } else {
@@ -4504,7 +4507,7 @@ function showGameDetail(idx) {
         var bg2 = isSuccess ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
         var border2 = isSuccess ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
         var color2 = isSuccess ? 'var(--green-bright)' : 'var(--red-bright)';
-        h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:13px">';
+        h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:14px">';
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
         h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '')) + '</span>';
         h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
@@ -4513,7 +4516,7 @@ function showGameDetail(idx) {
           h += ' | 投票 ' + lgc + ':' + lbc;
           var ltotal = lgc + lbc;
           var lall = (lbc === 0);
-          h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:12px">';
+          h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:13px">';
           if (lall) {
             h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
           } else {
@@ -4527,7 +4530,7 @@ function showGameDetail(idx) {
   }
   // 反方拍刀后的剩余轮次提示
   if (isGameAssassin && assassinCutoff !== null && assassinCutoff + 1 < rec.missions.length) {
-    h += '<div style="color:var(--text-dim);font-size:13px;margin-top:4px">（后续' + (rec.missions.length - assassinCutoff - 1) + '轮未进行，游戏在反方拍刀后终止）</div>';
+    h += '<div style="color:var(--text-dim);font-size:14px;margin-top:4px">（后续' + (rec.missions.length - assassinCutoff - 1) + '轮未进行，游戏在反方拍刀后终止）</div>';
   }
 
   // 正常流程结束后的刺杀环节（独立于轮次之外）
