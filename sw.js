@@ -1,11 +1,11 @@
-/* ==================== Service Worker v136 ==================== */
+/* ==================== Service Worker v137 ==================== */
 // SW strategy: stale-while-revalidate
-var CACHE_NAME = 'avalon-pwa-v136';
+var CACHE_NAME = 'avalon-pwa-v137';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v136',
-  './app.js?v=v136',
+  './style.css?v=v137',
+  './app.js?v=v137',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
@@ -20,7 +20,7 @@ self.addEventListener('install', function(e) {
       }));
     })
   );
-  self.skipWaiting();
+  // 不在此处 skipWaiting，等用户点击横幅后由 postMessage 触发
 });
 
 self.addEventListener('activate', function(e) {
