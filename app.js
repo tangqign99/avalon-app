@@ -4623,11 +4623,23 @@ function showGameDetail(idx) {
     h += '</table>';
   }
 
+  // v7 算法客观分析
+  _v7DetailRec = rec;
+  h += '<h3 style="margin-top:10px">v7算法分析</h3>';
+  h += '<p style="font-size:11px;color:var(--text-dim);margin-bottom:4px">选择玩家视角，v7评分引擎基于该玩家在游戏过程中可获得的信息进行客观评分（仅知自身身份）</p>';
+  h += '<select id="v7-detail-persp" onchange="refreshV7DetailAnalysis()" style="margin-bottom:6px;font-size:12px;padding:2px 6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px">';
+  for (var i = 0; i < rec.identities.length; i++) {
+    h += '<option value="' + i + '">' + (i + 1) + '号 ' + rec.identities[i].name + '（' + rec.identities[i].role + '）</option>';
+  }
+  h += '</select>';
+  h += '<div id="v7-detail-table"></div>';
+
   h += '<div class="modal-actions">';
   h += '<button class="btn" onclick="showEditGameRecord(' + idx + ')">编辑</button>';
   h += '<button class="btn" onclick="closeModal()">关闭</button>';
   h += '</div>';
   showModal(h);
+  setTimeout(function() { refreshV7DetailAnalysis(); }, 150);
 }
 
 function showEditGameRecord(idx) {
@@ -5884,6 +5896,183 @@ function computeSuspectScores() {
   return cloneTendScoreList(list);
 }
 
+/* ------- v7 Historical Record Analysis ------- */
+var _v7DetailRec = null;
+
+function computeRecordSuspectScores(rec, perspIdx) {
+  var pc = rec.playerCount;
+  if (perspIdx < 0 || perspIdx >= pc) return null;
+  if (!rec.missions || rec.missions.length === 0) return null;
+
+  // Build name-to-index lookup
+  var nameToIdx = {};
+  for (var i = 0; i < rec.identities.length; i++) {
+    var id = rec.identities[i];
+    nameToIdx[id.name] = id.index;
+    nameToIdx[(id.index + 1) + '号'] = id.index;
+  }
+
+  function labelToIdx(label) {
+    if (typeof label === 'number') return label;
+    if (nameToIdx[label] !== undefined) return nameToIdx[label];
+    var m = String(label).match(/^(\d+)号$/);
+    return m ? parseInt(m[1]) - 1 : -1;
+  }
+
+  function convertVotes(nameVotes) {
+    var idxVotes = {};
+    for (var key in nameVotes) {
+      if (nameVotes.hasOwnProperty(key)) {
+        var idx = labelToIdx(key);
+        if (idx >= 0 && idx < pc) idxVotes[idx] = nameVotes[key];
+      }
+    }
+    return idxVotes;
+  }
+
+  var savedState = window.state;
+
+  var tmpState = {
+    playerCount: pc,
+    selfIndex: perspIdx,
+    myRole: rec.identities[perspIdx].role,
+    playerNames: rec.identities.map(function(id) { return id.name; }),
+    knownIdentities: {},
+    ladyLakeChecks: (rec.ladyCheckHistory || []).map(function(h) {
+      return { holder: h.holder, target: h.target, result: h.result };
+    }),
+    excaliburHistory: (rec.excaliburHistory || []).map(function(e) {
+      return {
+        round: e.round, leader: e.leader, holder: e.holder,
+        used: e.used, target: e.target, feedbackRecorded: e.feedbackRecorded,
+        claimedDirection: e.claimedDirection || ''
+      };
+    }),
+    missions: (rec.missions || []).map(function(m) {
+      return {
+        round: m.round, size: m.size,
+        leader: labelToIdx(m.leader),
+        team: (m.team || []).map(function(t) { return labelToIdx(t); }),
+        result: m.result, failCount: m.failCount || 0,
+        launchFailures: m.launchFailures || 0,
+        votes: convertVotes(m.votes || {}),
+        launchAttempts: (m.launchAttempts || []).map(function(att) {
+          return {
+            team: (att.team || []).map(function(t) { return labelToIdx(t); }),
+            votes: convertVotes(att.votes || {}),
+            leader: labelToIdx(att.leader)
+          };
+        })
+      };
+    }),
+    lancelotFlipped: false,
+    lancelotFlipCount: 0
+  };
+
+  // Only the perspective player knows their own role
+  tmpState.knownIdentities[perspIdx] = rec.identities[perspIdx].role;
+
+  // Handle Lancelot flip for perspective player
+  var perspRole = rec.identities[perspIdx].role;
+  if (perspRole.indexOf('兰斯洛特') >= 0 && rec.lancelotFlips) {
+    var name = rec.identities[perspIdx].name;
+    tmpState.lancelotFlipCount = rec.lancelotFlips[name] || 0;
+    tmpState.lancelotFlipped = tmpState.lancelotFlipCount % 2 === 1;
+  }
+
+  // Clear cache so we get fresh computation
+  _tendScoreCacheKey = '';
+  _tendScoreCacheValue = null;
+
+  window.state = tmpState;
+  try {
+    return computeSuspectScores();
+  } finally {
+    window.state = savedState;
+  }
+}
+
+function refreshV7DetailAnalysis() {
+  if (!_v7DetailRec) return;
+  var selEl = document.getElementById('v7-detail-persp');
+  if (!selEl) return;
+  var sel = parseInt(selEl.value);
+  var scores = computeRecordSuspectScores(_v7DetailRec, sel);
+  var t = document.getElementById('v7-detail-table');
+  if (!t) return;
+
+  if (!scores || scores.length === 0) {
+    t.innerHTML = '<p style="color:var(--text-dim);font-size:11px;padding:8px">该视角下暂无足够数据进行分析</p>';
+    return;
+  }
+
+  var perspRole = _v7DetailRec.identities[sel].role;
+  var isGoodPersp = (perspRole.indexOf('梅林') >= 0 || perspRole === '派西维尔' || perspRole === '忠臣' || perspRole === '兰斯洛特(蓝)');
+
+  var quality = scores._dataQuality || 'unknown';
+  var totalRounds = scores._totalRounds || 0;
+  var qualityNote = '';
+  if (quality === 'low') qualityNote = ' <span style="font-size:10px;color:#ff9800">（数据不足，谨慎参考）</span>';
+  else if (quality === 'medium') qualityNote = ' <span style="font-size:10px;color:#ffc107">（中等置信度）</span>';
+  else if (quality === 'high') qualityNote = ' <span style="font-size:10px;color:#4caf50">（高置信度）</span>';
+
+  var h = '<p style="font-size:10px;color:var(--text-dim);margin-bottom:4px">';
+  if (isGoodPersp) {
+    h += '好人视角 · 分数越高 = 反方嫌疑越大' + qualityNote;
+  } else {
+    h += '反方视角 · 分数越高 = 梅林概率越大' + qualityNote;
+  }
+  h += '</p>';
+
+  h += '<table style="font-size:11px;width:100%;border-collapse:collapse">';
+  h += '<tr style="border-bottom:1px solid var(--border)"><th style="padding:2px 4px;text-align:left">玩家</th><th style="padding:2px 4px;text-align:center;width:60px">v7评分</th><th style="padding:2px 4px;text-align:left">证据链</th></tr>';
+  for (var i = 0; i < scores.length; i++) {
+    var item = scores[i];
+    var realRole = _v7DetailRec.identities[item.idx].role;
+    var isGoodReal = (realRole.indexOf('梅林') >= 0 || realRole === '派西维尔' || realRole === '忠臣' || realRole === '兰斯洛特(蓝)');
+    var isEvilReal = (realRole === '莫甘娜' || realRole === '刺客' || realRole === '莫德雷德' || realRole === '奥伯伦' || realRole === '爪牙' || realRole === '兰斯洛特(红)');
+
+    var isAccurate = false;
+    if (isGoodPersp) {
+      isAccurate = (isGoodReal && item.score < 50) || (isEvilReal && item.score >= 50);
+    } else {
+      isAccurate = (realRole === '梅林' && item.score >= 50) || (realRole !== '梅林' && item.score < 50);
+    }
+    var badge = isAccurate ? '<span style="color:#4caf50" title="判断正确">✓</span>' : '<span style="color:#f44336" title="判断偏差">✗</span>';
+
+    var scoreColor = item.score >= 65 ? 'var(--red-bright)' : item.score < 40 ? 'var(--green-bright)' : 'var(--gold-light)';
+    var isSelf = item.idx === sel;
+    var selfTag = isSelf ? ' <span style="font-size:9px;color:var(--gold-light)">☆</span>' : '';
+
+    var evidenceHtml = item.evidence.length > 0 ? item.evidence.map(function(ev) { return escapeHtml(ev); }).join('<br>') : '<span style="color:var(--text-dim)">（无证据，默认中性）</span>';
+
+    h += '<tr style="border-bottom:1px solid var(--border)">';
+    h += '<td style="padding:2px 4px;font-weight:600;white-space:nowrap">' + (item.idx + 1) + '号 ' + _v7DetailRec.identities[item.idx].name + selfTag + ' ' + badge + ' <span style="font-size:10px;color:var(--text-dim)">(' + realRole + ')</span></td>';
+    h += '<td style="padding:2px 4px;text-align:center;font-weight:700;color:' + scoreColor + '">' + item.score + '</td>';
+    h += '<td style="padding:2px 4px;font-size:10px;color:var(--text-dim)">' + evidenceHtml + '</td>';
+    h += '</tr>';
+  }
+  h += '</table>';
+
+  var accCount = 0;
+  for (var i = 0; i < scores.length; i++) {
+    var item = scores[i];
+    if (item.idx === sel) continue;
+    var rRole = _v7DetailRec.identities[item.idx].role;
+    var rGood = (rRole.indexOf('梅林') >= 0 || rRole === '派西维尔' || rRole === '忠臣' || rRole === '兰斯洛特(蓝)');
+    var rEvil = (rRole === '莫甘娜' || rRole === '刺客' || rRole === '莫德雷德' || rRole === '奥伯伦' || rRole === '爪牙' || rRole === '兰斯洛特(红)');
+    if (isGoodPersp) {
+      if ((rGood && item.score < 50) || (rEvil && item.score >= 50)) accCount++;
+    } else {
+      if ((rRole === '梅林' && item.score >= 50) || (rRole !== '梅林' && item.score < 50)) accCount++;
+    }
+  }
+  var totalJudged = pc - 1;
+  var accPct = totalJudged > 0 ? Math.round(accCount / totalJudged * 100) : 0;
+  h += '<p style="font-size:10px;color:var(--text-dim);margin-top:4px">准确率：' + accCount + '/' + totalJudged + '（' + accPct + '%）</p>';
+
+  t.innerHTML = h;
+}
 
 /* ------- v7 Engine Info Panel (v102: 9-step visualizer) ------- */
 function renderV7EngineInfo() {
