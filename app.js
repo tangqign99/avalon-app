@@ -1005,6 +1005,11 @@ function performUndo() {
   var ao = document.getElementById('assassin-overlay');
   if (ao) ao.remove();
   stopTimer();
+  // 取消 AudioContext 中已调度的所有音频（撤销计时时播放的提示音等）
+  if (window._audioCtx) {
+    try { window._audioCtx.close(); } catch(_) {}
+    window._audioCtx = null;
+  }
   renderGame();
   renderUndoButton();
   renderTimerDisplay();
@@ -3299,7 +3304,15 @@ function renderEndIdentityDropdowns() {
     }
 
     h += '<div class="end-player-row">';
-    h += '<span class="ep-name">' + playerLabel(i) + '</span>';
+    // 临时玩家（"玩家N"）显示为可编辑行内输入框，而非静态文本
+    var isTemp = /^玩家\d+$/.test(state.playerNames[i]);
+    if (isTemp) {
+      h += '<input type="text" id="end-name-' + i + '" value="' + escapeHtml(state.playerNames[i]) + '"';
+      h += ' style="width:60px;padding:3px 5px;border-radius:4px;border:1px dashed var(--border);background:transparent;color:var(--text-dim);font-size:12px;outline:none;text-align:center"';
+      h += ' title="临时玩家，可修改姓名">';
+    } else {
+      h += '<span class="ep-name">' + playerLabel(i) + '</span>';
+    }
     h += '<select id="end-role-' + i + '" onchange="onEndRoleChange(' + i + ')">';
     h += '<option value="">-- 未选 --</option>';
     for (var j = 0; j < state.activeRoles.length; j++) {
@@ -3309,6 +3322,16 @@ function renderEndIdentityDropdowns() {
     }
     h += '</select>';
     h += '<button class="btn small swap-seat-btn" id="end-swap-role-' + i + '" onclick="swapEndRole(' + i + ')" title="互换身份">⇄</button>';
+    // 混子跟随目标行内下拉（仅当角色为混子且未选择目标时显示）
+    if (curVal === '混子' && state._huntFollowTarget === undefined) {
+      h += '<select id="end-hunt-target" style="font-size:11px;padding:3px 4px;border-radius:4px;border:1px solid var(--gold-light);background:var(--bg-card);color:var(--gold-light);cursor:pointer;margin-left:4px;min-height:30px">';
+      h += '<option value="">混谁？</option>';
+      for (var hi = 0; hi < state.playerCount; hi++) {
+        if (hi === i) continue;
+        h += '<option value="' + hi + '">' + playerLabel(hi) + '</option>';
+      }
+      h += '</select>';
+    }
     h += '</div>';
   }
   grid.innerHTML = h;
@@ -3389,7 +3412,6 @@ function renderEnd() {
   $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
 
   renderEndIdentityDropdowns();
-  renderEndTempPlayerRenames();
   // 强制结束按钮：始终隐藏（v104：单机模式下不需要）
   var forceEndCard = $('end-force-end-card');
   if (forceEndCard) {
@@ -3463,7 +3485,7 @@ function saveTempPlayerRenames() {
 function onEndRoleChange(idx) {
   var sel = document.getElementById('end-role-' + idx);
   var role = sel ? sel.value : '';
-  if (role && UNIQUE_ROLES.indexOf(role) !== -1) {
+  if (role && (UNIQUE_ROLES.indexOf(role) !== -1 || role === '混子')) {
     renderEndIdentityDropdowns();
   }
 }
@@ -3647,6 +3669,22 @@ function setWinner(w) {
 function saveGameRecord() {
   if (!state.winner) { toast('请确定获胜方', 'warn'); return; }
 
+  // 保存行内修改的临时玩家名称
+  for (var i = 0; i < state.playerCount; i++) {
+    var nameInput = document.getElementById('end-name-' + i);
+    if (!nameInput) continue;
+    var newName = nameInput.value.trim();
+    if (!newName || newName === state.playerNames[i]) continue;
+    var dupName = false;
+    for (var k = 0; k < state.playerCount; k++) {
+      if (k !== i && state.playerNames[k] === newName) { dupName = true; break; }
+    }
+    if (dupName) { toast('名字「' + newName + '」已被其他玩家使用', 'warn'); return; }
+    state.playerNames[i] = newName;
+    if (namePool.indexOf(newName) === -1) namePool.push(newName);
+  }
+  saveNamePool();
+
   var identities = [];
   var allFilled = true;
   for (var i = 0; i < state.playerCount; i++) {
@@ -3657,14 +3695,10 @@ function saveGameRecord() {
   }
   if (!allFilled) { toast('请为所有玩家选择身份', 'warn'); return; }
 
-  // 混子：检查是否需要选择跟随目标
-  var huntIndex = -1;
-  for (var i = 0; i < identities.length; i++) {
-    if (identities[i].role === '混子') { huntIndex = i; break; }
-  }
-  if (huntIndex >= 0 && state._huntFollowTarget === undefined) {
-    showHuntFollowModal(huntIndex, identities);
-    return;
+  // 混子：从行内下拉读取跟随目标
+  var huntTargetSel = document.getElementById('end-hunt-target');
+  if (huntTargetSel && huntTargetSel.value !== '') {
+    state._huntFollowTarget = parseInt(huntTargetSel.value, 10);
   }
 
   var lancelotFlips = {};
