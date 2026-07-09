@@ -2,7 +2,7 @@
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
 var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
-var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)'];
+var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
 var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
 var NEUTRAL_ROLES = ['混子'];
@@ -999,6 +999,8 @@ function performUndo() {
   state._assassinTimerEnd = 0;
   state._timerEnd = 0;
   state.timerInterval = null;
+  state.timerRemaining = 0;
+  state.timerMode = 'off';
   state.assassinMode = false;
   state._assassinPickTarget = null;
   // Exit any assassin overlay
@@ -4041,15 +4043,17 @@ function renderStats() {
     }
     fpSel.innerHTML = fpOpts;
   }
-  // Player stats section - dropdown instead of buttons
-  h = '<select id="player-stat-select" onchange="togglePlayerStat(this.value)" style="width:100%;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;cursor:pointer;min-height:44px;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%2710%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M6 8L1 3h10z%27 fill=%27%23c9a84c%27/%3E%3C/svg%3E\');background-repeat:no-repeat;background-position:right 12px center;padding-right:32px">';
+  // Player stats section - larger dropdown, separated from profile
+  h = '<select id="player-stat-select" onchange="togglePlayerStat(this.value)" style="width:100%;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:16px;cursor:pointer;min-height:48px;font-weight:600;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M6 8L1 3h10z%27 fill=%27%23c9a84c%27/%3E%3C/svg%3E\');background-repeat:no-repeat;background-position:right 12px center;padding-right:36px">';
   h += '<option value="">-- 选择玩家查看统计 --</option>';
   for (var i = 0; i < names.length; i++) {
     h += '<option value="' + names[i] + '">' + names[i] + '</option>';
   }
   h += '</select>';
-  h += '<button class="btn" style="width:100%;margin-top:8px" onclick="showPlayerProfilePopup()">&#128100; 个人主页</button>';
   $('player-stat-btns').innerHTML = h;
+  // 个人主页放在下方独立区域
+  var profileBtn = '<button class="btn" style="width:100%;margin-top:12px;padding:10px;font-size:15px;font-weight:600" onclick="showPlayerProfilePopup()">&#128100; 个人主页</button>';
+  $('player-profile-row').innerHTML = profileBtn;
   state._playerSetCache = playerSet;
 
   // 今日胜率排行榜：第一天19:00到次日18:59:59为一天
@@ -4302,18 +4306,23 @@ function togglePlayerStat(name) {
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
 
-  var h = '<strong>总场次：</strong>' + total + ' 局<br>';
-  h += '<strong>总胜场：</strong>' + totalWins + ' 场 <span style="color:var(--gold-light)">(' + totalRate + '%)</span><br>';
-  h += '<strong>好人方胜率：</strong>' + winsGood + '/' + gamesGood + ' <span style="color:var(--green-bright)">(' + goodRate + '%)</span><br>';
-  h += '<strong>反方胜率：</strong>' + winsEvil + '/' + gamesEvil + ' <span style="color:var(--red-bright)">(' + evilRate + '%)</span><br><br>';
-  h += '<strong>各身份胜率：</strong><table>';
-  for (var j = 0; j < ALL_ROLES.length; j++) {
-    var r = ALL_ROLES[j];
+  var h = '<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+  h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px">' + total + '</div><div class="stat-label" style="font-size:13px">总场次</div></div>';
+  h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--gold-light)">' + totalRate + '%</div><div class="stat-label" style="font-size:13px">总胜率</div></div>';
+  h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--green-bright)">' + goodRate + '%</div><div class="stat-label" style="font-size:13px">好人胜率</div></div>';
+  h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--red-bright)">' + evilRate + '%</div><div class="stat-label" style="font-size:13px">反方胜率</div></div>';
+  h += '</div>';
+  h += '<div style="font-size:14px;color:var(--text-dim);margin-bottom:6px">好人 ' + winsGood + '/' + gamesGood + ' · 反方 ' + winsEvil + '/' + gamesEvil + '</div>';
+  h += '<div style="font-size:15px;font-weight:600;margin-bottom:6px">各身份胜率</div>';
+  h += '<table style="width:100%;font-size:14px">';
+  var roleList = (state.activeRoles && state.activeRoles.length > 0) ? state.activeRoles : ALL_ROLES;
+  for (var j = 0; j < roleList.length; j++) {
+    var r = roleList[j];
     var rs = roleStats[r];
     if (rs) {
-      h += '<tr><td>' + r + '</td><td>' + rs.wins + '/' + rs.total + '</td><td>' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
+      h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + rs.wins + '/' + rs.total + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
     } else {
-      h += '<tr><td>' + r + '</td><td>-</td><td>-</td></tr>';
+      h += '<tr><td style="padding:4px 8px;color:var(--text-dim)">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--text-dim)">-</td><td style="padding:4px 8px;text-align:right;color:var(--text-dim)">-</td></tr>';
     }
   }
   h += '</table>';
