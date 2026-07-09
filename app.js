@@ -1012,6 +1012,9 @@ function performUndo() {
     try { window._audioCtx.close(); } catch(_) {}
     window._audioCtx = null;
   }
+  // 清除计时结束后调度的 speakEnd / transitionToVotes 回调，防止撤销后重启计时
+  clearTimeout(window._undoSpeakEndTimeout);
+  clearTimeout(window._undoTransitionTimeout);
   renderGame();
   renderUndoButton();
   renderTimerDisplay();
@@ -2519,9 +2522,9 @@ function startTimer() {
       playBeepSound();
       toast('计时结束！', 'warn');
       if (state.timerMode === 'per' && state.currentSpeakerIdx < state.speakerOrder.length - 1) {
-        setTimeout(function() { speakEnd(); }, 800);
+        window._undoSpeakEndTimeout = setTimeout(function() { speakEnd(); }, 800);
       } else if (state._teamConfirmedPending) {
-        setTimeout(function() { transitionToVotes(); }, 800);
+        window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 800);
       }
     }
   }, 250);
