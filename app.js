@@ -2568,7 +2568,7 @@ function speakEnd() {
     state.speakerOrder = [];
     toast('所有玩家发言结束');
     if (state._teamConfirmedPending) {
-      setTimeout(function() { transitionToVotes(); }, 800);
+      window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 800);
     }
   }
 }
@@ -2584,7 +2584,7 @@ function endAllSpeak() {
   if (btnRow) btnRow.hidden = true;
   toast('已结束所有玩家发言');
   if (state._teamConfirmedPending) {
-    setTimeout(function() { transitionToVotes(); }, 500);
+    window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 500);
   }
 }
 
