@@ -994,6 +994,8 @@ function performUndo() {
   for (var i = 0; i < keys.length; i++) {
     state[keys[i]] = snap[keys[i]];
   }
+  // 必须在清除 state.timerInterval 之前停止正在运行的计时器，否则 stopTimer 看到 null 会跳过 clearInterval
+  stopTimer();
   // Fix non-serializable fields
   state._assassinTimerInterval = null;
   state._assassinTimerEnd = 0;
@@ -1005,7 +1007,6 @@ function performUndo() {
   // Exit any assassin overlay
   var ao = document.getElementById('assassin-overlay');
   if (ao) ao.remove();
-  stopTimer();
   // 取消 AudioContext 中已调度的所有音频（撤销计时时播放的提示音等）
   if (window._audioCtx) {
     try { window._audioCtx.close(); } catch(_) {}
@@ -2512,11 +2513,13 @@ function startTimer() {
     var btnRowAll = document.getElementById('timer-btns');
     if (btnRowAll) btnRowAll.hidden = false;
   }
+  state._timerEndFired = false;
   state.timerInterval = setInterval(function() {
     var remaining = Math.max(0, Math.ceil((state._timerEnd - Date.now()) / 1000));
     state.timerRemaining = remaining;
     renderTimerDisplay();
-    if (remaining <= 0) {
+    if (remaining <= 0 && !state._timerEndFired) {
+      state._timerEndFired = true;
       stopTimer();
       playBeepSound();
       toast('计时结束！', 'warn');
