@@ -2514,7 +2514,14 @@ function startTimer() {
     if (btnRowAll) btnRowAll.hidden = false;
   }
   state._timerEndFired = false;
+  // Serial guard: increments on each startTimer/stopTimer to invalidate orphan intervals
+  // that may have been created if timerInterval was nulled without clearInterval
+  state._timerSerial = (state._timerSerial || 0) + 1;
+  var mySerial = state._timerSerial;
   state.timerInterval = setInterval(function() {
+    // Bail out immediately if this interval has been superseded (e.g. by stopTimer
+    // incrementing serial to kill orphan intervals from confirmTeam double-click)
+    if (state._timerSerial !== mySerial) return;
     var remaining = Math.max(0, Math.ceil((state._timerEnd - Date.now()) / 1000));
     state.timerRemaining = remaining;
     renderTimerDisplay();
@@ -2528,6 +2535,7 @@ function startTimer() {
       } else if (state._teamConfirmedPending) {
         window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 800);
       }
+      return; // 防止 stopTimer 后代码继续执行
     }
   }, 250);
   renderTimerDisplay();
@@ -2538,6 +2546,10 @@ function stopTimer() {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
+  // Bump serial to invalidate any orphan intervals (created when timerInterval
+  // was nulled without clearInterval, e.g. confirmTeam double-click).
+  // The next tick of an orphan interval will see serial mismatch and bail out.
+  state._timerSerial = (state._timerSerial || 0) + 1;
   state._timerEnd = 0;
   var el = $('timer-display');
   if (el) el.style.display = 'none';
@@ -2878,6 +2890,7 @@ function confirmTeam() {
     }
     state.currentSpeakerIdx = 0;
     state.timerRemaining = state.timerSeconds;
+    stopTimer();
     state.timerInterval = null;
     renderTimerDisplay();
     renderStepPanel();
@@ -2888,6 +2901,7 @@ function confirmTeam() {
     }
   } else if (state.timerMode === 'all') {
     state.timerRemaining = state.timerSeconds;
+    stopTimer();
     state.timerInterval = null;
     state.speakerOrder = [];
     state.currentSpeakerIdx = -1;
