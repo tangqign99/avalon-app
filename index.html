@@ -18,6 +18,7 @@
   <div class="nav-btns">
     <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
     <button id="nav-game" onclick="goToGame()">游戏</button>
+    <button id="nav-tools" onclick="showPage('tools')">工具</button>
     <button id="nav-tend" onclick="showPage('tend')">倾向</button>
     <button id="nav-end" onclick="showPage('end')">结束</button>
     <button id="nav-stats" onclick="showPage('stats')">统计</button>
@@ -111,7 +112,7 @@
     <div class="game-main">
       <div class="card" id="step-container"></div>
       <div class="review-section" id="review-section" style="display:none">
-        <button class="btn" onclick="toggleReview()">复盘</button>
+        <button class="btn" onclick="showReplay()">复盘回放</button>
         <div id="review-panel" style="display:none;margin-top:8px"></div>
       </div>
     </div>
@@ -267,10 +268,36 @@
 
 </section>
 
+<!-- ===== 工具 ===== -->
+<section class="page" id="page-tools">
+  <h2 style="color:var(--gold-light);text-align:center;margin-bottom:8px">工具箱</h2>
+  <div class="card">
+    <h2>录音播放</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">功能开发中，后续将支持上传录音文件并播放。</p>
+    <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">功能开发中</div>
+  </div>
+</section>
+
+<!-- 复盘弹窗（全局） -->
+<div class="modal-overlay" id="replay-modal-overlay" style="display:none" onclick="closeReplayModal(event)">
+  <div class="modal replay-modal" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2>对局复盘回放</h2>
+      <button class="btn small" onclick="closeReplayModal()">关闭</button>
+    </div>
+    <div id="replay-timeline"></div>
+    <div class="replay-chart-container" id="replay-chart-container" style="display:none">
+      <canvas id="replay-chart-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
 </main>
 
 <div class="toast" id="toast"></div>
 
+<!-- 夜间模式切换按钮 -->
+<button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="切换夜间模式">&#9790;</button>
 
 <div class="modal-overlay" id="name-pool-modal-overlay" onclick="closeNamePoolModal(event)">
   <div class="modal name-pool-modal" onclick="event.stopPropagation()">

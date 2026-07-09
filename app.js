@@ -3415,6 +3415,18 @@ function renderEnd() {
   // Show review on end page
   $('end-review-content').innerHTML = buildReviewHTML();
 
+  // Add replay button
+  var reviewCard = document.getElementById('end-review-card');
+  if (reviewCard) {
+    var existingBtn = document.getElementById('end-replay-btn');
+    if (existingBtn) existingBtn.remove();
+    var btnRow = document.createElement('div');
+    btnRow.id = 'end-replay-btn';
+    btnRow.style.cssText = 'text-align:center;margin-top:12px';
+    btnRow.innerHTML = '<button class="btn primary" onclick="showReplay()" style="font-size:16px;padding:12px 32px">复盘回放</button>';
+    reviewCard.appendChild(btnRow);
+  }
+
   if (state.assassinFromMission && !state.winner) {
     $('winner-toggle').innerHTML = '';
   } else {
@@ -6678,5 +6690,400 @@ function toggleEvidence(idx) {
   var el = document.getElementById('ev-' + idx);
   if (!el) return;
   el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+}
+
+/* ==================== FEATURE 4: NIGHT MODE ==================== */
+function initNightMode() {
+  var saved = localStorage.getItem('avalon_theme');
+  if (saved === 'night') {
+    document.documentElement.setAttribute('data-theme', 'night');
+    updateThemeToggleIcon(true);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    updateThemeToggleIcon(false);
+  }
+}
+
+function toggleNightMode() {
+  var isNight = document.documentElement.getAttribute('data-theme') === 'night';
+  if (isNight) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('avalon_theme', 'light');
+    updateThemeToggleIcon(false);
+    toast('已切换到日间模式');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'night');
+    localStorage.setItem('avalon_theme', 'night');
+    updateThemeToggleIcon(true);
+    toast('已切换到夜间模式');
+  }
+}
+
+function updateThemeToggleIcon(isNight) {
+  var btn = document.getElementById('theme-toggle-btn');
+  if (!btn) return;
+  btn.innerHTML = isNight ? '&#9789;' : '&#9790;';
+}
+
+initNightMode();
+
+/* ==================== FEATURE 3: REPLAY ==================== */
+function showReplay() {
+  var overlay = document.getElementById('replay-modal-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  buildReplayTimeline();
+  setTimeout(function() { drawReplayChart(); }, 100);
+}
+function closeReplayModal(event) {
+  var overlay = document.getElementById('replay-modal-overlay');
+  if (!overlay) return;
+  if (event && event.target !== overlay) return;
+  overlay.style.display = 'none';
+}
+
+function buildReplayTimeline() {
+  var container = document.getElementById('replay-timeline');
+  if (!container) return;
+
+  var pc = state.playerCount;
+  var h = '';
+
+  // 遍历所有轮次和事件
+  for (var r = 0; r <= state.currentRound; r++) {
+    var m = state.missions[r];
+    if (!m) continue;
+
+    // 组队尝试
+    var attempts = m.launchAttempts || [];
+    for (var a = 0; a < attempts.length; a++) {
+      var att = attempts[a];
+      var attApproves = 0;
+      for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+      var launched = attApproves > Math.floor(pc / 2);
+      var approveList = [], rejectList = [];
+      for (var k = 0; k < pc; k++) {
+        if (att.votes[k] === 'approve') approveList.push(playerLabel(k));
+        else rejectList.push(playerLabel(k));
+      }
+
+      h += '<div class="replay-event-card round-event">';
+      h += '<div class="replay-event-header">';
+      h += '<span class="replay-event-title">第' + (r + 1) + '轮 · 第' + (a + 1) + '次组队</span>';
+      h += '<span class="replay-event-time">队长：' + playerLabel(att.leader) + '</span>';
+      h += '</div>';
+      h += '<div class="replay-event-body">';
+      h += '<p>队伍成员：' + att.team.map(function(i) { return playerLabel(i); }).join('、') + '</p>';
+      h += '<p>投票结果：' + (launched ? '<span style="color:var(--green-bright)">组队成功</span>' : '<span style="color:var(--red-bright)">组队未通过</span>') + '（赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves) + '）</p>';
+
+      h += '<div class="replay-event-votes">';
+      h += '<div class="replay-vote-col approve-col"><div class="replay-vote-col-title">赞成</div>';
+      h += approveList.map(function(n) { return '<span class="replay-vote-name">' + n + '</span>'; }).join('');
+      h += '</div>';
+      h += '<div class="replay-vote-col reject-col"><div class="replay-vote-col-title">反对</div>';
+      h += rejectList.map(function(n) { return '<span class="replay-vote-name">' + n + '</span>'; }).join('');
+      h += '</div></div>';
+      h += '</div></div>';
+    }
+
+    // 任务结果
+    if (m.result) {
+      h += '<div class="replay-event-card round-event">';
+      h += '<div class="replay-event-header">';
+      h += '<span class="replay-event-title">第' + (r + 1) + '轮任务结果</span>';
+      h += '<span class="replay-event-time">队长：' + playerLabel(m.leader) + '</span>';
+      h += '</div>';
+      h += '<div class="replay-event-body">';
+      h += '<p>队伍：' + (m.team || []).map(function(i) { return playerLabel(i); }).join('、') + '</p>';
+      var resultColor = m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)';
+      var resultText = m.result === 'success' ? '成功' : '失败';
+      h += '<p>结果：<strong style="color:' + resultColor + '">' + resultText + '</strong>';
+      if (m.result === 'fail' && m.failCount) h += '（' + m.failCount + '张失败票）';
+      h += '</p>';
+      h += '</div></div>';
+    }
+
+    // 湖中女神事件
+    var ladyRecords = (state.ladyCheckHistory || []).filter(function(rec) {
+      return rec && rec.round === r;
+    });
+    if (ladyRecords.length > 0) {
+      for (var li = 0; li < ladyRecords.length; li++) {
+        var lr = ladyRecords[li];
+        h += '<div class="replay-event-card lady-event">';
+        h += '<div class="replay-event-header">';
+        h += '<span class="replay-event-title">湖中女神验人</span>';
+        h += '<span class="replay-event-time">第' + (r + 1) + '轮</span>';
+        h += '</div>';
+        h += '<div class="replay-event-body">';
+        h += '<p>' + playerLabel(lr.holder) + ' 查看了 ' + playerLabel(lr.target) + ' 的身份牌</p>';
+        h += '<p>结果声明：<strong>' + ladyClaimLabel(lr.result) + '</strong></p>';
+        if (lr.note) h += '<p style="color:var(--text-dim);font-size:12px">备注：' + escapeHtml(lr.note) + '</p>';
+        h += '</div></div>';
+      }
+    }
+
+    // 王者之剑事件
+    var exRec = getExcaliburRecord(r);
+    if (exRec && (exRec.used === true || exRec.used === false)) {
+      h += '<div class="replay-event-card excalibur-event">';
+      h += '<div class="replay-event-header">';
+      h += '<span class="replay-event-title">王者之剑</span>';
+      h += '<span class="replay-event-time">第' + (r + 1) + '轮</span>';
+      h += '</div>';
+      h += '<div class="replay-event-body">';
+      h += '<p>持剑者：' + playerLabel(exRec.holder) + '</p>';
+      if (exRec.used) {
+        h += '<p>对 <strong>' + playerLabel(exRec.target) + '</strong> 使用</p>';
+        if (exRec.claimedDirection) h += '<p>声称改变方向：' + excaliburDirectionLabel(exRec.claimedDirection) + '</p>';
+      } else {
+        h += '<p>未使用</p>';
+      }
+      h += '</div></div>';
+    }
+
+    // 兰斯洛特翻转
+    if (r > 0 && r < (state.lancelotDrawResults || []).length) {
+      var drew = state.lancelotDrawResults[r];
+      if (drew !== null && drew !== undefined) {
+        h += '<div class="replay-event-card flip-event">';
+        h += '<div class="replay-event-header">';
+        h += '<span class="replay-event-title">兰斯洛特翻转</span>';
+        h += '<span class="replay-event-time">第' + (r) + '轮后抽取</span>';
+        h += '</div>';
+        h += '<div class="replay-event-body">';
+        h += '<p>结果：<strong style="color:' + (drew ? 'var(--orange)' : 'var(--text-dim)') + '">' + (drew ? '反转' : '未反转') + '</strong></p>';
+        h += '</div></div>';
+      }
+    }
+  }
+
+  // 刺客刺杀
+  if (state.assassinTarget !== null) {
+    h += '<div class="replay-event-card assassin-event">';
+    h += '<div class="replay-event-header">';
+    h += '<span class="replay-event-title">刺客刺杀</span>';
+    h += '</div>';
+    h += '<div class="replay-event-body">';
+    h += '<p>刺杀目标：<strong>' + playerLabel(state.assassinTarget) + '</strong></p>';
+    if (state.winner === 'evil') {
+      h += '<p style="color:var(--red-bright)">刺杀成功，反方获胜</p>';
+    } else if (state.winner === 'good') {
+      h += '<p style="color:var(--green-bright)">刺杀失败，好人方获胜</p>';
+    }
+    h += '</div></div>';
+  }
+
+  container.innerHTML = h || '<p style="color:var(--text-dim);text-align:center;padding:20px">暂无复盘数据</p>';
+}
+
+// 尝试获取玩家阵容，优先从结束页 DOM 读取，其次从 knownIdentities
+function getPlayerFaction(idx) {
+  // 方法1：从结束页身份选择下拉框读取
+  var sel = document.getElementById('end-role-' + idx);
+  if (sel && sel.value) {
+    var role = sel.value;
+    if (ROLE_CATEGORY[role] === 'good') return 'good';
+    if (ROLE_CATEGORY[role] === 'evil') return 'evil';
+    return 'neutral';
+  }
+  // 方法2：从 knownIdentities 读取
+  var known = state.knownIdentities && state.knownIdentities[idx];
+  if (known) {
+    if (ROLE_CATEGORY[known] === 'good') return 'good';
+    if (ROLE_CATEGORY[known] === 'evil') return 'evil';
+    return 'neutral';
+  }
+  return 'unknown';
+}
+
+function getFactionColor(faction) {
+  if (faction === 'good')  return { fill: '#4a90d9', bg: 'rgba(74,144,217,0.15)', text: '#2d6eb0' };
+  if (faction === 'evil')  return { fill: '#c44a4a', bg: 'rgba(196,74,74,0.15)', text: '#9e2e2e' };
+  if (faction === 'neutral') return { fill: '#8a8070', bg: 'rgba(138,128,112,0.12)', text: '#5a5246' };
+  return { fill: '#8a8070', bg: 'rgba(138,128,112,0.08)', text: '#5a5246' };
+}
+
+function drawReplayChart() {
+  var canvas = document.getElementById('replay-chart-canvas');
+  if (!canvas) return;
+
+  var rt = state.roundTendencies || [];
+  if (rt.length === 0) {
+    document.getElementById('replay-chart-container').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('replay-chart-container').style.display = 'block';
+  var pc = state.playerCount;
+
+  // 构建轮次标签（去重合并）
+  var rounds = [];
+  var seenLabels = {};
+  for (var i = 0; i < rt.length; i++) {
+    var snap = rt[i];
+    var r = (snap.r !== undefined) ? snap.r : i;
+    var a = (snap.a !== undefined && snap.a > 0) ? snap.a : 0;
+    var label = a > 0 ? 'R' + (r + 1) + '-' + a : 'R' + (r + 1);
+    var key = 'r' + r + 'a' + a;
+    if (!seenLabels[key]) {
+      seenLabels[key] = true;
+      rounds.push({ label: label, r: r, a: a, idx: i });
+    }
+  }
+  var numRounds = rounds.length;
+
+  // 大尺寸 Canvas
+  var ROW_H = 62;
+  var LEFT_MARGIN = 100;
+  var RIGHT_MARGIN = 24;
+  var TOP_MARGIN = 44;
+  var BOTTOM_MARGIN = 36;
+  var COL_GAP = 12;
+
+  var chartW = Math.max(700, numRounds * 100);
+  var chartH = TOP_MARGIN + pc * ROW_H + BOTTOM_MARGIN;
+
+  canvas.width = (LEFT_MARGIN + chartW + RIGHT_MARGIN) * 2;
+  canvas.height = chartH * 2;
+  canvas.style.width = (LEFT_MARGIN + chartW + RIGHT_MARGIN) + 'px';
+  canvas.style.height = chartH + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  // 白色背景
+  ctx.fillStyle = '#faf8f2';
+  ctx.fillRect(0, 0, LEFT_MARGIN + chartW + RIGHT_MARGIN, chartH);
+
+  // 标题
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 15px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('玩家倾向值变化', (LEFT_MARGIN + chartW) / 2, 28);
+
+  // 辅助：每列中心 X
+  var colW = (chartW - COL_GAP * (numRounds - 1)) / numRounds;
+  function colX(ci) { return LEFT_MARGIN + ci * (colW + COL_GAP) + colW / 2; }
+
+  // 列头（轮次标签）
+  ctx.fillStyle = '#666';
+  ctx.font = '12px system-ui';
+  ctx.textAlign = 'center';
+  for (var ci = 0; ci < numRounds; ci++) {
+    ctx.fillText(rounds[ci].label, colX(ci), TOP_MARGIN - 8);
+  }
+
+  // 每行玩家
+  for (var p = 0; p < pc; p++) {
+    var rowY = TOP_MARGIN + p * ROW_H;
+    var faction = getPlayerFaction(p);
+    var fc = getFactionColor(faction);
+
+    // 行背景（交替浅色条纹）
+    if (p % 2 === 0) {
+      ctx.fillStyle = 'rgba(0,0,0,0.02)';
+      ctx.fillRect(LEFT_MARGIN, rowY, chartW, ROW_H);
+    }
+
+    // 玩家名（左标签）
+    ctx.fillStyle = fc.text;
+    ctx.font = 'bold 13px system-ui';
+    ctx.textAlign = 'right';
+    var name = state.playerNames[p] || ('P' + (p + 1));
+    // 截断过长名字
+    if (name.length > 6) name = name.substring(0, 5) + '..';
+    ctx.fillText(name, LEFT_MARGIN - 10, rowY + ROW_H / 2 + 4);
+
+    // 每列绘制条形 + 数值
+    for (var ci = 0; ci < numRounds; ci++) {
+      var rIdx = rounds[ci].idx;
+      var snap = rt[rIdx];
+      var v = snap.v || snap;
+      var score = (typeof v === 'object' && v[p] !== undefined) ? v[p] : 50;
+      var cx = colX(ci);
+
+      // 背景条（浅灰底）
+      var barMaxW = colW - 8;
+      var barH = 18;
+      var barY = rowY + ROW_H / 2 - barH / 2;
+      var barX = cx - barMaxW / 2;
+
+      ctx.fillStyle = '#e8e4da';
+      ctx.beginPath();
+      roundRect(ctx, barX, barY, barMaxW, barH, 4);
+      ctx.fill();
+
+      // 倾向值填充条
+      var fillW = Math.max(4, (score / 100) * barMaxW);
+      ctx.fillStyle = fc.fill;
+      ctx.beginPath();
+      roundRect(ctx, barX, barY, fillW, barH, 4);
+      ctx.fill();
+
+      // 数值标注
+      ctx.fillStyle = fc.text;
+      ctx.font = 'bold 11px system-ui';
+      ctx.textAlign = 'center';
+      var numX = barX + fillW + 4;
+      if (fillW > barMaxW * 0.6) {
+        // 数值显示在条内右侧
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'right';
+        numX = barX + fillW - 5;
+      }
+      ctx.fillText(String(score), numX, barY + barH / 2 + 4);
+
+      // 如果是有多次尝试的轮次（连续拒绝），在条上方加小圆点标记区别
+      if (rounds[ci].a > 1) {
+        ctx.fillStyle = '#999';
+        ctx.beginPath();
+        ctx.arc(cx, barY - 6, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // 行底部分隔线
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(LEFT_MARGIN, rowY + ROW_H);
+    ctx.lineTo(LEFT_MARGIN + chartW, rowY + ROW_H);
+    ctx.stroke();
+  }
+
+  // 底部图例
+  var legendY = TOP_MARGIN + pc * ROW_H + 16;
+  var legends = [
+    { label: '好人方', color: '#4a90d9' },
+    { label: '反派方', color: '#c44a4a' },
+    { label: '中立/未知', color: '#8a8070' }
+  ];
+  ctx.font = '11px system-ui';
+  var legendX = LEFT_MARGIN;
+  for (var li = 0; li < legends.length; li++) {
+    ctx.fillStyle = legends[li].color;
+    ctx.beginPath();
+    ctx.arc(legendX + 5, legendY - 3, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'left';
+    ctx.fillText(legends[li].label, legendX + 16, legendY);
+    legendX += 90;
+  }
+}
+
+// 圆角矩形辅助函数
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
 }
 
