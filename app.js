@@ -1303,7 +1303,7 @@ function renderTendencyMini() {
   var probs = computeMerlinProbability();
   var h = '';
   for (var i = 0; i < state.playerCount; i++) {
-    h += renderTendencyItem(i, state.tendencies[i] || 50, probs[i]);
+    h += renderTendencyItem(i, state.tendencies[i] != null ? state.tendencies[i] : 50, probs[i]);
   }
   el.innerHTML = h;
 }
@@ -1345,7 +1345,7 @@ function computeMerlinProbability() {
   // Tendency scores
   for (var i = 0; i < pc; i++) {
     if (i === state.selfIndex) continue;
-    var t = state.tendencies[i] || 50;
+    var t = state.tendencies[i] != null ? state.tendencies[i] : 50;
     probs[i] += t * 0.5;
     totalWeight += 0.5;
   }
@@ -1985,13 +1985,13 @@ function computePredictProbability(idx) {
   var pred = state.playerPredictions[idx];
   if (!pred || pred === '未标记') {
     // No prediction, show tendency-based
-    var t = state.tendencies[idx] || 50;
+    var t = state.tendencies[idx] != null ? state.tendencies[idx] : 50;
     return { good: t, evil: 100 - t };
   }
 
   var goodScore = 50;
   // Base on tendency
-  var t = state.tendencies[idx] || 50;
+  var t = state.tendencies[idx] != null ? state.tendencies[idx] : 50;
   goodScore = t;
 
   // Adjust based on prediction
@@ -3005,7 +3005,7 @@ function confirmVotes() {
     // Save tendency snapshot for this failed launch attempt
     var snap = {};
     for (var i = 0; i < pc; i++) {
-      snap[i] = state.tendencies[i] || 50;
+      snap[i] = state.tendencies[i] != null ? state.tendencies[i] : 50;
     }
     state.roundTendencies.push({ v: snap, r: state.currentRound, a: m.launchFailures });
 
@@ -3151,7 +3151,7 @@ function finalizeMission() {
   // Capture tendency snapshot for this round
   var snap = {};
   for (var i = 0; i < state.playerCount; i++) {
-    snap[i] = state.tendencies[i] || 50;
+    snap[i] = state.tendencies[i] != null ? state.tendencies[i] : 50;
   }
   state.roundTendencies.push({ v: snap, r: state.currentRound, a: 0 });
 
