@@ -1000,7 +1000,6 @@ function performUndo() {
   state._timerEnd = 0;
   state.timerInterval = null;
   state.timerRemaining = 0;
-  state.timerMode = 'off';
   state.assassinMode = false;
   state._assassinPickTarget = null;
   // Exit any assassin overlay
@@ -4870,29 +4869,11 @@ function showGameDetail(idx) {
     h += '</table>';
   }
 
-  // v7 算法客观分析
-  _v7DetailRec = rec;
-  _v7DetailHistIdx = idx;
-  var hasSavedV7 = rec.v7Scores && Object.keys(rec.v7Scores).length > 0;
-  var savedBadge = hasSavedV7 ? ' <span style="font-size:10px;color:#4caf50;background:rgba(76,175,80,0.15);padding:1px 6px;border-radius:3px">已保存</span>' : '';
-  h += '<h3 style="margin-top:10px">v7算法分析' + savedBadge + '</h3>';
-  h += '<p style="font-size:11px;color:var(--text-dim);margin-bottom:4px">选择玩家视角，v7评分引擎基于该玩家在游戏过程中可获得的信息进行客观评分（仅知自身身份）</p>';
-  h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">';
-  h += '<select id="v7-detail-persp" onchange="refreshV7DetailAnalysis()" style="font-size:12px;padding:2px 6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;flex:1">';
-  for (var i = 0; i < rec.identities.length; i++) {
-    h += '<option value="' + i + '">' + (i + 1) + '号 ' + rec.identities[i].name + '（' + rec.identities[i].role + '）</option>';
-  }
-  h += '</select>';
-  h += '<button class="btn small" onclick="saveV7AnalysisToHistory()" style="font-size:11px;white-space:nowrap">保存v7分析</button>';
-  h += '</div>';
-  h += '<div id="v7-detail-table"></div>';
-
   h += '<div class="modal-actions">';
   h += '<button class="btn" onclick="showEditGameRecord(' + idx + ')">编辑</button>';
   h += '<button class="btn" onclick="closeModal()">关闭</button>';
   h += '</div>';
   showModal(h);
-  setTimeout(function() { refreshV7DetailAnalysis(); }, 150);
 }
 
 function showEditGameRecord(idx) {
