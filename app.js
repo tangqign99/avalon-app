@@ -507,6 +507,19 @@ function toRecordV2(record) {
   return v2;
 }
 
+// 统一标准化函数：输入任意格式（v2短键名 或 长格式），返回统一长格式
+function normalizeGameData(gd) {
+  if (!gd) return null;
+  // JSON 字符串则解析
+  if (typeof gd === 'string') { try { gd = JSON.parse(gd); } catch(e) { return null; } }
+  // v2 短键名格式
+  if (gd.d !== undefined && gd.w !== undefined) return fromRecordV2(gd);
+  // 已经是长格式
+  if (gd.date !== undefined || gd.playerCount !== undefined) return gd;
+  // 兜底：尝试正常化
+  return normalizeRecord(gd);
+}
+
 // 将 v2 短字段格式转回旧格式（供渲染等消费端使用）
 function fromRecordV2(v2) {
   var rec = {};
@@ -579,6 +592,12 @@ function loadDeletedKeys() {
 }
 function saveDeletedKeys(data) {
   localStorage.setItem('avalon_deleted_keys', JSON.stringify(data));
+}
+function clearDeletedKeys() {
+  localStorage.removeItem('avalon_deleted_keys');
+  invalidateHistoryCache();
+  if (state._currentPage === 'stats') renderStats();
+  toast('已清理删除标记，历史记录已恢复');
 }
 function saveLastGame() {
   var cfg = {
@@ -4193,6 +4212,11 @@ function renderStats() {
     h += '<span class="hci-toggle">&#9654;</span>';
     h += '</div></div>';
     h += '<div class="hci-body">';
+    // Duration
+    if (rec.startTime && rec.endTime) {
+      var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
+      if (durMin > 0) h += '<div style="margin-top:4px;font-size:12px;color:var(--gold-light);font-weight:600">时长：' + durMin + '分钟</div>';
+    }
     // Roles
     if (rec.identities) {
       h += '<div class="hci-roles">';
@@ -4202,14 +4226,40 @@ function renderStats() {
       }
       h += '</div>';
     }
-    // Missions summary
+    // Missions with full vote details
     if (rec.missions) {
-      h += '<div class="hci-missions">任务：';
-      for (var j = 0; j < rec.missions.length; j++) {
-        var m = rec.missions[j];
-        if (!m.result) continue;
-        h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
-        h += 'R' + (j + 1) + (m.result === 'success' ? '✓' : '✕') + '</span> ';
+      h += '<div class="hci-missions" style="margin-top:4px">';
+      for (var mi = 0; mi < rec.missions.length; mi++) {
+        var m = rec.missions[mi];
+        if (!m.result && (!m.launchAttempts || m.launchAttempts.length === 0)) continue;
+        h += '<div style="margin-bottom:3px;padding:3px 6px;background:rgba(255,255,255,0.02);border-radius:4px;font-size:12px">';
+        h += '<span style="font-weight:700">第' + (mi + 1) + '轮</span>';
+        if (m.launchAttempts && m.launchAttempts.length > 0) {
+          for (var la = 0; la < m.launchAttempts.length; la++) {
+            var att = m.launchAttempts[la];
+            var isLast = (la === m.launchAttempts.length - 1);
+            var appCnt = 0, rejCnt = 0;
+            for (var vk in att.votes) { if (att.votes[vk] === 'approve') appCnt++; else rejCnt++; }
+            var resIcon = '';
+            if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
+            else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
+            h += '<div style="margin-top:2px;font-size:11px">';
+            h += '组队' + (la + 1) + '：队长' + (att.leader || '') + ' 队伍[' + ((att.team || []).join(',')) + '] 投票' + appCnt + ':' + rejCnt + resIcon;
+            h += '</div>';
+          }
+        } else {
+          h += ' ' + (m.result === 'success' ? '<span style="color:var(--green-bright)">&#10003;</span>' : '<span style="color:var(--red-bright)">&#10007;</span>');
+        }
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    // Lady check history
+    if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">湖女查验：';
+      for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+        var lc = rec.ladyCheckHistory[li];
+        h += '<span>' + lc.holderName + '→' + lc.targetName + '=' + (lc.result || '?') + ' </span>';
       }
       h += '</div>';
     }
@@ -4223,12 +4273,20 @@ function renderStats() {
       }
       h += '</div>';
     }
+    // Lancelot flips
+    if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
+      var flipPlayers = [];
+      for (var lfIdx in rec.lancelotFlips) {
+        if (rec.identities && rec.identities[lfIdx]) flipPlayers.push(rec.identities[lfIdx].name);
+      }
+      if (flipPlayers.length > 0) h += '<div style="margin-top:4px;font-size:11px;color:var(--orange)">兰斯洛特变节：' + flipPlayers.join(',') + '</div>';
+    }
     if (rec.assassinTarget) {
       h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">刺杀';
       if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
         h += '（第' + (rec.assassinAfterRound + 1) + '轮任务后）';
       }
-      h += '：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '成功' : '失败') + '</div>';
+      h += '：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中</span>' : '<span style="color:#99ff99">未命中</span>') + '</div>';
     }
     h += '<div class="hci-actions">';
     h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
@@ -4409,6 +4467,19 @@ function renderStats() {
     if (leaderboardCard) leaderboardCard.style.display = '';
   }
   $('win-rate-leaderboard').innerHTML = lh;
+  // Relationship network
+  var networkCard = document.getElementById('relationship-network-container');
+  if (!networkCard) {
+    var networkDiv = document.createElement('div');
+    networkDiv.id = 'relationship-network-container';
+    var winCard = document.getElementById('win-rate-leaderboard');
+    if (winCard) {
+      var parentCard = winCard.closest('.card') || winCard.parentNode;
+      parentCard.parentNode.insertBefore(networkDiv, parentCard.nextSibling);
+    }
+    networkCard = networkDiv;
+  }
+  networkCard.innerHTML = renderRelationshipNetwork(history);
   renderNamePoolList();
 }
 
@@ -4489,6 +4560,66 @@ function clearHistoryFilter() {
   if (player) player.value = '';
   state._historyPage = 0;
   renderStats();
+}
+
+/* ==================== PLAYER RELATIONSHIP NETWORK ==================== */
+function renderRelationshipNetwork(history) {
+  var pairStats = {};
+  function addPair(name1, name2, isSameTeam) {
+    if (name1 === name2) return;
+    var key = [name1, name2].sort().join('||');
+    if (!pairStats[key]) pairStats[key] = { p1: [name1, name2].sort()[0], p2: [name1, name2].sort()[1], same: 0, diff: 0 };
+    if (isSameTeam) pairStats[key].same++;
+    else pairStats[key].diff++;
+  }
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    if (!rec.identities) continue;
+    var goods = [], evils = [];
+    for (var j = 0; j < rec.identities.length; j++) {
+      var id = rec.identities[j];
+      if (!id.role) continue;
+      if (id.role === '混子') continue;
+      if (id.role === '梅林' || id.role === '派西维尔' || id.role === '忠臣' || id.role === '兰斯洛特(蓝)' || id.role === '正方') {
+        goods.push(id.name);
+      } else if (id.role === '莫甘娜' || id.role === '刺客' || id.role === '莫德雷德' || id.role === '奥伯伦' || id.role === '爪牙' || id.role === '兰斯洛特(红)' || id.role === '反方') {
+        evils.push(id.name);
+      }
+    }
+    for (var a = 0; a < goods.length; a++)
+      for (var b = a + 1; b < goods.length; b++)
+        addPair(goods[a], goods[b], true);
+    for (var a = 0; a < evils.length; a++)
+      for (var b = a + 1; b < evils.length; b++)
+        addPair(evils[a], evils[b], true);
+    for (var a = 0; a < goods.length; a++)
+      for (var b = 0; b < evils.length; b++)
+        addPair(goods[a], evils[b], false);
+  }
+  var pairs = Object.values(pairStats);
+  var best = pairs.slice().sort(function(a, b) { return b.same - a.same || a.p1.localeCompare(b.p1); }).slice(0, 5);
+  var rival = pairs.slice().sort(function(a, b) { return b.diff - a.diff || a.p1.localeCompare(b.p1); }).slice(0, 5);
+  var h = '<div class="card"><h2>玩家关系网</h2>';
+  if (pairs.length === 0) {
+    h += '<p style="color:var(--text-dim);font-size:13px;text-align:center;padding:8px">暂无足够数据</p>';
+  } else {
+    h += '<h3 style="font-size:14px;margin-bottom:6px;color:var(--green-bright)">&#9829; 最佳队友 Top5</h3>';
+    h += '<table style="width:100%;font-size:13px">';
+    for (var i = 0; i < best.length; i++) {
+      var p = best[i];
+      h += '<tr><td style="padding:2px 4px">' + (i + 1) + '.</td><td style="padding:2px 4px">' + p.p1 + ' & ' + p.p2 + '</td><td style="padding:2px 4px;text-align:right;color:var(--green-bright);font-weight:600">' + p.same + '局</td></tr>';
+    }
+    h += '</table>';
+    h += '<h3 style="font-size:14px;margin:10px 0 6px;color:var(--red-bright)">&#9876; 宿敌 Top5</h3>';
+    h += '<table style="width:100%;font-size:13px">';
+    for (var i = 0; i < rival.length; i++) {
+      var p = rival[i];
+      h += '<tr><td style="padding:2px 4px">' + (i + 1) + '.</td><td style="padding:2px 4px">' + p.p1 + ' & ' + p.p2 + '</td><td style="padding:2px 4px;text-align:right;color:var(--red-bright);font-weight:600">' + p.diff + '局</td></tr>';
+    }
+    h += '</table>';
+  }
+  h += '</div>';
+  return h;
 }
 
 /* ==================== PLAYER STAT ==================== */
@@ -5544,68 +5675,102 @@ function exportData() {
       try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
     }
   }
-  // 导出时把 v2 格式转回旧格式（可读）
-  if (data['avalon_history_v2'] && Array.isArray(data['avalon_history_v2'])) {
-    data['avalon_history_v2'] = data['avalon_history_v2'].map(function(r) { return normalizeRecord(r); });
-  }
-  var json = JSON.stringify(data);
-
-  var prettyJson = JSON.stringify(data, null, 2);
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(prettyJson).then(function() {
-      toast('数据已复制到剪贴板');
-    }).catch(function() {
-      showExportModal(prettyJson);
-    });
-  } else {
-    showExportModal(prettyJson);
-  }
-}
-
-function showExportModal(json) {
-  var h = '<h2>导出数据</h2>';
-  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">复制下方 JSON 文本：</p>';
-  h += '<textarea class="import-textarea" readonly onclick="this.select()">' + json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>';
-  h += '<div class="modal-actions"><button class="btn" onclick="closeModal()">关闭</button></div>';
-  showModal(h);
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'avalon-data-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('数据已导出');
 }
 
 function importData() {
   var h = '<h2>导入数据</h2>';
-  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">粘贴 JSON 数据后点击导入。将覆盖现有的阿瓦隆数据。</p>';
-  h += '<textarea class="import-textarea" id="import-textarea" placeholder="在此粘贴 JSON 数据…"></textarea>';
+  h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">选择 JSON 文件导入。按 fingerprint 去重合并到现有数据，不会覆盖已有记录。</p>';
+  h += '<input type="file" accept=".json" id="import-file-input" style="display:block;margin:10px auto;padding:8px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;width:100%;max-width:300px">';
   h += '<div class="modal-actions">';
-  h += '<button class="btn primary" onclick="doImport()">确认导入</button>';
+  h += '<button class="btn primary" onclick="doImportFile()">确认导入</button>';
   h += '<button class="btn" onclick="closeModal()">取消</button>';
   h += '</div>';
   showModal(h);
 }
 
-function doImport() {
-  var ta = document.getElementById('import-textarea');
-  if (!ta) return;
-  var raw = ta.value.trim();
-  if (!raw) { toast('请粘贴 JSON 数据', 'warn'); return; }
+function doImportFile() {
+  var input = document.getElementById('import-file-input');
+  if (!input || !input.files || !input.files[0]) { toast('请选择文件', 'warn'); return; }
+  var file = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var raw = e.target.result;
+    var data;
+    try { data = JSON.parse(raw); } catch(err) { toast('JSON 格式错误', 'warn'); return; }
+    if (!data || typeof data !== 'object') { toast('数据格式无效', 'warn'); return; }
 
-  var data;
-  try { data = JSON.parse(raw); } catch(e) { toast('JSON 格式错误，请检查', 'warn'); return; }
-  if (!data || typeof data !== 'object') { toast('数据格式无效', 'warn'); return; }
+    var importedCount = 0;
 
-  var validKeys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
-  var imported = 0;
-  for (var i = 0; i < validKeys.length; i++) {
-    var k = validKeys[i];
-    if (k in data) {
-      localStorage.setItem(k, JSON.stringify(data[k]));
-      if (k === 'avalon_history_v2') invalidateHistoryCache();
-      imported++;
+    // 导入 name_pool
+    if (data['avalon_name_pool'] && Array.isArray(data['avalon_name_pool'])) {
+      var existingPool = [];
+      try { existingPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]'); } catch(e) {}
+      var poolSet = {};
+      for (var i = 0; i < existingPool.length; i++) poolSet[existingPool[i]] = true;
+      for (var i = 0; i < data['avalon_name_pool'].length; i++) {
+        if (!poolSet[data['avalon_name_pool'][i]]) {
+          existingPool.push(data['avalon_name_pool'][i]);
+          poolSet[data['avalon_name_pool'][i]] = true;
+        }
+      }
+      localStorage.setItem('avalon_name_pool', JSON.stringify(existingPool));
+      importedCount++;
     }
-  }
-  if (imported === 0) { toast('未识别到有效数据', 'warn'); return; }
 
-  closeModal();
-  toast('已导入 ' + imported + ' 条数据，即将刷新页面');
+    // 导入 history_v2 — 按 fingerprint 去重合并
+    if (data['avalon_history_v2'] && Array.isArray(data['avalon_history_v2'])) {
+      var existingHistory = loadHistory();
+      var existingKeys = {};
+      for (var i = 0; i < existingHistory.length; i++) {
+        existingKeys[makeRecordKey(existingHistory[i])] = true;
+      }
+      var toAdd = [];
+      for (var i = 0; i < data['avalon_history_v2'].length; i++) {
+        var rec = data['avalon_history_v2'][i];
+        if (!existingKeys[makeRecordKey(rec)]) {
+          toAdd.push(rec);
+        }
+      }
+      if (toAdd.length > 0) {
+        existingHistory = existingHistory.concat(toAdd);
+        saveHistory(existingHistory);
+        // push 到 Supabase
+        var sb = getSupabase();
+        if (sb) {
+          for (var j = 0; j < toAdd.length; j++) {
+            var recV2 = toAdd[j];
+            var recOld = toRecordV2 ? null : null;
+            (function(r) {
+              sb.from('game_records').insert({ game_data: null, game_data_v2: r }).select('id').single().then(function(res) {
+                if (res.error) console.warn('[Import] Supabase push failed:', res.error);
+              });
+            })(recV2);
+          }
+        }
+        importedCount++;
+        toast('导入 ' + toAdd.length + ' 条新对局记录');
+        invalidateHistoryCache();
+        if (state._currentPage === 'stats') renderStats();
+      } else {
+        toast('没有新的对局记录需要导入');
+      }
+    }
+
+    closeModal();
+  };
+  reader.readAsText(file);
+}
   setTimeout(function() { location.reload(); }, 800);
 }
 
@@ -5847,29 +6012,28 @@ function mergeHistories(local, cloud) {
 }
 
 function makeRecordKey(record) {
-  var rec = normalizeRecord(record);
+  var rec = normalizeGameData(record);
   if (!rec) return '';
-  // 兼容压缩格式（d/pc/w/ids）和长格式（date/playerCount/winner/identities）
-  var identities = rec.identities || rec.ids || [];
-  var date = rec.date || rec.d || '';
-  var playerCount = rec.playerCount || rec.pc || 0;
+  var identities = rec.identities || [];
+  var date = rec.date || '';
+  var playerCount = rec.playerCount || 0;
   var identityStr = identities.map(function(id) {
-    return (id.name || id.n || '') + '|' + (id.role || id.r || '');
+    return (id.name || '') + '|' + (id.role || '');
   }).sort().join(',');
   return date + '|' + playerCount + '|' + identityStr;
 }
 
 function deduplicateHistory(history) {
   // 归一化到长格式以确保指纹一致性
-  var normalized = history.map(function(r) { return normalizeRecord(r) || r; });
+  var normalized = history.map(function(r) { return normalizeGameData(r) || r; });
   var groups = {};
   for (var i = 0; i < normalized.length; i++) {
     var rec = normalized[i];
-    var date = rec.date || rec.d || '';
-    var pc = rec.playerCount || rec.pc || 0;
-    var winner = rec.winner || rec.w || '';
-    var ids = rec.identities || rec.ids || [];
-    var nameStr = ids.map(function(id) { return id.name || id.n || ''; }).sort().join(',');
+    var date = rec.date || '';
+    var pc = rec.playerCount || 0;
+    var winner = rec.winner || '';
+    var ids = rec.identities || [];
+    var nameStr = ids.map(function(id) { return id.name || ''; }).sort().join(',');
     var fp = date + '|' + pc + '|' + winner + '|' + nameStr;
     // 用原始记录（含 _sid 等附加字段）入组
     groups[fp] = groups[fp] || [];

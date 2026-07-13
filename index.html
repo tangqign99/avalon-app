@@ -87,6 +87,13 @@
     </div>
     <button class="btn" onclick="showNamePoolModal()">管理所有姓名</button>
   </div>
+  <div class="card" style="text-align:center">
+    <h2>数据管理</h2>
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn small" onclick="clearDeletedKeys()" title="清理 localStorage 中残留的删除标记">清理删除标记</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:6px">清理后已删除的对局记录将恢复正常显示</p>
+  </div>
 </section>
 
 <section class="page" id="page-game">
