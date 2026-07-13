@@ -1510,6 +1510,15 @@ function renderStepPanel() {
   c.innerHTML = h;
 }
 
+/* ===== Tools Page - Toggle Tendency Panel ===== */
+function toggleTendPanel() {
+  var panel = document.getElementById('tend-panel');
+  var btn = document.getElementById('tend-toggle-btn');
+  if (!panel || !btn) return;
+  var open = panel.classList.toggle('open');
+  btn.innerHTML = open ? '&#9660; 倾向分析' : '&#9654; 倾向分析';
+}
+
 /* ==================== TENDENCY RENDER ==================== */
 function renderTendencyItem(idx, score, merlinProb) {
   var cls, barCls;
