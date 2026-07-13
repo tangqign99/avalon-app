@@ -4635,8 +4635,10 @@ function togglePlayerStat(name) {
     if (rec.winner !== 'good') continue;
     if (rec.identities) {
       for (var ji = 0; ji < rec.identities.length; ji++) {
-        if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
-          shieldCount++;
+        if (rec.identities[ji].name === name) {
+          if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
+            shieldCount++;
+          }
           break;
         }
       }
@@ -4814,8 +4816,10 @@ function renderPlayerProfile() {
     if (rec.winner !== 'good') continue;
     if (rec.identities) {
       for (var ji = 0; ji < rec.identities.length; ji++) {
-        if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
-          shieldCount++;
+        if (rec.identities[ji].name === name) {
+          if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
+            shieldCount++;
+          }
           break;
         }
       }
