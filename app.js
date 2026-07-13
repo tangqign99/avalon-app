@@ -4203,20 +4203,37 @@ function renderStats() {
     var winnerColor = rec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)';
     var winnerLabel = rec.winner === 'good' ? '好人方胜' : '反方胜';
 
+    // --- One-line summary ---
+    var successCount = 0, failCount = 0;
+    if (rec.missions) {
+      for (var mi2 = 0; mi2 < rec.missions.length; mi2++) {
+        if (rec.missions[mi2].result === 'success') successCount++;
+        else if (rec.missions[mi2].result === 'fail') failCount++;
+      }
+    }
+    var oneLiner = successCount + ':' + failCount;
+    if (rec.winner === 'good') oneLiner = '好人' + oneLiner + '胜利';
+    else oneLiner = '反方' + oneLiner + '胜利';
+    if (rec.assassinTarget) {
+      oneLiner += '，刺' + rec.assassinTarget + (rec.assassinSuccess ? '命中' : '未中');
+    }
+
     h += '<div class="history-compact-item">';
     h += '<div class="hci-header" onclick="toggleCompactHistory(this)">';
     h += '<span class="hci-date">' + rec.date + '</span>';
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
+    if (rec.startTime && rec.endTime) {
+      var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
+      if (durMin > 0) h += '<span class="hci-duration" style="font-size:11px;color:var(--text-dim);margin-left:4px">' + durMin + '分钟</span>';
+    }
     h += '<div class="hci-right">';
     h += '<span class="hci-result" style="color:' + winnerColor + '">' + winnerLabel + '</span>';
+    h += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + oneLiner + '</span>';
     h += '<span class="hci-toggle">&#9654;</span>';
     h += '</div></div>';
     h += '<div class="hci-body">';
-    // Duration
-    if (rec.startTime && rec.endTime) {
-      var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
-      if (durMin > 0) h += '<div style="margin-top:4px;font-size:12px;color:var(--gold-light);font-weight:600">时长：' + durMin + '分钟</div>';
-    }
+    h += '<div class="hci-detail-toggle" onclick="toggleHciDetail(this)">&#9660; 完整详情</div>';
+    h += '<div class="hci-detail-content">';
     // Roles
     if (rec.identities) {
       h += '<div class="hci-roles">';
@@ -4289,9 +4306,8 @@ function renderStats() {
       h += '：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中</span>' : '<span style="color:#99ff99">未命中</span>') + '</div>';
     }
     h += '<div class="hci-actions">';
-    h += '<button class="btn small" onclick="showGameDetail(' + i + ')">完整详情</button>';
     h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')" style="margin-left:auto">删除</button>';
-    h += '</div></div></div>';
+    h += '</div></div></div></div>';
   }
   cl.innerHTML = h;
   $('no-history').style.display = filtered.length === 0 ? 'block' : 'none';
@@ -4486,6 +4502,12 @@ function renderStats() {
 function toggleLeaderboard() {
   state._showAllLeaderboard = !state._showAllLeaderboard;
   renderStats();
+}
+
+function toggleHciDetail(toggle) {
+  var content = toggle.nextElementSibling;
+  toggle.classList.toggle('open');
+  if (content) content.classList.toggle('open');
 }
 
 function toggleCompactHistory(header) {

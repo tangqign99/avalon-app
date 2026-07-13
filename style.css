@@ -1263,4 +1263,13 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* ===== Setup Page - Section Titles Centered ===== */
 #page-setup .card > h2{text-align:center}
 
+/* ===== History List - Detail Toggle ===== */
+.hci-body{display:none}
+.hci-body.open{display:block}
+.hci-detail-toggle{cursor:pointer;padding:6px 8px;font-size:13px;color:var(--gold-light);font-weight:600;text-align:center;user-select:none;margin:4px 0;border-radius:var(--radius-sm);background:rgba(201,168,76,0.06)}
+.hci-detail-toggle:hover{background:rgba(201,168,76,0.12)}
+.hci-detail-toggle.open{margin-bottom:6px}
+.hci-detail-content{display:none;border-top:1px solid rgba(201,168,76,0.1);padding-top:6px;margin-top:2px}
+.hci-detail-content.open{display:block}
+
 /* ===== Tools Page - Recording Playback (开发中) ===== */
