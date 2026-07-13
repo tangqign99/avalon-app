@@ -1278,4 +1278,17 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .tend-panel{overflow:hidden;max-height:0;transition:max-height 0.4s ease}
 .tend-panel.open{max-height:3000px}
 .tend-panel .card{margin-bottom:8px}
+
+/* ---- Tendency panel card visual differentiation ---- */
+#tend-role-card{border-left:4px solid #C9A84C}
+#tend-perspective-card{border-left:4px solid #4A90D9}
+#tend-perspective-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;opacity:0.04;background:radial-gradient(circle at 100% 0%,#4A90D9,transparent 70%);pointer-events:none}
+#v7-engine-card{border-left:4px solid #9B6B9B}
+#v7-engine-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;opacity:0.04;background:radial-gradient(circle at 100% 0%,#9B6B9B,transparent 70%);pointer-events:none}
+#known-identity-card{border-left:4px solid #5F9B6B}
+#known-identity-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;opacity:0.04;background:radial-gradient(circle at 100% 0%,#5F9B6B,transparent 70%);pointer-events:none}
+#tend-result-card{border-left:4px solid #D98C4A}
+#tend-result-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;opacity:0.04;background:radial-gradient(circle at 100% 0%,#D98C4A,transparent 70%);pointer-events:none}
+#tend-evidence-card{border-left:4px solid #C94A4A}
+#tend-evidence-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;opacity:0.04;background:radial-gradient(circle at 100% 0%,#C94A4A,transparent 70%);pointer-events:none}
 .tend-panel .card:last-child{margin-bottom:0}
