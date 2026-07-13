@@ -140,76 +140,6 @@ function generateUUID() {
     hex(arr[8]) + hex(arr[9]) + '-' + hex(arr[10]) + hex(arr[11]) + hex(arr[12]) + hex(arr[13]) + hex(arr[14]) + hex(arr[15]);
 }
 
-/* ---- Offline queue ---- */
-function getOfflineQueue() {
-  try { return JSON.parse(localStorage.getItem('avalon_offline_queue') || '[]'); } catch(e) { return []; }
-}
-function saveOfflineQueue(queue) {
-  localStorage.setItem('avalon_offline_queue', JSON.stringify(queue));
-}
-function getOfflineDeleteQueue() {
-  try { return JSON.parse(localStorage.getItem('avalon_offline_delete_queue') || '[]'); } catch(e) { return []; }
-}
-function saveOfflineDeleteQueue(queue) {
-  localStorage.setItem('avalon_offline_delete_queue', JSON.stringify(queue));
-}
-function processOfflineQueues() {
-  var sb = getSupabase();
-  if (!sb) return;
-
-  // 处理离线写入队列
-  var writeQueue = getOfflineQueue();
-  if (writeQueue.length > 0) {
-    var remaining = [];
-    var processed = 0;
-    for (var i = 0; i < writeQueue.length; i++) {
-      (function(item) {
-        sb.from('game_records').insert({ game_data: item.record, game_data_v2: item.recordV2 }).select('id').single().then(function(res) {
-          if (res.error) {
-            console.warn('[OfflineQueue] write failed:', res.error);
-            remaining.push(item);
-          } else if (res.data && res.data.id) {
-            item.recordV2._sid = res.data.id;
-            var history = loadHistory();
-            var found = false;
-            for (var j = 0; j < history.length; j++) {
-              if (history[j]._uuid === item._uuid) { history[j]._sid = res.data.id; found = true; break; }
-            }
-            if (!found) history.push(item.recordV2);
-            saveHistory(history);
-            processed++;
-          }
-          // 最后一个回调用完再保存队列
-          if (i === writeQueue.length - 1) {
-            saveOfflineQueue(remaining);
-            if (processed > 0) { console.log('[OfflineQueue] processed ' + processed + ' items'); scheduleRenderStats(); }
-          }
-        });
-      })(writeQueue[i]);
-    }
-  }
-
-  // 处理离线删除队列
-  var deleteQueue = getOfflineDeleteQueue();
-  if (deleteQueue.length > 0) {
-    var remainingDel = [];
-    for (var i = 0; i < deleteQueue.length; i++) {
-      (function(item) {
-        sb.from('game_records').delete().eq('id', item.sid).then(function(res) {
-          if (res.error) {
-            console.warn('[OfflineQueue] delete failed:', res.error);
-            remainingDel.push(item);
-          }
-          if (i === deleteQueue.length - 1) {
-            saveOfflineDeleteQueue(remainingDel);
-            if (remainingDel.length < deleteQueue.length) { console.log('[OfflineQueue] processed ' + (deleteQueue.length - remainingDel.length) + ' deletes'); }
-          }
-        });
-      })(deleteQueue[i]);
-    }
-  }
-}
-
 var namePool = DEFAULT_NAME_POOL.slice();
 var _historyRawCache = null;
 var _historyCache = null;
@@ -4099,12 +4029,8 @@ function saveGameRecord() {
     sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
-        // 离线队列
-        var queue = getOfflineQueue();
-        queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
-        saveOfflineQueue(queue);
-        toast('云端保存失败，已加入离线队列', 'warn');
-        writeLocalAndFinish(null);
+        // 离线时静默失败，不保存本地
+        finishSave();
       } else if (res.data && res.data.id) {
         writeLocalAndFinish(res.data.id);
       } else {
@@ -4118,11 +4044,9 @@ function saveGameRecord() {
     // 超时兜底：5 秒后无论如何跳转
     setTimeout(finishSave, 5000);
   } else {
-    // 无 Supabase 连接：入离线队列
-    var queue = getOfflineQueue();
-    queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
-    saveOfflineQueue(queue);
-    writeLocalAndFinish(null);
+    console.warn('[Supabase] saveGameRecord: no connection');
+    // 离线时静默失败，不保存本地
+    finishSave();
   }
 }
 
@@ -5498,12 +5422,7 @@ function confirmDeleteGame(idx) {
           doLocalDelete();
         } else {
           console.warn('[Supabase] deleteGameRecord failed:', res.error);
-          // 入离线删除队列
-          var delQueue = getOfflineDeleteQueue();
-          delQueue.push({ sid: sid, key: key, idx: idx });
-          saveOfflineDeleteQueue(delQueue);
           doLocalDelete();
-          toast('云端删除失败，已加入离线删除队列');
         }
       });
     }
@@ -5540,12 +5459,7 @@ function confirmDeleteGame(idx) {
         });
     }
   } else {
-    // 无 Supabase 连接：入离线删除队列
-    if (recRaw._sid) {
-      var delQueue = getOfflineDeleteQueue();
-      delQueue.push({ sid: recRaw._sid, key: key, idx: idx });
-      saveOfflineDeleteQueue(delQueue);
-    }
+    console.warn('[Supabase] deleteGameRecord: no connection');
     doLocalDelete();
   }
 }
@@ -5979,8 +5893,6 @@ function deduplicateHistory(history) {
   // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
   setTimeout(function() {
     setupRealtimeSubscriptions();
-    // 处理离线队列（暂时禁用，防止启动时旧记录回推 Supabase 造成循环）
-    // setTimeout(function() { processOfflineQueues(); }, 500);
   }, 1200);
 
 })();
