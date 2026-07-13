@@ -318,7 +318,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v138';
+  var SW_VERSION = 'v139';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
