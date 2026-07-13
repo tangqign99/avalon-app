@@ -1260,4 +1260,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 }
 .replay-modal .replay-chart-container{min-height:200px;overflow-x:auto}
 
+/* ===== Setup Page - Section Titles Centered ===== */
+#page-setup .card > h2{text-align:center}
+
 /* ===== Tools Page - Recording Playback (开发中) ===== */
