@@ -420,25 +420,26 @@ function loadHistory() {
           }
           cloudHistory.push(recordV2);
         }
-        // 合并本地未同步的记录（按 _uuid 去重）
+        // 合并本地未同步的记录（按 _sid 去重，避免 refresh 时 UUID 漂移导致无限增长）
         var localRaw = [];
         try { localRaw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]'); } catch(e) {}
-        var cloudUUIDs = {};
+        var cloudBySid = {};
         for (var i = 0; i < cloudHistory.length; i++) {
-          cloudUUIDs[cloudHistory[i]._uuid] = true;
+          cloudBySid[cloudHistory[i]._sid] = true;
         }
         var merged = cloudHistory.slice();
         for (var i = 0; i < localRaw.length; i++) {
           var lr = localRaw[i];
           // v2 格式标准化
           if (!isRecordV2(lr)) { lr = toRecordV2(lr); }
-          if (!lr._uuid) {
-            lr._uuid = generateUUID();
+          // 已在云端的记录（按 _sid 匹配）跳过，避免每次 refresh 因 UUID 重生成而重复合并
+          if (lr._sid && cloudBySid[lr._sid]) {
+            continue;
           }
-          if (!cloudUUIDs[lr._uuid]) {
-            merged.push(lr);
-          }
+          merged.push(lr);
         }
+        // 按内容指纹去重，只保留一份
+        merged = deduplicateHistory(merged);
         // 写回 localStorage 作为缓存
         saveHistory(merged);
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
@@ -5666,8 +5667,8 @@ function pullInitialData(sb) {
     var localHistory = loadHistory();
     var localDeletedKeys = loadDeletedKeys();
 
-    // 构建云端记录按 _uuid 索引
-    var cloudByUUID = {};
+    // 构建云端记录按 _sid 索引（稳定去重键，避免 refresh 时 UUID 漂移）
+    var cloudBySid = {};
     var cloudRecords = [];
     for (var i = 0; i < gameRes.data.length; i++) {
       var row = gameRes.data[i];
@@ -5684,20 +5685,19 @@ function pullInitialData(sb) {
       }
 
       cloudRecords.push(recordV2);
-      cloudByUUID[recordV2._uuid] = true;
+      cloudBySid[recordV2._sid] = true;
     }
 
-    // 合并：云端记录全量采用，本地未同步的补充
+    // 合并：云端记录全量采用，本地未同步的补充（按 _sid 去重）
     var merged = cloudRecords.slice();
     var hasNew = false;
     for (var i = 0; i < localHistory.length; i++) {
       var lr = localHistory[i];
       if (!isRecordV2(lr)) lr = toRecordV2(lr);
-      if (!lr._uuid) lr._uuid = generateUUID();
-      if (!cloudByUUID[lr._uuid]) {
-        merged.push(lr);
-        hasNew = true;
-      }
+      // 已在云端的记录（按 _sid 匹配）跳过，避免每次 refresh 因 UUID 重生成而重复合并
+      if (lr._sid && cloudBySid[lr._sid]) continue;
+      merged.push(lr);
+      hasNew = true;
     }
 
     if (hasNew || merged.length !== localHistory.length) {
@@ -5708,6 +5708,8 @@ function pullInitialData(sb) {
         if (da > db) return 1;
         return (a.startTime || '').localeCompare(b.startTime || '');
       });
+      // 按内容指纹去重，只保留一份
+      merged = deduplicateHistory(merged);
       saveHistory(merged);
       console.log('[InitPull] merged ' + cloudRecords.length + ' cloud + ' +
         (merged.length - cloudRecords.length) + ' local = ' + merged.length);
@@ -5891,6 +5893,47 @@ function makeRecordKey(record) {
   return (rec.date || '') + '|' + (rec.playerCount || 0) + '|' + identityStr;
 }
 
+function deduplicateHistory(history) {
+  var groups = {};
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    var date = rec.d || rec.date || '';
+    var pc = rec.pc || rec.playerCount || 0;
+    var winner = rec.w || rec.winner || '';
+    var ids = rec.ids || rec.identities || [];
+    var nameStr = ids.map(function(id) { return id.n || id.name || ''; }).sort().join(',');
+    var fp = date + '|' + pc + '|' + winner + '|' + nameStr;
+    if (!groups[fp]) groups[fp] = [];
+    groups[fp].push(rec);
+  }
+  var result = [];
+  var dedupCount = 0;
+  for (var fp in groups) {
+    var items = groups[fp];
+    if (items.length === 1) {
+      result.push(items[0]);
+    } else {
+      var best = items[0];
+      for (var j = 1; j < items.length; j++) {
+        var cur = items[j];
+        var bestHasSid = best._sid || best._supabaseId;
+        var curHasSid = cur._sid || cur._supabaseId;
+        if (curHasSid && !bestHasSid) {
+          best = cur;
+        } else if (curHasSid && bestHasSid && (cur._sid || cur._supabaseId) < (best._sid || best._supabaseId)) {
+          best = cur;
+        }
+      }
+      result.push(best);
+      dedupCount += items.length - 1;
+    }
+  }
+  if (dedupCount > 0) {
+    console.log('[Dedup] removed ' + dedupCount + ' duplicate records (from ' + history.length + ' to ' + result.length + ')');
+  }
+  return result;
+}
+
 /* ==================== INIT ==================== */
 (function() {
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
@@ -5922,8 +5965,8 @@ function makeRecordKey(record) {
   // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
   setTimeout(function() {
     setupRealtimeSubscriptions();
-    // 处理离线队列
-    setTimeout(function() { processOfflineQueues(); }, 500);
+    // 处理离线队列（暂时禁用，防止启动时旧记录回推 Supabase 造成循环）
+    // setTimeout(function() { processOfflineQueues(); }, 500);
   }, 1200);
 
 })();
