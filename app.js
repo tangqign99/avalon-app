@@ -140,6 +140,39 @@ function generateUUID() {
     hex(arr[8]) + hex(arr[9]) + '-' + hex(arr[10]) + hex(arr[11]) + hex(arr[12]) + hex(arr[13]) + hex(arr[14]) + hex(arr[15]);
 }
 
+// ====== Pending Queue (离线重推) ======
+function getPendingQueue() {
+  try { return JSON.parse(localStorage.getItem('avalon_pending_queue') || '[]'); } catch(e) { return []; }
+}
+function savePendingQueue(queue) {
+  localStorage.setItem('avalon_pending_queue', JSON.stringify(queue));
+}
+function processOfflineQueues() {
+  var sb = getSupabase();
+  if (!sb) return;
+  var queue = getPendingQueue();
+  if (queue.length === 0) return;
+  var remaining = [];
+  var processed = 0;
+  for (var i = 0; i < queue.length; i++) {
+    (function(item) {
+      sb.from('game_records').insert({ game_data: item.record, game_data_v2: item.recordV2 }).select('id').single().then(function(res) {
+        if (res.error) {
+          console.warn('[PendingQueue] push failed:', res.error);
+          remaining.push(item);
+        } else {
+          processed++;
+        }
+        if (i === queue.length - 1) {
+          savePendingQueue(remaining);
+          if (processed > 0) console.log('[PendingQueue] pushed ' + processed + ' items');
+        }
+      });
+    })(queue[i]);
+  }
+}
+// ====== End Pending Queue ======
+
 var namePool = DEFAULT_NAME_POOL.slice();
 var _historyRawCache = null;
 var _historyCache = null;
@@ -4029,7 +4062,11 @@ function saveGameRecord() {
     sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
-        // 离线时静默失败，不保存本地
+        // 入 pending_queue，下次初始化时重推
+        var queue = getPendingQueue();
+        queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+        savePendingQueue(queue);
+        toast('云端保存失败，已加入重推队列', 'warn');
         finishSave();
       } else if (res.data && res.data.id) {
         writeLocalAndFinish(res.data.id);
@@ -4045,7 +4082,11 @@ function saveGameRecord() {
     setTimeout(finishSave, 5000);
   } else {
     console.warn('[Supabase] saveGameRecord: no connection');
-    // 离线时静默失败，不保存本地
+    // 入 pending_queue，下次初始化时重推
+    var queue = getPendingQueue();
+    queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+    savePendingQueue(queue);
+    toast('云端保存失败，已加入重推队列', 'warn');
     finishSave();
   }
 }
@@ -5889,6 +5930,9 @@ function deduplicateHistory(history) {
     initState(7);
   }
   showPage('setup');
+
+  // 尝试重推待发送队列
+  processOfflineQueues();
 
   // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
   setTimeout(function() {
