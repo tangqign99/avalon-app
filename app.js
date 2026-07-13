@@ -432,10 +432,10 @@ function loadHistory() {
           var lr = localRaw[i];
           // v2 格式标准化
           if (!isRecordV2(lr)) { lr = toRecordV2(lr); }
-          // 已在云端的记录（按 _sid 匹配）跳过，避免每次 refresh 因 UUID 重生成而重复合并
-          if (lr._sid && cloudBySid[lr._sid]) {
-            continue;
-          }
+          // 有 _sid 的记录跟随云端状态：云端存在则已含在 cloudHistory 中，
+          // 云端不存在该 _sid 说明被其他设备删了，同步从本地移除
+          if (lr._sid) continue;
+          // 无 _sid 的纯本地记录保留
           merged.push(lr);
         }
         // 按内容指纹去重，只保留一份
@@ -5694,8 +5694,9 @@ function pullInitialData(sb) {
     for (var i = 0; i < localHistory.length; i++) {
       var lr = localHistory[i];
       if (!isRecordV2(lr)) lr = toRecordV2(lr);
-      // 已在云端的记录（按 _sid 匹配）跳过，避免每次 refresh 因 UUID 重生成而重复合并
-      if (lr._sid && cloudBySid[lr._sid]) continue;
+      // 有 _sid 的记录跟随云端状态：云端存在则已含在 cloudRecords 中，
+      // 云端不存在该 _sid 说明被其他设备删了，同步从本地移除
+      if (lr._sid) continue;
       merged.push(lr);
       hasNew = true;
     }
