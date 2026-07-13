@@ -398,7 +398,6 @@ function loadHistory() {
       xhr.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc', false);
       xhr.setRequestHeader('apikey', token);
       xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-      xhr.timeout = 3000;
       xhr.send();
       if (xhr.status >= 200 && xhr.status < 300) {
         result = JSON.parse(xhr.responseText);
