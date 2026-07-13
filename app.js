@@ -118,7 +118,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v140';
+var SW_VERSION = 'v141';
 
 /* ---- UUID utility ---- */
 function generateUUID() {
@@ -4231,7 +4231,7 @@ function renderStats() {
     }
 
     h += '<div class="history-compact-item">';
-    h += '<div class="hci-header" onclick="toggleCompactHistory(this)">';
+    h += '<div class="hci-header" onclick="openHistoryModal(' + i + ')">';
     h += '<span class="hci-date">' + rec.date + '</span>';
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
     if (rec.startTime && rec.endTime) {
@@ -4241,85 +4241,9 @@ function renderStats() {
     h += '<div class="hci-right">';
     h += '<span class="hci-result" style="color:' + winnerColor + '">' + winnerLabel + '</span>';
     h += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + oneLiner + '</span>';
-    h += '<span class="hci-toggle">&#9654;</span>';
+
     h += '</div></div>';
-    h += '<div class="hci-body">';
-    h += '<div class="hci-detail-toggle" onclick="toggleHciDetail(this)">&#9660; 完整详情</div>';
-    h += '<div class="hci-detail-content">';
-    // Roles
-    if (rec.identities) {
-      h += '<div class="hci-roles">';
-      for (var j = 0; j < rec.identities.length; j++) {
-        var id = rec.identities[j];
-        h += '<span class="hci-role-item"><span class="hci-name">' + id.name + '</span><button class="hci-name-edit" onclick="event.stopPropagation();startRenameHistoryPlayer(' + i + ',' + j + ')" title="改名">&#9998;</button>：' + (id.role || '--') + '</span>';
-      }
-      h += '</div>';
-    }
-    // Missions with full vote details
-    if (rec.missions) {
-      h += '<div class="hci-missions" style="margin-top:4px">';
-      for (var mi = 0; mi < rec.missions.length; mi++) {
-        var m = rec.missions[mi];
-        if (!m.result && (!m.launchAttempts || m.launchAttempts.length === 0)) continue;
-        h += '<div style="margin-bottom:3px;padding:3px 6px;background:rgba(255,255,255,0.02);border-radius:4px;font-size:12px">';
-        h += '<span style="font-weight:700">第' + (mi + 1) + '轮</span>';
-        if (m.launchAttempts && m.launchAttempts.length > 0) {
-          for (var la = 0; la < m.launchAttempts.length; la++) {
-            var att = m.launchAttempts[la];
-            var isLast = (la === m.launchAttempts.length - 1);
-            var appCnt = 0, rejCnt = 0;
-            for (var vk in att.votes) { if (att.votes[vk] === 'approve') appCnt++; else rejCnt++; }
-            var resIcon = '';
-            if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
-            else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
-            h += '<div style="margin-top:2px;font-size:11px">';
-            h += '组队' + (la + 1) + '：队长' + (att.leader || '') + ' 队伍[' + ((att.team || []).join(',')) + '] 投票' + appCnt + ':' + rejCnt + resIcon;
-            h += '</div>';
-          }
-        } else {
-          h += ' ' + (m.result === 'success' ? '<span style="color:var(--green-bright)">&#10003;</span>' : '<span style="color:var(--red-bright)">&#10007;</span>');
-        }
-        h += '</div>';
-      }
-      h += '</div>';
-    }
-    // Lady check history
-    if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
-      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">湖女查验：';
-      for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
-        var lc = rec.ladyCheckHistory[li];
-        h += '<span>' + lc.holderName + '→' + lc.targetName + '=' + (lc.result || '?') + ' </span>';
-      }
-      h += '</div>';
-    }
-    // Identity marks
-    if (rec.identityMarks && rec.identityMarks.length > 0) {
-      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">标记：';
-      for (var j = 0; j < rec.identityMarks.length; j++) {
-        var mk = rec.identityMarks[j];
-        var lvlLabel = mk.level === 'high' ? '高' : mk.level === 'mid' ? '中' : '低';
-        h += '<span>' + mk.targetName + '[' + lvlLabel + '] </span>';
-      }
-      h += '</div>';
-    }
-    // Lancelot flips
-    if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
-      var flipPlayers = [];
-      for (var lfIdx in rec.lancelotFlips) {
-        if (rec.identities && rec.identities[lfIdx]) flipPlayers.push(rec.identities[lfIdx].name);
-      }
-      if (flipPlayers.length > 0) h += '<div style="margin-top:4px;font-size:11px;color:var(--orange)">兰斯洛特变节：' + flipPlayers.join(',') + '</div>';
-    }
-    if (rec.assassinTarget) {
-      h += '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">刺杀';
-      if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
-        h += '（第' + (rec.assassinAfterRound + 1) + '轮任务后）';
-      }
-      h += '：' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中</span>' : '<span style="color:#99ff99">未命中</span>') + '</div>';
-    }
-    h += '<div class="hci-actions">';
-    h += '<button class="btn small danger" onclick="deleteGameRecord(' + i + ')" style="margin-left:auto">删除</button>';
-    h += '</div></div></div></div>';
+    h += '</div>';
   }
   cl.innerHTML = h;
   $('no-history').style.display = filtered.length === 0 ? 'block' : 'none';
@@ -7655,5 +7579,203 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + r);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
+}
+
+/* ==================== HISTORY DETAIL MODAL ==================== */
+function getPlayerFaction(role) {
+  if (GOOD_ROLES.indexOf(role) !== -1) return 'good';
+  if (EVIL_ROLES.indexOf(role) !== -1) return 'evil';
+  if (NEUTRAL_ROLES.indexOf(role) !== -1) return 'neutral';
+  return 'neutral';
+}
+
+function closeHistoryModal() {
+  var overlay = document.getElementById('hci-modal-overlay');
+  if (overlay) overlay.remove();
+}
+
+function openHistoryModal(idx) {
+  var history = loadHistory();
+  if (idx < 0 || idx >= history.length) return;
+  var recRaw = history[idx];
+  var rec = normalizeRecord(recRaw);
+  if (!rec) return;
+
+  var overlay = document.createElement('div');
+  overlay.className = 'hci-modal-overlay';
+  overlay.id = 'hci-modal-overlay';
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeHistoryModal();
+  });
+
+  var winnerColor = rec.winner === 'good' ? 'good' : 'evil';
+  var winnerLabel = rec.winner === 'good' ? '好人方胜' : '反方胜';
+
+  // Build duration
+  var durStr = '';
+  if (rec.startTime && rec.endTime) {
+    var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
+    if (durMin > 0) durStr = durMin + '分钟';
+  }
+
+  var h = '';
+  h += '<div class="hci-modal">';
+
+  // --- Header ---
+  h += '<div class="hci-modal-header">';
+  h += '<span class="hci-modal-date">' + (rec.date || '--') + '</span>';
+  h += '<span class="hci-modal-result ' + winnerColor + '">' + winnerLabel + '</span>';
+  h += '<button class="hci-modal-close" onclick="closeHistoryModal()">&times;</button>';
+  h += '</div>';
+
+  // --- Body ---
+  h += '<div class="hci-modal-body">';
+
+  // a) Basic info
+  h += '<div class="hci-modal-meta">';
+  h += '<span>' + (rec.playerCount || '?') + ' 人</span>';
+  if (durStr) h += '<span>' + durStr + '</span>';
+  h += '</div>';
+
+  // b) Identity panel
+  if (rec.identities && rec.identities.length > 0) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">身份</div>';
+    h += '<div class="hci-player-grid">';
+    for (var j = 0; j < rec.identities.length; j++) {
+      var id = rec.identities[j];
+      var faction = getPlayerFaction(id.role || '');
+      var flipped = rec.lancelotFlips && rec.lancelotFlips[id.index != null ? id.index : j];
+      var roleText = id.role || '--';
+      if (flipped) roleText += ' <span style="color:var(--orange);font-size:10px">&#8617;变节</span>';
+      h += '<div class="hci-player-card ' + faction + '">';
+      h += '<div class="hci-pc-name">' + id.name + '</div>';
+      h += '<div class="hci-pc-role">' + roleText + '</div>';
+      h += '</div>';
+    }
+    h += '</div></div>';
+  }
+
+  // c) Mission review
+  if (rec.missions && rec.missions.length > 0) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">任务回顾</div>';
+    h += '<div class="hci-mission-list">';
+    for (var mi = 0; mi < rec.missions.length; mi++) {
+      var m = rec.missions[mi];
+      if (!m.result && (!m.launchAttempts || m.launchAttempts.length === 0)) continue;
+      h += '<div class="hci-mission-card">';
+      h += '<div class="hci-mission-round">';
+      h += '第' + (mi + 1) + '轮';
+      if (m.result) {
+        h += m.result === 'success' ? ' <span style="color:var(--green-bright)">&#10003; 成功</span>' : ' <span style="color:var(--red-bright)">&#10007; 失败</span>';
+      }
+      h += '</div>';
+      if (m.launchAttempts && m.launchAttempts.length > 0) {
+        for (var la = 0; la < m.launchAttempts.length; la++) {
+          var att = m.launchAttempts[la];
+          var isLast = (la === m.launchAttempts.length - 1);
+          var appCnt = 0, rejCnt = 0;
+          for (var vk in att.votes) { if (att.votes[vk] === 'approve') appCnt++; else rejCnt++; }
+          var resIcon = '';
+          if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
+          else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
+          var teamMembers = (att.team || []).join(', ');
+          h += '<div class="hci-mission-attempt">';
+          h += '组队' + (la + 1) + '：<span class="leader">' + (att.leader || '') + '</span>';
+          if (teamMembers) h += ' <span class="team-members">[' + teamMembers + ']</span>';
+          h += ' <span class="vote-count">投票 ' + appCnt + '<span class="hci-vote-approve">赞成</span>:' + rejCnt + '<span class="hci-vote-reject">反对</span>' + resIcon + '</span>';
+          h += '</div>';
+        }
+      } else {
+        h += '<div class="hci-mission-attempt">';
+        h += '结果：' + (m.result === 'success' ? '<span style="color:var(--green-bright)">&#10003;</span>' : '<span style="color:var(--red-bright)">&#10007;</span>');
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div></div>';
+  }
+
+  // d) Lady check
+  if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">湖女查验</div>';
+    for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+      var lc = rec.ladyCheckHistory[li];
+      h += '<div class="hci-detail-row">' + lc.holderName + ' &#8594; ' + lc.targetName + ' = <strong>' + (lc.result || '?') + '</strong></div>';
+    }
+    h += '</div>';
+  }
+
+  // e) Identity marks
+  if (rec.identityMarks && rec.identityMarks.length > 0) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">身份标记</div>';
+    for (var mkIdx = 0; mkIdx < rec.identityMarks.length; mkIdx++) {
+      var mk = rec.identityMarks[mkIdx];
+      var lvlLabel = mk.level === 'high' ? '高' : mk.level === 'mid' ? '中' : '低';
+      h += '<div class="hci-detail-row">' + (mk.targetName || mk.target) + ' [' + lvlLabel + ']</div>';
+    }
+    h += '</div>';
+  }
+
+  // f) Excalibur
+  if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">湖中剑</div>';
+    for (var exIdx = 0; exIdx < rec.excaliburHistory.length; exIdx++) {
+      var ex = rec.excaliburHistory[exIdx];
+      h += '<div class="hci-detail-row">' + (ex.holderName || ex.holder) + ' &#8594; ' + (ex.targetName || ex.target) + (ex.used ? '（已使用）' : '（未使用）') + '</div>';
+    }
+    h += '</div>';
+  }
+
+  // g) Lancelot flips
+  if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
+    var flipPlayers = [];
+    for (var lfIdx in rec.lancelotFlips) {
+      if (rec.identities && rec.identities[lfIdx]) flipPlayers.push(rec.identities[lfIdx].name);
+    }
+    if (flipPlayers.length > 0) {
+      h += '<div>';
+      h += '<div class="hci-modal-section-title">兰斯洛特变节</div>';
+      h += '<div class="hci-detail-row" style="color:var(--orange)">' + flipPlayers.join(' &#8594; ') + '</div>';
+      h += '</div>';
+    }
+  }
+
+  // h) Assassin
+  if (rec.assassinTarget) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">刺杀</div>';
+    h += '<div class="hci-detail-row">';
+    if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+      h += '（第' + (rec.assassinAfterRound + 1) + '轮任务后）';
+    }
+    h += '目标：' + rec.assassinTarget + ' &#8594; ';
+    h += rec.assassinSuccess ? '<span style="color:var(--red-bright);font-weight:700">命中</span>' : '<span style="color:var(--green-bright);font-weight:700">未命中</span>';
+    h += '</div></div>';
+  }
+
+  // Force ended info
+  if (rec.forceEnded) {
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">强制结束</div>';
+    h += '<div class="hci-detail-row" style="color:var(--orange)">' + (rec.forceEndReason || '未知原因') + '</div>';
+    h += '</div>';
+  }
+
+  h += '</div>'; // body
+
+  // --- Footer ---
+  h += '<div class="hci-modal-footer">';
+  h += '<button class="btn small danger" onclick="deleteGameRecord(' + idx + ');closeHistoryModal()">删除</button>';
+  h += '</div>';
+
+  h += '</div>'; // modal
+
+  overlay.innerHTML = h;
+  document.body.appendChild(overlay);
 }
 

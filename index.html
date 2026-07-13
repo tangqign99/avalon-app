@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v140">
+<link rel="stylesheet" href="./style.css?v=v141">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v140"></script>
+<script defer src="./app.js?v=v141"></script>
 </head>
 <body>
 
@@ -312,7 +312,7 @@
 
 <script>
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v140';
+  var SW_VERSION = 'v141';
 
   navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
