@@ -395,7 +395,7 @@ function loadHistory() {
       var result = null;
       var xhr = new XMLHttpRequest();
       var token = SUPABASE_KEY;
-      xhr.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc', false);
+      xhr.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc&limit=1000', false);
       xhr.setRequestHeader('apikey', token);
       xhr.setRequestHeader('Authorization', 'Bearer ' + token);
       xhr.send();
@@ -5889,23 +5889,32 @@ function mergeHistories(local, cloud) {
 
 function makeRecordKey(record) {
   var rec = normalizeRecord(record);
-  if (!rec || !rec.identities) return '';
-  var identityStr = rec.identities.map(function(id) { return (id.name || '') + '|' + (id.role || ''); }).sort().join(',');
-  return (rec.date || '') + '|' + (rec.playerCount || 0) + '|' + identityStr;
+  if (!rec) return '';
+  // 兼容压缩格式（d/pc/w/ids）和长格式（date/playerCount/winner/identities）
+  var identities = rec.identities || rec.ids || [];
+  var date = rec.date || rec.d || '';
+  var playerCount = rec.playerCount || rec.pc || 0;
+  var identityStr = identities.map(function(id) {
+    return (id.name || id.n || '') + '|' + (id.role || id.r || '');
+  }).sort().join(',');
+  return date + '|' + playerCount + '|' + identityStr;
 }
 
 function deduplicateHistory(history) {
+  // 归一化到长格式以确保指纹一致性
+  var normalized = history.map(function(r) { return normalizeRecord(r) || r; });
   var groups = {};
-  for (var i = 0; i < history.length; i++) {
-    var rec = history[i];
-    var date = rec.d || rec.date || '';
-    var pc = rec.pc || rec.playerCount || 0;
-    var winner = rec.w || rec.winner || '';
-    var ids = rec.ids || rec.identities || [];
-    var nameStr = ids.map(function(id) { return id.n || id.name || ''; }).sort().join(',');
+  for (var i = 0; i < normalized.length; i++) {
+    var rec = normalized[i];
+    var date = rec.date || rec.d || '';
+    var pc = rec.playerCount || rec.pc || 0;
+    var winner = rec.winner || rec.w || '';
+    var ids = rec.identities || rec.ids || [];
+    var nameStr = ids.map(function(id) { return id.name || id.n || ''; }).sort().join(',');
     var fp = date + '|' + pc + '|' + winner + '|' + nameStr;
-    if (!groups[fp]) groups[fp] = [];
-    groups[fp].push(rec);
+    // 用原始记录（含 _sid 等附加字段）入组
+    groups[fp] = groups[fp] || [];
+    groups[fp].push(history[i]);
   }
   var result = [];
   var dedupCount = 0;
