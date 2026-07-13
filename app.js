@@ -4599,25 +4599,43 @@ function renderRelationshipNetwork(history) {
   var pairs = Object.values(pairStats);
   var best = pairs.slice().sort(function(a, b) { return b.same - a.same || a.p1.localeCompare(b.p1); }).slice(0, 5);
   var rival = pairs.slice().sort(function(a, b) { return b.diff - a.diff || a.p1.localeCompare(b.p1); }).slice(0, 5);
-  var h = '<div class="card"><h2>玩家关系网</h2>';
-  if (pairs.length === 0) {
-    h += '<p style="color:var(--text-dim);font-size:13px;text-align:center;padding:8px">暂无足够数据</p>';
-  } else {
-    h += '<h3 style="font-size:14px;margin-bottom:6px;color:var(--green-bright)">&#9829; 最佳队友 Top5</h3>';
-    h += '<table style="width:100%;font-size:13px">';
-    for (var i = 0; i < best.length; i++) {
-      var p = best[i];
-      h += '<tr><td style="padding:2px 4px">' + (i + 1) + '.</td><td style="padding:2px 4px">' + p.p1 + ' & ' + p.p2 + '</td><td style="padding:2px 4px;text-align:right;color:var(--green-bright);font-weight:600">' + p.same + '局</td></tr>';
+
+  var circleNums = ['\u2460', '\u2461', '\u2462', '\u2463', '\u2464'];
+
+  function renderList(items, field, color) {
+    if (items.length === 0) {
+      return '<div style="text-align:center;color:var(--text-dim);font-size:12px;padding:10px 0">暂无数据</div>';
     }
-    h += '</table>';
-    h += '<h3 style="font-size:14px;margin:10px 0 6px;color:var(--red-bright)">&#9876; 宿敌 Top5</h3>';
-    h += '<table style="width:100%;font-size:13px">';
-    for (var i = 0; i < rival.length; i++) {
-      var p = rival[i];
-      h += '<tr><td style="padding:2px 4px">' + (i + 1) + '.</td><td style="padding:2px 4px">' + p.p1 + ' & ' + p.p2 + '</td><td style="padding:2px 4px;text-align:right;color:var(--red-bright);font-weight:600">' + p.diff + '局</td></tr>';
+    var html = '';
+    for (var i = 0; i < items.length; i++) {
+      var p = items[i];
+      var count = p[field];
+      html += '<div style="display:flex;align-items:center;padding:3px 0;font-size:12px">';
+      html += '<span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(201,168,76,0.12);font-size:10px;color:var(--gold);flex-shrink:0;margin-right:6px">' + circleNums[i] + '</span>';
+      html += '<span style="flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.p1 + ' <span style="color:var(--text-dim)">·</span> ' + p.p2 + '</span>';
+      html += '<span style="color:' + color + ';font-weight:600;flex-shrink:0;margin-left:4px">' + count + '次</span>';
+      html += '</div>';
     }
-    h += '</table>';
+    return html;
   }
+
+  var h = '<div class="card" style="margin-top:12px">';
+  h += '<h2 style="font-size:15px;margin-bottom:10px">\uD83E\uDD1D 玩家关系网</h2>';
+  h += '<div style="display:flex;gap:10px">';
+
+  // Left column — 最佳队友
+  h += '<div style="flex:1;background:rgba(74,201,74,0.04);border-radius:var(--radius-sm,8px);padding:10px;border:1px solid rgba(74,201,74,0.1)">';
+  h += '<div style="font-size:13px;font-weight:600;color:var(--green-bright);margin-bottom:6px;letter-spacing:0.5px">\uD83E\uDD1D 最佳队友</div>';
+  h += renderList(best, 'same', 'var(--green-bright)');
+  h += '</div>';
+
+  // Right column — 宿敌
+  h += '<div style="flex:1;background:rgba(196,74,74,0.04);border-radius:var(--radius-sm,8px);padding:10px;border:1px solid rgba(196,74,74,0.1)">';
+  h += '<div style="font-size:13px;font-weight:600;color:var(--red-bright);margin-bottom:6px;letter-spacing:0.5px">\u2694\uFE0F 宿敌</div>';
+  h += renderList(rival, 'diff', 'var(--red-bright)');
+  h += '</div>';
+
+  h += '</div>';
   h += '</div>';
   return h;
 }
