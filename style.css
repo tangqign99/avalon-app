@@ -282,18 +282,37 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .vote-btn.reject{border-color:#663333;background:linear-gradient(180deg,#2a1a1a,#1a1010);color:#cc8888}
 .vote-btn.reject.selected{border-color:var(--red-bright);background:linear-gradient(180deg,#4a1a1a,#2a0a0a);color:var(--red-bright);box-shadow:0 0 16px rgba(255,96,96,0.35)}
 .vote-num{font-size:14px;color:#c9b85c;min-width:16px;text-align:center;align-self:center;font-weight:700}
-.mission-result-area{display:flex;gap:14px;justify-content:center;padding:14px}
+.mission-result-area{display:flex;gap:18px;justify-content:center;padding:16px 8px}
 .mission-btn{
-  width:80px;height:80px;border-radius:50%;border:3px solid rgba(201,168,76,0.2);
-  font-size:38px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;
+  width:110px;height:110px;border-radius:16px;border:3px solid rgba(201,168,76,0.2);
+  font-size:48px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   background:linear-gradient(180deg,var(--parchment-light),var(--parchment));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.03),0 2px 8px rgba(0,0,0,0.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.03),0 3px 12px rgba(0,0,0,0.35);
+  position:relative;overflow:hidden;
 }
-.mission-btn:hover{transform:scale(1.06)}
-.mission-btn.success-btn{border-color:#336633}
-.mission-btn.success-btn:hover,.mission-btn.success-btn.selected{border-color:var(--green-bright);background:linear-gradient(180deg,#1a3a1a,#102810);box-shadow:0 0 24px rgba(96,255,96,0.4)}
-.mission-btn.fail-btn{border-color:#663333}
-.mission-btn.fail-btn:hover,.mission-btn.fail-btn.selected{border-color:var(--red-bright);background:linear-gradient(180deg,#3a1a1a,#2a1010);box-shadow:0 0 24px rgba(255,96,96,0.4)}
+.mission-btn .mission-icon{font-size:46px;line-height:1;display:block}
+.mission-btn .mission-label{font-size:14px;font-weight:700;letter-spacing:2px;display:block}
+.mission-btn:hover{transform:scale(1.08)}
+.mission-btn:active{transform:scale(0.95)}
+.mission-btn.success-btn{border-color:#2d5a2d}
+.mission-btn.success-btn .mission-label{color:var(--green-bright,#4CAF50)}
+.mission-btn.success-btn:hover,.mission-btn.success-btn.selected{
+  border-color:var(--green-bright);background:linear-gradient(180deg,#1e4a1e,#0f2a0f);
+  box-shadow:0 0 32px rgba(96,255,96,0.5),inset 0 0 20px rgba(96,255,96,0.08)
+}
+.mission-btn.fail-btn{border-color:#5a2d2d}
+.mission-btn.fail-btn .mission-label{color:var(--red-bright,#ff4444)}
+.mission-btn.fail-btn:hover,.mission-btn.fail-btn.selected{
+  border-color:var(--red-bright);background:linear-gradient(180deg,#4a1a1a,#2a0e0e);
+  box-shadow:0 0 32px rgba(255,96,96,0.5),inset 0 0 20px rgba(255,96,96,0.08)
+}
+/* 移动端适配 */
+@media(max-width:480px){
+  .mission-btn{width:90px;height:90px;font-size:36px;border-radius:14px}
+  .mission-btn .mission-icon{font-size:36px}
+  .mission-btn .mission-label{font-size:12px;letter-spacing:1px}
+  .mission-result-area{gap:14px;padding:12px 4px}
+}
 .fail-count-row{text-align:center;margin-top:8px}
 .fail-count-btns{display:flex;gap:8px;justify-content:center;padding:8px}
 .fail-count-btn{

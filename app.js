@@ -15,26 +15,200 @@ var _supabase = null;
 var _supabaseConnected = false;
 var _supabaseChannel = null;
 function getSupabase() {
-  if (_supabase) {
-    return _supabase;
-  }
-  // 兼容多种全局变量名
+  if (_supabase) return _supabase;
+
   var sdkGlobal = typeof supabase !== 'undefined' ? supabase : (typeof window.supabase !== 'undefined' ? window.supabase : null);
-  if (!sdkGlobal) {
-    console.warn('[Supabase] SDK not loaded (typeof supabase=' + typeof supabase + ', typeof window.supabase=' + typeof window.supabase + '), running in offline mode');
-    return null;
+  if (sdkGlobal) {
+    try {
+      _supabase = sdkGlobal.createClient(SUPABASE_URL, SUPABASE_KEY);
+      if (_supabase) {
+        _supabaseConnected = true;
+        console.log('[Supabase] client created successfully, URL:', SUPABASE_URL, ', keys:', Object.keys(_supabase).length);
+        return _supabase;
+      }
+    } catch(e) {
+      console.error('[Supabase] createClient failed:', e.message, '| sdkGlobal keys:', Object.keys(sdkGlobal).slice(0, 5));
+    }
   }
-  try {
-    _supabase = sdkGlobal.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log('[Supabase] client created successfully, URL:', SUPABASE_URL, ', keys:', Object.keys(_supabase).length);
-  } catch(e) {
-    console.error('[Supabase] createClient failed:', e.message, '| sdkGlobal keys:', Object.keys(sdkGlobal).slice(0, 5));
-    _supabase = null;
-  }
+
+  // Supabase SDK 不可用 → 使用 REST API 降级方案（直接 XHR/fetch 调用）
+  console.warn('[Supabase] SDK not loaded (typeof supabase=' + typeof supabase + '), using REST API fallback');
+  _supabase = createRestFallbackClient();
+  _supabaseConnected = true;
   return _supabase;
+}
+
+/* ---- REST API Fallback (Supabase SDK 不可用时直接用 fetch 调用 REST API) ---- */
+function createRestFallbackClient() {
+  function restFetch(method, table, opts) {
+    var url = SUPABASE_URL + '/rest/v1/' + table;
+    var headers = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': ''
+    };
+    if (opts.single) headers['Prefer'] = 'return=representation';
+    if (opts.upsert) {
+      headers['Prefer'] = (headers['Prefer'] ? headers['Prefer'] + ',' : '') + 'resolution=merge-duplicates';
+    }
+    if (opts.onConflict) {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'onConflict=' + encodeURIComponent(opts.onConflict);
+    }
+    if (opts.select) {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'select=' + encodeURIComponent(opts.select);
+    }
+    if (opts.filter) {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + encodeURIComponent(opts.filter.col) + '=eq.' + encodeURIComponent(String(opts.filter.val));
+    }
+    if (opts.order && opts.order.col) {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'order=' + encodeURIComponent(opts.order.col + (opts.order.asc === false ? '.desc' : '.asc'));
+    }
+
+    return {
+      then: function(fn) {
+        fetch(url, {
+          method: method,
+          headers: headers,
+          body: opts.body ? JSON.stringify(opts.body) : undefined
+        }).then(function(resp) {
+          if (method === 'DELETE') {
+            if (!resp.ok) return resp.text().then(function(t) { fn({ data: null, error: { message: resp.status + ': ' + t } }); });
+            return resp.json().then(function(d) { fn({ data: d, error: null }); }).catch(function() { fn({ data: null, error: null }); });
+          }
+          if (!resp.ok) return resp.text().then(function(t) { fn({ data: null, error: { message: resp.status + ': ' + t } }); });
+          return resp.json().then(function(d) {
+            if (opts.single && Array.isArray(d)) {
+              fn({ data: d.length > 0 ? d[0] : null, error: null });
+            } else {
+              fn({ data: d, error: null });
+            }
+          });
+        }).catch(function(err) {
+          fn({ data: null, error: { message: err.message || 'Network error' } });
+        });
+      }
+    };
+  }
+
+  function queryBuilder(table) {
+    var _select = null, _single = false, _filter = null, _order = null, _body = null, _onConflict = null, _upsert = false, _method = 'GET';
+    var q = {
+      insert: function(body) { _body = body; _method = 'POST'; return q; },
+      delete: function() { _method = 'DELETE'; return q; },
+      upsert: function(body, opts) {
+        _body = body; _method = 'POST'; _upsert = true;
+        if (opts && opts.onConflict) _onConflict = opts.onConflict;
+        return q;
+      },
+      select: function(cols) { _select = cols || '*'; return q; },
+      eq: function(col, val) { _filter = { col: col, val: val }; return q; },
+      single: function() { _single = true; return q; },
+      order: function(col, dir) { _order = { col: col, asc: !dir || !dir.ascending !== false }; return q; },
+      then: function(fn) {
+        return restFetch(_method, table, { select: _select, single: _single, body: _body, filter: _filter, order: _order, upsert: _upsert, onConflict: _onConflict }).then(fn);
+      }
+    };
+    return q;
+  }
+
+  return {
+    from: function(table) { return queryBuilder(table); },
+    channel: function() { return { on: function() { return this; }, subscribe: function() {} }; },
+    removeChannel: function() {}
+  };
 }
 var SW_VERSION = 'v128';
 
+/* ---- UUID utility ---- */
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: crypto.getRandomValues + hex
+  var arr = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(arr);
+  } else {
+    for (var i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
+  }
+  arr[6] = (arr[6] & 0x0f) | 0x40;
+  arr[8] = (arr[8] & 0x3f) | 0x80;
+  function hex(v) { return (v < 16 ? '0' : '') + v.toString(16); }
+  return hex(arr[0]) + hex(arr[1]) + hex(arr[2]) + hex(arr[3]) + '-' +
+    hex(arr[4]) + hex(arr[5]) + '-' + hex(arr[6]) + hex(arr[7]) + '-' +
+    hex(arr[8]) + hex(arr[9]) + '-' + hex(arr[10]) + hex(arr[11]) + hex(arr[12]) + hex(arr[13]) + hex(arr[14]) + hex(arr[15]);
+}
+
+/* ---- Offline queue ---- */
+function getOfflineQueue() {
+  try { return JSON.parse(localStorage.getItem('avalon_offline_queue') || '[]'); } catch(e) { return []; }
+}
+function saveOfflineQueue(queue) {
+  localStorage.setItem('avalon_offline_queue', JSON.stringify(queue));
+}
+function getOfflineDeleteQueue() {
+  try { return JSON.parse(localStorage.getItem('avalon_offline_delete_queue') || '[]'); } catch(e) { return []; }
+}
+function saveOfflineDeleteQueue(queue) {
+  localStorage.setItem('avalon_offline_delete_queue', JSON.stringify(queue));
+}
+function processOfflineQueues() {
+  var sb = getSupabase();
+  if (!sb) return;
+
+  // 处理离线写入队列
+  var writeQueue = getOfflineQueue();
+  if (writeQueue.length > 0) {
+    var remaining = [];
+    var processed = 0;
+    for (var i = 0; i < writeQueue.length; i++) {
+      (function(item) {
+        sb.from('game_records').insert({ game_data: item.record, game_data_v2: item.recordV2 }).select('id').single().then(function(res) {
+          if (res.error) {
+            console.warn('[OfflineQueue] write failed:', res.error);
+            remaining.push(item);
+          } else if (res.data && res.data.id) {
+            item.recordV2._sid = res.data.id;
+            var history = loadHistory();
+            var found = false;
+            for (var j = 0; j < history.length; j++) {
+              if (history[j]._uuid === item._uuid) { history[j]._sid = res.data.id; found = true; break; }
+            }
+            if (!found) history.push(item.recordV2);
+            saveHistory(history);
+            processed++;
+          }
+          // 最后一个回调用完再保存队列
+          if (i === writeQueue.length - 1) {
+            saveOfflineQueue(remaining);
+            if (processed > 0) { console.log('[OfflineQueue] processed ' + processed + ' items'); scheduleRenderStats(); }
+          }
+        });
+      })(writeQueue[i]);
+    }
+  }
+
+  // 处理离线删除队列
+  var deleteQueue = getOfflineDeleteQueue();
+  if (deleteQueue.length > 0) {
+    var remainingDel = [];
+    for (var i = 0; i < deleteQueue.length; i++) {
+      (function(item) {
+        sb.from('game_records').delete().eq('id', item.sid).then(function(res) {
+          if (res.error) {
+            console.warn('[OfflineQueue] delete failed:', res.error);
+            remainingDel.push(item);
+          }
+          if (i === deleteQueue.length - 1) {
+            saveOfflineDeleteQueue(remainingDel);
+            if (remainingDel.length < deleteQueue.length) { console.log('[OfflineQueue] processed ' + (deleteQueue.length - remainingDel.length) + ' deletes'); }
+          }
+        });
+      })(deleteQueue[i]);
+    }
+  }
+}
 
 var namePool = DEFAULT_NAME_POOL.slice();
 var _historyRawCache = null;
@@ -214,6 +388,73 @@ function migrateRoundTendenciesV2(v2) {
 }
 
 function loadHistory() {
+  // 先尝试从 Supabase 全量拉取，不可用时回退到 localStorage
+  var sb = getSupabase();
+  if (sb) {
+    try {
+      var result = null;
+      var xhr = new XMLHttpRequest();
+      var token = SUPABASE_KEY;
+      xhr.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc', false);
+      xhr.setRequestHeader('apikey', token);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.timeout = 3000;
+      xhr.send();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        result = JSON.parse(xhr.responseText);
+      }
+      if (result && result.length > 0) {
+        var cloudHistory = [];
+        var deletedKeys = loadDeletedKeys();
+        for (var i = 0; i < result.length; i++) {
+          var row = result[i];
+          var recordV2 = row.game_data_v2 ? row.game_data_v2 : (row.game_data ? toRecordV2(row.game_data) : null);
+          if (!recordV2) continue;
+          recordV2._sid = row.id;
+          // 从 game_data_v2 内读取 _uuid（已由 saveGameRecord 存入 JSONB）
+          // 检查删除黑名单
+          var dk = makeRecordKey(recordV2);
+          if (deletedKeys.indexOf(dk) !== -1) continue;
+          // 向后兼容：旧记录没有 _uuid 的，赋予一个
+          if (!recordV2._uuid) {
+            recordV2._uuid = generateUUID();
+          }
+          cloudHistory.push(recordV2);
+        }
+        // 合并本地未同步的记录（按 _uuid 去重）
+        var localRaw = [];
+        try { localRaw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]'); } catch(e) {}
+        var cloudUUIDs = {};
+        for (var i = 0; i < cloudHistory.length; i++) {
+          cloudUUIDs[cloudHistory[i]._uuid] = true;
+        }
+        var merged = cloudHistory.slice();
+        for (var i = 0; i < localRaw.length; i++) {
+          var lr = localRaw[i];
+          // v2 格式标准化
+          if (!isRecordV2(lr)) { lr = toRecordV2(lr); }
+          if (!lr._uuid) {
+            lr._uuid = generateUUID();
+          }
+          if (!cloudUUIDs[lr._uuid]) {
+            merged.push(lr);
+          }
+        }
+        // 写回 localStorage 作为缓存
+        saveHistory(merged);
+        console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
+        return merged.slice();
+      }
+    } catch(e) {
+      console.warn('[loadHistory] Supabase sync failed, falling back to localStorage:', e);
+    }
+  }
+
+  // 回退到 localStorage
+  return loadHistoryLocal();
+}
+
+function loadHistoryLocal() {
   try {
     var rawText = localStorage.getItem('avalon_history_v2') || '[]';
     if (_historyRawCache === rawText && _historyCache) return _historyCache.slice();
@@ -223,6 +464,10 @@ function loadHistory() {
     for (var i = 0; i < raw.length; i++) {
       if (!isRecordV2(raw[i])) {
         raw[i] = toRecordV2(raw[i]);
+        migrated = true;
+      }
+      if (!raw[i]._uuid) {
+        raw[i]._uuid = generateUUID();
         migrated = true;
       }
       if (migrateRoundTendenciesV2(raw[i])) rtMigrated = true;
@@ -3091,8 +3336,8 @@ function renderStepPanelWithResult() {
   h += '<hr style="border-color:var(--border);margin-bottom:10px">';
   h += '<div class="step-label">步骤D：任务结果</div>';
   h += '<div class="mission-result-area">';
-  h += '<div class="mission-btn success-btn' + (m.result === 'success' ? ' selected' : '') + '" onclick="setMissionResult(\'success\')">&#128737;</div>';
-  h += '<div class="mission-btn fail-btn' + (m.result === 'fail' ? ' selected' : '') + '" onclick="setMissionResult(\'fail\')">&#128481;</div>';
+  h += '<div class="mission-btn success-btn' + (m.result === 'success' ? ' selected' : '') + '" onclick="setMissionResult(\'success\')"><span class="mission-icon">&#128737;</span><span class="mission-label">成功</span></div>';
+  h += '<div class="mission-btn fail-btn' + (m.result === 'fail' ? ' selected' : '') + '" onclick="setMissionResult(\'fail\')"><span class="mission-icon">&#128481;</span><span class="mission-label">失败</span></div>';
   h += '</div>';
   h += '<div id="fail-count-row" class="fail-count-row" style="display:none">';
   h += '<div class="step-label">失败票数量</div>';
@@ -3742,8 +3987,10 @@ function saveGameRecord() {
     }
   }
 
+  var _uuid = generateUUID();
   var history = loadHistory();
   var record = {
+    _uuid: _uuid,
     date: new Date().toISOString().slice(0, 10),
     startTime: state.gameStartTime || '',
     endTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
@@ -3821,10 +4068,9 @@ function saveGameRecord() {
     })
   };
   var recordV2 = toRecordV2(record);
-  history.push(recordV2);
-  saveHistory(history);
+  recordV2._uuid = _uuid;
 
-  // Supabase: 等待插入完成再跳转，防止刷新丢失
+  // 顺序：先 Supabase，成功后写 localStorage
   var sb = getSupabase();
   var done = false;
   function finishSave() {
@@ -3841,18 +4087,29 @@ function saveGameRecord() {
     state.myRole = null;
     showPage('setup');
   }
+  function writeLocalAndFinish(sid) {
+    if (sid) {
+      recordV2._sid = sid;
+    }
+    history.push(recordV2);
+    saveHistory(history);
+    finishSave();
+  }
   if (sb) {
-    var recordKey = makeRecordKey(record);
     sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
-        toast('保存失败：' + res.error.message, 'warn');
+        // 离线队列
+        var queue = getOfflineQueue();
+        queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+        saveOfflineQueue(queue);
+        toast('云端保存失败，已加入离线队列', 'warn');
+        writeLocalAndFinish(null);
       } else if (res.data && res.data.id) {
-        recordV2._sid = res.data.id;
-        history[history.length - 1]._sid = res.data.id;
-        saveHistory(history);
+        writeLocalAndFinish(res.data.id);
+      } else {
+        writeLocalAndFinish(null);
       }
-      finishSave();
     });
     // 同步 name_pool 到云端
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(function(res) {
@@ -3861,7 +4118,11 @@ function saveGameRecord() {
     // 超时兜底：5 秒后无论如何跳转
     setTimeout(finishSave, 5000);
   } else {
-    finishSave();
+    // 无 Supabase 连接：入离线队列
+    var queue = getOfflineQueue();
+    queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+    saveOfflineQueue(queue);
+    writeLocalAndFinish(null);
   }
 }
 
@@ -4358,6 +4619,33 @@ function togglePlayerStat(name) {
   }
   h += '</table>';
 
+  // 掩护梅林次数（被刺次数）：统计该玩家为好人且非梅林时被刺客选中的次数
+  var shieldCount = 0;
+  for (var si = 0; si < data.length; si++) {
+    var sd = data[si];
+    var rec = history[sd.recIndex];
+    if (!rec || rec.assassinTarget == null) continue;
+    var srole = sd.role;
+    var sflipped = sd.flipped || false;
+    var sfaction = getFinalFaction(srole, sflipped);
+    if (srole === '混子' && sd.huntFollow != null && sd.recIndex < history.length) {
+      sfaction = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
+    }
+    if (sfaction !== 'good' || srole === '梅林') continue;
+    if (rec.identities) {
+      for (var ji = 0; ji < rec.identities.length; ji++) {
+        if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
+          shieldCount++;
+          break;
+        }
+      }
+    }
+  }
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin-top:10px;background:rgba(255,102,102,0.06);border:1px solid rgba(255,102,102,0.2);border-radius:var(--radius-sm)">';
+  h += '<span style="font-size:14px;font-weight:600">掩护梅林次数（被刺次数）</span>';
+  h += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
+  h += '</div>';
+
   var div = document.createElement('div');
   div.id = safeId;
   div.className = 'player-stat-expand';
@@ -4509,6 +4797,29 @@ function renderPlayerProfile() {
 
   var initial = name.charAt(0);
 
+  // 掩护梅林次数（被刺次数）：统计该玩家为好人且非梅林时被刺客选中的次数
+  var shieldCount = 0;
+  for (var si = 0; si < data.length; si++) {
+    var sd = data[si];
+    var rec = history[sd.recIndex];
+    if (!rec || rec.assassinTarget == null) continue;
+    var srole = sd.role;
+    var sflipped = sd.flipped || false;
+    var sfaction = getFinalFaction(srole, sflipped);
+    if (srole === '混子' && sd.huntFollow != null && sd.recIndex < history.length) {
+      sfaction = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
+    }
+    if (sfaction !== 'good' || srole === '梅林') continue;
+    if (rec.identities) {
+      for (var ji = 0; ji < rec.identities.length; ji++) {
+        if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
+          shieldCount++;
+          break;
+        }
+      }
+    }
+  }
+
   var ph = '<div style="text-align:center;margin-bottom:16px">';
   ph += '<div style="display:inline-block;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8b6914);line-height:60px;font-size:28px;font-weight:700;color:#fff;margin-bottom:8px">' + initial + '</div>';
   ph += '<div style="font-size:20px;font-weight:700">' + name + '</div>';
@@ -4528,6 +4839,12 @@ function renderPlayerProfile() {
   ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">当前' + streakLabel + '</div><div style="font-size:24px;font-weight:700;color:' + streakColor + '">' + streak + '</div><div style="font-size:10px;color:var(--text-dim)">最高' + maxStreak + '</div></div>';
   ph += '<div style="background:rgba(153,255,153,0.04);border:1px solid rgba(153,255,153,0.15);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">蓝方胜率</div><div style="font-size:24px;font-weight:700;color:var(--green-bright)">' + goodRate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + gamesGood + '场</div></div>';
   ph += '<div style="background:rgba(255,153,153,0.04);border:1px solid rgba(255,153,153,0.15);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">红方胜率</div><div style="font-size:24px;font-weight:700;color:var(--red-bright)">' + evilRate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + gamesEvil + '场</div></div>';
+  ph += '</div>';
+
+  // 掩护梅林次数（被刺次数）
+  ph += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin-bottom:12px;background:rgba(255,102,102,0.06);border:1px solid rgba(255,102,102,0.2);border-radius:var(--radius-sm)">';
+  ph += '<span style="font-size:14px;font-weight:600">掩护梅林次数（被刺次数）</span>';
+  ph += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
   ph += '</div>';
 
   // Recent performance
@@ -5175,13 +5492,20 @@ function confirmDeleteGame(idx) {
           doLocalDelete();
         } else {
           console.warn('[Supabase] deleteGameRecord failed:', res.error);
-          toast('云端删除失败，请重试');
+          // 入离线删除队列
+          var delQueue = getOfflineDeleteQueue();
+          delQueue.push({ sid: sid, key: key, idx: idx });
+          saveOfflineDeleteQueue(delQueue);
+          doLocalDelete();
+          toast('云端删除失败，已加入离线删除队列');
         }
       });
     }
 
     if (record._supabaseId) {
       doDeleteById(record._supabaseId);
+    } else if (recRaw._sid) {
+      doDeleteById(recRaw._sid);
     } else {
       // 无 _supabaseId，按 date + playerCount + identities 匹配查找
       sb.from('game_records').select('id')
@@ -5210,7 +5534,12 @@ function confirmDeleteGame(idx) {
         });
     }
   } else {
-    // 无 Supabase 连接，仅本地删除
+    // 无 Supabase 连接：入离线删除队列
+    if (recRaw._sid) {
+      var delQueue = getOfflineDeleteQueue();
+      delQueue.push({ sid: recRaw._sid, key: key, idx: idx });
+      saveOfflineDeleteQueue(delQueue);
+    }
     doLocalDelete();
   }
 }
@@ -5322,65 +5651,68 @@ function doImport() {
 // Supabase Realtime 订阅：跨设备实时同步
 // 页面加载时从 Supabase 拉取历史数据合并到本地（补充实时推送之前的记录）
 function pullInitialData(sb) {
-  var lastSync = localStorage.getItem('avalon_last_sync');
-  var query = sb.from('game_records').select('id, game_data, game_data_v2, created_at').order('created_at', { ascending: true });
-
-  if (lastSync) {
-    query = query.gt('created_at', lastSync);
-  }
-
-  query.then(function(gameRes) {
+  // 全量拉取云端记录，_uuid 去重合并
+  sb.from('game_records').select('id, game_data, game_data_v2, created_at').order('created_at', { ascending: true }).then(function(gameRes) {
     if (gameRes.error) {
       console.warn('[InitPull] game_records fetch failed:', gameRes.error);
       return;
     }
     if (!gameRes.data || gameRes.data.length === 0) {
-      if (!lastSync) console.log('[InitPull] no records in cloud');
+      console.log('[InitPull] no records in cloud');
       return;
     }
 
     var localHistory = loadHistory();
     var localDeletedKeys = loadDeletedKeys();
-    var newSyncTime = gameRes.data[gameRes.data.length - 1].created_at;
-    var hasNew = false;
 
+    // 构建云端记录按 _uuid 索引
+    var cloudByUUID = {};
+    var cloudRecords = [];
     for (var i = 0; i < gameRes.data.length; i++) {
       var row = gameRes.data[i];
       var recordV2 = row.game_data_v2 ? row.game_data_v2 : (row.game_data ? toRecordV2(row.game_data) : null);
       if (!recordV2) continue;
       recordV2._sid = row.id;
+      // 从 game_data_v2 内读取 _uuid（已由 saveGameRecord 存入 JSONB）
+      if (!recordV2._uuid) recordV2._uuid = generateUUID();
 
-      // 检查删除黑名单
       var key = makeRecordKey(recordV2);
       if (localDeletedKeys.indexOf(key) !== -1) {
         console.log('[InitPull] skipped deleted:', key);
         continue;
       }
 
-      // 合并去重：按 key 查找本地是否已存在
-      var exists = false;
-      for (var j = 0; j < localHistory.length; j++) {
-        if (makeRecordKey(localHistory[j]) === key) { exists = true; break; }
-      }
-      if (!exists) {
-        localHistory.push(recordV2);
+      cloudRecords.push(recordV2);
+      cloudByUUID[recordV2._uuid] = true;
+    }
+
+    // 合并：云端记录全量采用，本地未同步的补充
+    var merged = cloudRecords.slice();
+    var hasNew = false;
+    for (var i = 0; i < localHistory.length; i++) {
+      var lr = localHistory[i];
+      if (!isRecordV2(lr)) lr = toRecordV2(lr);
+      if (!lr._uuid) lr._uuid = generateUUID();
+      if (!cloudByUUID[lr._uuid]) {
+        merged.push(lr);
         hasNew = true;
       }
     }
 
-    if (hasNew) {
-      localHistory.sort(function(a, b) {
-        var da = (a.d || a.date || '');
-        var db = (b.d || b.date || '');
+    if (hasNew || merged.length !== localHistory.length) {
+      merged.sort(function(a, b) {
+        var da = (a.date || '');
+        var db = (b.date || '');
         if (da < db) return -1;
         if (da > db) return 1;
-        return 0;
+        return (a.startTime || '').localeCompare(b.startTime || '');
       });
-      saveHistory(localHistory);
-      console.log('[InitPull] merged ' + gameRes.data.length + ' cloud records, total:', localHistory.length);
+      saveHistory(merged);
+      console.log('[InitPull] merged ' + cloudRecords.length + ' cloud + ' +
+        (merged.length - cloudRecords.length) + ' local = ' + merged.length);
+    } else {
+      console.log('[InitPull] already in sync, no changes');
     }
-
-    if (newSyncTime) localStorage.setItem('avalon_last_sync', newSyncTime);
 
     scheduleRenderStats();
   });
@@ -5420,22 +5752,23 @@ function setupRealtimeSubscriptions() {
           newRecord = toRecordV2(newRecord);
         }
         newRecord._sid = payload.new.id;
+        // 从 game_data_v2 内读取 _uuid（已由 saveGameRecord 存入 JSONB）
+        if (!newRecord._uuid) newRecord._uuid = generateUUID();
         // 检查删除黑名单
         var dk = loadDeletedKeys();
         if (dk.indexOf(makeRecordKey(newRecord)) !== -1) { console.log('[Realtime] skipped deleted record'); return; }
         var localHistory = loadHistory();
-        // 检查是否已存在（避免重复）
-        var newKey = makeRecordKey(newRecord);
+        // 按 _uuid 去重
         var exists = false;
         for (var i = 0; i < localHistory.length; i++) {
-          if (makeRecordKey(localHistory[i]) === newKey) { exists = true; break; }
+          if (localHistory[i]._uuid && localHistory[i]._uuid === newRecord._uuid) { exists = true; break; }
         }
         if (!exists) {
           localHistory.push(newRecord);
           saveHistory(localHistory);
           console.log('[Realtime] added new record, total:', localHistory.length);
         } else {
-          console.log('[Realtime] skipped duplicate record');
+          console.log('[Realtime] skipped duplicate record by _uuid:', newRecord._uuid);
         }
         // 当前在 stats 页面则刷新
         scheduleRenderStats();
@@ -5489,13 +5822,20 @@ function setupRealtimeSubscriptions() {
     }
   );
 
+  var _prevRealtimeStatus = null;
   _supabaseChannel.subscribe(function(status) {
     console.log('[Realtime] channel status:', status);
     if (status === 'SUBSCRIBED') {
+      if (_prevRealtimeStatus !== null && _prevRealtimeStatus !== 'SUBSCRIBED') {
+        console.log('[Realtime] reconnected, triggering full pull');
+        var sb = getSupabase();
+        if (sb) pullInitialData(sb);
+      }
       _supabaseConnected = true;
     } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
       _supabaseConnected = false;
     }
+    _prevRealtimeStatus = status;
     // Update connection indicator if on stats page
     if (state._currentPage === 'stats') {
       renderConnectionStatus();
@@ -5581,6 +5921,8 @@ function makeRecordKey(record) {
   // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
   setTimeout(function() {
     setupRealtimeSubscriptions();
+    // 处理离线队列
+    setTimeout(function() { processOfflineQueues(); }, 500);
   }, 1200);
 
 })();
