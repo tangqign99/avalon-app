@@ -691,6 +691,9 @@ function showPage(page) {
   if (page === 'tend') {
     renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
   }
+  if (page === 'tools') {
+    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
+  }
   if (page === 'end') renderEnd();
   if (page === 'stats') {
     if (prevPage !== 'stats') state._historyPage = 0;

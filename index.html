@@ -19,7 +19,6 @@
     <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
     <button id="nav-game" onclick="goToGame()">游戏</button>
     <button id="nav-tools" onclick="showPage('tools')">工具</button>
-    <button id="nav-tend" onclick="showPage('tend')">倾向</button>
     <button id="nav-end" onclick="showPage('end')">结束</button>
     <button id="nav-stats" onclick="showPage('stats')">统计</button>
   </div>
@@ -138,57 +137,6 @@
   
 </section>
 
-<section class="page" id="page-tend">
-  
-  <div class="card" id="tend-role-card">
-    <h2>我的身份</h2>
-    <div id="tend-role-grid"></div>
-  </div>
-
-  <div class="card">
-    <h2 id="tend-perspective-title">倾向分析</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
-  </div>
-
-  
-  <div class="card" id="v7-engine-card">
-    <div class="v7-card-header">
-      <h2 style="margin:0">&#9883; v7 算法面板</h2>
-      <span class="v7-version-badge">v110</span>
-    </div>
-
-    <!-- 全局状态条 -->
-    <div id="v7-engine-status" class="v7-status-bar"></div>
-
-    <!-- 算法 9 步实时状态 -->
-    <div id="v7-engine-steps" class="v7-step-grid"></div>
-
-    <!-- 公式说明 -->
-    <div class="v7-formula">
-      <span style="color:var(--accent)">&#9888;</span>
-      <strong>评分公式</strong>：分数 = 好人证据 / (好人证据 + 坏人证据) &#215; 100
-      &nbsp;|&nbsp; 先验 10:10，随轮次推进逐步收敛
-    </div>
-  </div>
-
-  <div class="card" id="known-identity-card">
-    <h2>已知身份标注</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范围</p>
-    <div id="known-identity-grid"></div>
-  </div>
-
-  <div class="card" id="tend-result-card">
-    <h2 id="tend-result-title">分析结果</h2>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px" id="tend-result-desc"></p>
-    <div id="tend-result-list"></div>
-  </div>
-
-  <div class="card" id="tend-evidence-card">
-    <h2>关键证据</h2>
-    <div id="tend-evidence-list"></div>
-  </div>
-</section>
-
 <section class="page" id="page-end">
   <div class="card" id="end-assassin-card" style="display:none">
     <h2>刺客刺杀环节</h2>
@@ -282,6 +230,47 @@
     <h2>录音播放</h2>
     <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">功能开发中，后续将支持上传录音文件并播放。</p>
     <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">功能开发中</div>
+  </div>
+
+  <div class="card" id="tend-role-card">
+    <h2>我的身份</h2>
+    <div id="tend-role-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="tend-perspective-title">倾向分析</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
+  </div>
+
+  <div class="card" id="v7-engine-card">
+    <div class="v7-card-header">
+      <h2 style="margin:0">&#9883; v7 算法面板</h2>
+      <span class="v7-version-badge">v110</span>
+    </div>
+    <div id="v7-engine-status" class="v7-status-bar"></div>
+    <div id="v7-engine-steps" class="v7-step-grid"></div>
+    <div class="v7-formula">
+      <span style="color:var(--accent)">&#9888;</span>
+      <strong>评分公式</strong>：分数 = 好人证据 / (好人证据 + 坏人证据) &#215; 100
+      &nbsp;|&nbsp; 先验 10:10，随轮次推进逐步收敛
+    </div>
+  </div>
+
+  <div class="card" id="known-identity-card">
+    <h2>已知身份标注</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范围</p>
+    <div id="known-identity-grid"></div>
+  </div>
+
+  <div class="card" id="tend-result-card">
+    <h2 id="tend-result-title">分析结果</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px" id="tend-result-desc"></p>
+    <div id="tend-result-list"></div>
+  </div>
+
+  <div class="card" id="tend-evidence-card">
+    <h2>关键证据</h2>
+    <div id="tend-evidence-list"></div>
   </div>
 </section>
 
