@@ -5771,8 +5771,6 @@ function doImportFile() {
   };
   reader.readAsText(file);
 }
-  setTimeout(function() { location.reload(); }, 800);
-}
 
 // Supabase Realtime 订阅：跨设备实时同步
 // 页面加载时从 Supabase 拉取历史数据合并到本地（补充实时推送之前的记录）
