@@ -4632,6 +4632,7 @@ function togglePlayerStat(name) {
       sfaction = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
     }
     if (sfaction !== 'good' || srole === '梅林') continue;
+    if (rec.winner !== 'good') continue;
     if (rec.identities) {
       for (var ji = 0; ji < rec.identities.length; ji++) {
         if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
@@ -4810,6 +4811,7 @@ function renderPlayerProfile() {
       sfaction = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
     }
     if (sfaction !== 'good' || srole === '梅林') continue;
+    if (rec.winner !== 'good') continue;
     if (rec.identities) {
       for (var ji = 0; ji < rec.identities.length; ji++) {
         if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
