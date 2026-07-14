@@ -7625,7 +7625,10 @@ function openHistoryModal(idx) {
   h += '<div class="hci-modal-header">';
   h += '<span class="hci-modal-date">' + (rec.date || '--') + '</span>';
   h += '<span class="hci-modal-result ' + winnerColor + '">' + winnerLabel + '</span>';
+  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:4px">';
+  h += '<button class="hci-modal-del-btn" onclick="deleteGameRecord(' + idx + ');closeHistoryModal()" title="删除">删除</button>';
   h += '<button class="hci-modal-close" onclick="closeHistoryModal()">&times;</button>';
+  h += '</div>';
   h += '</div>';
 
   // --- Body ---
@@ -7676,7 +7679,25 @@ function openHistoryModal(idx) {
           var att = m.launchAttempts[la];
           var isLast = (la === m.launchAttempts.length - 1);
           var appCnt = 0, rejCnt = 0;
-          for (var vk in att.votes) { if (att.votes[vk] === 'approve') appCnt++; else rejCnt++; }
+          var approveVoters = [], rejectVoters = [];
+          for (var vk in att.votes) {
+            var voterIdx = parseInt(vk);
+            if (att.votes[vk] === 'approve') { appCnt++; approveVoters.push(voterIdx); }
+            else { rejCnt++; rejectVoters.push(voterIdx); }
+          }
+          // Build voter name lists
+          var approveNames = approveVoters.map(function(vi) {
+            for (var vti = 0; vti < rec.identities.length; vti++) {
+              if (rec.identities[vti].index === vi) return (vi + 1) + '号';
+            }
+            return (vi + 1) + '号';
+          });
+          var rejectNames = rejectVoters.map(function(vi) {
+            for (var vti = 0; vti < rec.identities.length; vti++) {
+              if (rec.identities[vti].index === vi) return (vi + 1) + '号';
+            }
+            return (vi + 1) + '号';
+          });
           var resIcon = '';
           if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
           else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
@@ -7694,7 +7715,13 @@ function openHistoryModal(idx) {
           h += '<div class="hci-mission-attempt">';
           h += '组队' + (la + 1) + '：<span class="leader">' + (att.leader || '') + '</span>';
           if (teamHtml) h += ' <span class="team-members">[' + teamHtml + ']</span>';
-          h += ' <span class="vote-count">投票 ' + appCnt + '<span class="hci-vote-approve">赞成</span>:' + rejCnt + '<span class="hci-vote-reject">反对</span>' + resIcon + '</span>';
+          var toggleId = 'vote-detail-' + mi + '-' + la;
+          h += ' <span class="vote-count hci-vote-toggle" onclick="var el=document.getElementById(\'' + toggleId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">投票 ' + appCnt + '<span class="hci-vote-approve">赞成</span>:' + rejCnt + '<span class="hci-vote-reject">反对</span>' + resIcon + '</span>';
+          h += '<div id="' + toggleId + '" class="hci-vote-detail" style="display:none">';
+          h += '赞成：' + (approveNames.join('、') || '无');
+          h += '&nbsp;|&nbsp;';
+          h += '反对：' + (rejectNames.join('、') || '无');
+          h += '</div>';
           h += '</div>';
         }
       } else {
@@ -7713,7 +7740,10 @@ function openHistoryModal(idx) {
     h += '<div class="hci-modal-section-title">湖女查验</div>';
     for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
       var lc = rec.ladyCheckHistory[li];
-      h += '<div class="hci-detail-row">' + lc.holderName + ' &#8594; ' + lc.targetName + ' = <strong>' + (lc.result || '?') + '</strong></div>';
+      var holderNum = (lc.holder != null) ? (lc.holder + 1) + '号 ' : '';
+      var targetNum = (lc.target != null) ? (lc.target + 1) + '号 ' : '';
+      var roundLabel = lc.round ? '第' + lc.round + '轮：' : '';
+      h += '<div class="hci-detail-row">' + roundLabel + holderNum + lc.holderName + ' 查验 ' + targetNum + lc.targetName + ' &#8594; <strong>' + (lc.result || '?') + '</strong></div>';
     }
     h += '</div>';
   }
@@ -7733,7 +7763,7 @@ function openHistoryModal(idx) {
   // f) Excalibur
   if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
     h += '<div>';
-    h += '<div class="hci-modal-section-title">湖中剑</div>';
+    h += '<div class="hci-modal-section-title">王者之剑</div>';
     for (var exIdx = 0; exIdx < rec.excaliburHistory.length; exIdx++) {
       var ex = rec.excaliburHistory[exIdx];
       h += '<div class="hci-detail-row">' + (ex.holderName || ex.holder) + ' &#8594; ' + (ex.targetName || ex.target) + (ex.used ? '（已使用）' : '（未使用）') + '</div>';
@@ -7743,16 +7773,20 @@ function openHistoryModal(idx) {
 
   // g) Lancelot flips
   if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
-    var flipPlayers = [];
+    h += '<div>';
+    h += '<div class="hci-modal-section-title">兰斯洛特变节</div>';
     for (var lfIdx in rec.lancelotFlips) {
-      if (rec.identities && rec.identities[lfIdx]) flipPlayers.push(rec.identities[lfIdx].name);
+      if (rec.identities && rec.identities[lfIdx]) {
+        var player = rec.identities[lfIdx];
+        var playerNum = (player.index != null ? player.index : parseInt(lfIdx)) + 1;
+        var origRole = player.role || '';
+        var origFaction = ROLE_CATEGORY[origRole] || '';
+        var shortRole = origRole === '兰斯洛特(蓝)' ? '蓝兰斯洛特' : origRole === '兰斯洛特(红)' ? '红兰斯洛特' : origRole;
+        var afterLabel = (origFaction === 'good') ? '红方（坏人）' : (origFaction === 'evil') ? '蓝方（好人）' : '?';
+        h += '<div class="hci-detail-row" style="color:var(--orange)">' + playerNum + '号 ' + shortRole + ' &#8594; ' + afterLabel + '</div>';
+      }
     }
-    if (flipPlayers.length > 0) {
-      h += '<div>';
-      h += '<div class="hci-modal-section-title">兰斯洛特变节</div>';
-      h += '<div class="hci-detail-row" style="color:var(--orange)">' + flipPlayers.join(' &#8594; ') + '</div>';
-      h += '</div>';
-    }
+    h += '</div>';
   }
 
   // h) Assassin
@@ -7781,7 +7815,6 @@ function openHistoryModal(idx) {
   // --- Footer ---
   h += '<div class="hci-modal-footer">';
   h += '<button class="btn small" onclick="openHistoryEdit(' + idx + ')">编辑记录</button>';
-  h += '<button class="btn small danger" onclick="deleteGameRecord(' + idx + ');closeHistoryModal()">删除</button>';
   h += '</div>';
 
   h += '</div>'; // modal
