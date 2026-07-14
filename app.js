@@ -7649,7 +7649,7 @@ function openHistoryModal(idx) {
       var roleText = id.role || '--';
       if (flipped) roleText += ' <span style="color:var(--orange);font-size:10px">&#8617;变节</span>';
       h += '<div class="hci-player-card ' + faction + '">';
-      h += '<div class="hci-pc-name">' + id.name + '</div>';
+      h += '<div class="hci-pc-name">' + (id.index != null ? (id.index + 1) + '号 ' : '') + id.name + '</div>';
       h += '<div class="hci-pc-role">' + roleText + '</div>';
       h += '</div>';
     }
@@ -7680,10 +7680,20 @@ function openHistoryModal(idx) {
           var resIcon = '';
           if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
           else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
-          var teamMembers = (att.team || []).join(', ');
+          var teamItems = (att.team || []).map(function(tmName) {
+            for (var ti = 0; ti < rec.identities.length; ti++) {
+              if (rec.identities[ti].name === tmName) {
+                var tf = getPlayerFaction(rec.identities[ti].role || '');
+                if (tf === 'evil') return '<span style="color:var(--red-bright);font-weight:600">' + tmName + '</span>';
+                break;
+              }
+            }
+            return tmName;
+          });
+          var teamHtml = teamItems.join(', ');
           h += '<div class="hci-mission-attempt">';
           h += '组队' + (la + 1) + '：<span class="leader">' + (att.leader || '') + '</span>';
-          if (teamMembers) h += ' <span class="team-members">[' + teamMembers + ']</span>';
+          if (teamHtml) h += ' <span class="team-members">[' + teamHtml + ']</span>';
           h += ' <span class="vote-count">投票 ' + appCnt + '<span class="hci-vote-approve">赞成</span>:' + rejCnt + '<span class="hci-vote-reject">反对</span>' + resIcon + '</span>';
           h += '</div>';
         }
@@ -7770,6 +7780,7 @@ function openHistoryModal(idx) {
 
   // --- Footer ---
   h += '<div class="hci-modal-footer">';
+  h += '<button class="btn small" onclick="openHistoryEdit(' + idx + ')">编辑记录</button>';
   h += '<button class="btn small danger" onclick="deleteGameRecord(' + idx + ');closeHistoryModal()">删除</button>';
   h += '</div>';
 
@@ -7777,5 +7788,175 @@ function openHistoryModal(idx) {
 
   overlay.innerHTML = h;
   document.body.appendChild(overlay);
+}
+
+/* ==================== HISTORY EDIT ==================== */
+function openHistoryEdit(idx) {
+  var history = loadHistory();
+  if (idx < 0 || idx >= history.length) return;
+  var recRaw = history[idx];
+  var rec = normalizeRecord(recRaw);
+  if (!rec) return;
+
+  var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
+
+  var h = '';
+  h += '<div class="hci-modal" style="max-width:520px">';
+  h += '<div class="hci-modal-header">';
+  h += '<span class="hci-modal-date">编辑记录</span>';
+  h += '<button class="hci-modal-close" onclick="closeHistoryModal()">&times;</button>';
+  h += '</div>';
+  h += '<div class="hci-modal-body">';
+  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">修改玩家名称和身份后点击保存</div>';
+  for (var i = 0; i < rec.identities.length; i++) {
+    var id = rec.identities[i];
+    var num = id.index != null ? (id.index + 1) : (i + 1);
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    h += '<span style="font-size:13px;font-weight:600;color:var(--text-bright);min-width:30px">' + num + '号</span>';
+    h += '<input id="edit-name-' + i + '" value="' + (id.name || '').replace(/"/g, '&quot;') + '" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px">';
+    h += '<select id="edit-role-' + i + '" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px">';
+    for (var ri = 0; ri < ALL_ROLES.length; ri++) {
+      var sel = (ALL_ROLES[ri] === id.role) ? ' selected' : '';
+      h += '<option value="' + ALL_ROLES[ri] + '"' + sel + '>' + ALL_ROLES[ri] + '</option>';
+    }
+    h += '</select>';
+    h += '</div>';
+  }
+  h += '</div>'; // body
+  h += '<div class="hci-modal-footer" style="gap:8px">';
+  h += '<button class="btn" onclick="closeHistoryEdit(' + idx + ')">取消</button>';
+  h += '<button class="btn primary" onclick="saveHistoryEdit(' + idx + ')">保存</button>';
+  h += '</div>';
+  h += '</div>';
+
+  var overlay = document.getElementById('hci-modal-overlay');
+  if (!overlay) return;
+  overlay.innerHTML = h;
+}
+
+function closeHistoryEdit(idx) {
+  closeHistoryModal();
+  openHistoryModal(idx);
+}
+
+function saveHistoryEdit(idx) {
+  var history = loadHistory();
+  if (idx < 0 || idx >= history.length) return;
+  var recRaw = history[idx];
+  var rec = normalizeRecord(recRaw);
+  if (!rec) return;
+
+  var newIdentities = [];
+  for (var i = 0; i < rec.identities.length; i++) {
+    var nameInput = document.getElementById('edit-name-' + i);
+    var roleSelect = document.getElementById('edit-role-' + i);
+    if (!nameInput || !roleSelect) { toast('编辑表单异常', 'error'); return; }
+    var newName = nameInput.value.trim();
+    if (!newName) { toast('玩家名称不能为空', 'warn'); return; }
+    var newRole = roleSelect.value;
+    if (!newRole) { toast('请为所有玩家选择身份', 'warn'); return; }
+    newIdentities.push({ name: newName, role: newRole, index: rec.identities[i].index != null ? rec.identities[i].index : i });
+  }
+
+  // Check duplicate names
+  var names = newIdentities.map(function(id) { return id.name; });
+  for (var i = 0; i < names.length; i++) {
+    if (names.indexOf(names[i]) !== names.lastIndexOf(names[i])) {
+      toast('名字「' + names[i] + '」重复', 'warn');
+      return;
+    }
+  }
+
+  // Clone raw record and update identities
+  var updatedV2 = JSON.parse(JSON.stringify(recRaw));
+  updatedV2.ids = newIdentities.map(function(id) { return { n: id.name, r: id.role, i: id.index }; });
+
+  // Build name remapping: map old name -> new name by index
+  var oldNames = rec.identities.map(function(id) { return id.name; });
+  var newNames = newIdentities.map(function(id) { return id.name; });
+  function remapName(oldName) {
+    for (var ni = 0; ni < oldNames.length; ni++) {
+      if (oldNames[ni] === oldName && oldNames[ni] !== newNames[ni]) {
+        return newNames[ni];
+      }
+    }
+    return oldName;
+  }
+
+  // Update missions
+  if (updatedV2.ms) {
+    for (var mi = 0; mi < updatedV2.ms.length; mi++) {
+      var m = updatedV2.ms[mi];
+      if (m.ld) m.ld = remapName(m.ld);
+      if (m.t) m.t = m.t.map(function(tm) { return remapName(tm); });
+      if (m.la) {
+        for (var lai = 0; lai < m.la.length; lai++) {
+          var att = m.la[lai];
+          if (att.ld) att.ld = remapName(att.ld);
+          if (att.t) att.t = att.t.map(function(tm) { return remapName(tm); });
+          var newVotes = {};
+          for (var vk in att.v) newVotes[remapName(vk)] = att.v[vk];
+          att.v = newVotes;
+        }
+      }
+      if (m.v) {
+        var newVotes = {};
+        for (var vk in m.v) newVotes[remapName(vk)] = m.v[vk];
+        m.v = newVotes;
+      }
+    }
+  }
+
+  // Update lady check history
+  if (updatedV2.lch) {
+    for (var li = 0; li < updatedV2.lch.length; li++) {
+      var lc = updatedV2.lch[li];
+      if (lc.hn) lc.hn = remapName(lc.hn);
+      if (lc.tn) lc.tn = remapName(lc.tn);
+    }
+  }
+
+  // Update excalibur history
+  if (updatedV2.ex) {
+    for (var ei = 0; ei < updatedV2.ex.length; ei++) {
+      var ex = updatedV2.ex[ei];
+      if (ex.ldn) ex.ldn = remapName(ex.ldn);
+      if (ex.hn) ex.hn = remapName(ex.hn);
+      if (ex.tn) ex.tn = remapName(ex.tn);
+    }
+  }
+
+  // Update assassin target
+  if (updatedV2.at) updatedV2.at = remapName(updatedV2.at);
+
+  // Update identity marks target names
+  if (updatedV2.im) {
+    for (var imi = 0; imi < updatedV2.im.length; imi++) {
+      var im = updatedV2.im[imi];
+      if (im.tn) im.tn = remapName(im.tn);
+    }
+  }
+
+  // Preserve UUID
+  updatedV2._uuid = recRaw._uuid || generateUUID();
+
+  // Save locally
+  history[idx] = updatedV2;
+  saveHistory(history);
+
+  // Try Supabase update
+  var sb = getSupabase();
+  if (sb) {
+    var sid = recRaw._sid || rec._supabaseId;
+    if (sid) {
+      sb.from('game_records').update({ game_data_v2: updatedV2 }).eq('id', sid).then(function(res) {
+        if (res.error) console.warn('[Supabase] update failed:', res.error);
+      });
+    }
+  }
+
+  toast('已保存');
+  closeHistoryModal();
+  openHistoryModal(idx);
 }
 

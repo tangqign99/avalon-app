@@ -1321,7 +1321,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .hci-player-card.evil{background:rgba(196,74,74,0.18);border-left:3px solid var(--red)}
 .hci-player-card.neutral{background:rgba(201,168,76,0.12);border-left:3px solid var(--gold)}
 .hci-player-card .hci-pc-name{font-weight:600;color:var(--text-bright);font-size:13px}
-.hci-player-card .hci-pc-role{color:var(--text-dim);font-size:11px;margin-top:2px}
+.hci-player-card .hci-pc-role{color:var(--text-dim);font-size:12px;margin-top:3px}
 
 /* Mission cards */
 .hci-mission-list{display:flex;flex-direction:column;gap:6px}
@@ -1331,7 +1331,7 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .hci-mission-attempt:first-child{border-top:none}
 .hci-mission-attempt .leader{color:var(--gold-light);font-weight:600}
 .hci-mission-attempt .team-members{color:var(--text)}
-.hci-mission-attempt .vote-count{color:var(--text-dim);font-size:11px}
+.hci-mission-attempt .vote-count{color:var(--text-dim);font-size:12px}
 .hci-vote-approve{color:var(--green-bright);margin:0 1px}
 .hci-vote-reject{color:var(--red-bright);margin:0 1px}
 
