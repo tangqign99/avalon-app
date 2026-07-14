@@ -7814,6 +7814,7 @@ function openHistoryModal(idx) {
 
   // --- Footer ---
   h += '<div class="hci-modal-footer">';
+  h += '<button class="btn small" onclick="generateGameScreenshot(' + idx + ')">生成截图</button>';
   h += '<button class="btn small" onclick="openHistoryEdit(' + idx + ')">编辑记录</button>';
   h += '</div>';
 
@@ -7821,6 +7822,314 @@ function openHistoryModal(idx) {
 
   overlay.innerHTML = h;
   document.body.appendChild(overlay);
+}
+
+/* ==================== SCREENSHOT GENERATION ==================== */
+function generateGameScreenshot(idx) {
+  var history = loadHistory();
+  if (idx < 0 || idx >= history.length) { alert('无效记录'); return; }
+  var recRaw = history[idx];
+  var rec = normalizeRecord(recRaw);
+  if (!rec) { alert('记录解析失败'); return; }
+
+  var W = 750;
+  var PAD = 30;
+  var y = 0;
+
+  var canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = 2000; // temporary, will resize
+  var ctx = canvas.getContext('2d');
+
+  // Helper: wrapped text with line height
+  function drawText(text, x, yPos, fontSize, color, align) {
+    ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = color || '#333';
+    ctx.textAlign = align || 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, x, yPos);
+  }
+
+  // Helper: measure text width
+  function textWidth(text, fontSize) {
+    ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
+    return ctx.measureText(text).width;
+  }
+
+  var contentW = W - PAD * 2;
+
+  // Compute card height first
+  var sections = [];
+
+  // --- Title ---
+  sections.push({ type: 'title', text: '阿瓦隆 对局记录', fontSize: 32, height: 50, paddingBottom: 10 });
+
+  // --- Divider ---
+  sections.push({ type: 'divider', height: 1, paddingTop: 5, paddingBottom: 10 });
+
+  // --- Info line ---
+  var winnerLabel = rec.winner === 'good' ? '好人方胜利' : '反方胜利';
+  var infoText = (rec.date || '--') + '  |  ' + (rec.playerCount || '?') + ' 人  |  ' + winnerLabel;
+  sections.push({ type: 'text', text: infoText, fontSize: 15, height: 24, paddingBottom: 16 });
+
+  // --- Players ---
+  sections.push({ type: 'text', text: '玩家角色', fontSize: 18, bold: true, height: 28, paddingBottom: 8 });
+  var cardW = 220, cardH = 46, cardGap = 10, cardsPerRow = 3;
+  if (rec.identities && rec.identities.length > 0) {
+    var rows = Math.ceil(rec.identities.length / cardsPerRow);
+    sections.push({ type: 'playerCards', rows: rows, height: rows * (cardH + cardGap) - cardGap + 10, paddingBottom: 16 });
+  }
+
+  // --- Missions ---
+  if (rec.missions && rec.missions.length > 0) {
+    sections.push({ type: 'text', text: '任务回顾', fontSize: 18, bold: true, height: 28, paddingBottom: 8 });
+    sections.push({ type: 'missions', height: 28 * rec.missions.length + 8, paddingBottom: 16 });
+  }
+
+  // --- Key events ---
+  var hasEvents = false;
+  var eventLines = 0;
+
+  if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+    hasEvents = true;
+    eventLines += rec.ladyCheckHistory.length;
+  }
+  if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
+    hasEvents = true;
+    eventLines += Object.keys(rec.lancelotFlips).length;
+  }
+  if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
+    hasEvents = true;
+    eventLines += rec.excaliburHistory.length;
+  }
+  if (rec.assassinTarget) {
+    hasEvents = true;
+    eventLines += 1;
+  }
+  if (rec.forceEnded) {
+    hasEvents = true;
+    eventLines += 1;
+  }
+  if (rec.identityMarks && rec.identityMarks.length > 0) {
+    hasEvents = true;
+    eventLines += rec.identityMarks.length;
+  }
+
+  if (hasEvents) {
+    sections.push({ type: 'text', text: '关键事件', fontSize: 18, bold: true, height: 28, paddingBottom: 8 });
+    sections.push({ type: 'events', lines: eventLines, height: Math.max(22 * eventLines + 16, 30), paddingBottom: 16 });
+  }
+
+  // --- Watermark ---
+  sections.push({ type: 'watermark', height: 24, paddingTop: 5 });
+
+  // Calculate total height
+  var totalH = PAD * 2;
+  for (var si = 0; si < sections.length; si++) {
+    var sec = sections[si];
+    var top = (sec.paddingTop || 0);
+    var bot = (sec.paddingBottom || 0);
+    totalH += top + sec.height + bot;
+  }
+  canvas.height = Math.ceil(totalH);
+
+  // Start drawing
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  y = PAD;
+
+  // --- Helper: draw a section title ---
+  function drawSectionTitle(text, yPos) {
+    drawText(text, PAD, yPos, 18, '#222', 'left');
+  }
+
+  // --- Title ---
+  drawText('阿瓦隆 对局记录', W / 2, y, 32, '#1a1a2e', 'center');
+  y += 50 + 10;
+
+  // --- Divider ---
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD, y);
+  ctx.lineTo(W - PAD, y);
+  ctx.stroke();
+  y += 1 + 10;
+
+  // --- Info ---
+  drawText(infoText, PAD, y, 15, '#666', 'left');
+  y += 24 + 16;
+
+  // --- Players ---
+  drawSectionTitle('玩家角色', y);
+  y += 28 + 8;
+
+  // Draw player cards
+  if (rec.identities && rec.identities.length > 0) {
+    for (var pi = 0; pi < rec.identities.length; pi++) {
+      var id = rec.identities[pi];
+      var col = pi % cardsPerRow;
+      var row = Math.floor(pi / cardsPerRow);
+      var cx = PAD + col * (cardW + cardGap);
+      var cy = y + row * (cardH + cardGap);
+
+      var faction = getPlayerFaction(id.role || '');
+      var isEvil = faction === 'evil';
+      var bgColor = isEvil ? '#ffebee' : '#e3f2fd';
+      var borderColor = isEvil ? '#ef9a9a' : '#90caf9';
+      var nameColor = isEvil ? '#c62828' : '#1565c0';
+      var roleColor = isEvil ? '#d32f2f' : '#1976d2';
+
+      // Card background
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.roundRect(cx, cy, cardW, cardH, 8);
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(cx, cy, cardW, cardH, 8);
+      ctx.stroke();
+
+      var playerNum = (id.index != null ? id.index : pi) + 1;
+      drawText(playerNum + '号 ' + id.name, cx + 12, cy + 6, 14, nameColor, 'left');
+
+      var roleText = id.role || '--';
+      // Check lancelot flip
+      var flipped = rec.lancelotFlips && rec.lancelotFlips[id.index != null ? id.index : pi];
+      if (flipped) roleText += ' ↷变节';
+
+      // Draw role on right side
+      ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
+      var roleW = ctx.measureText(roleText).width;
+      drawText(roleText, cx + cardW - 12 - roleW, cy + 9, 12, roleColor, 'left');
+    }
+    y += rows * (cardH + cardGap) - cardGap + 10;
+    y += 16 - 10; // paddingBottom
+  }
+
+  // --- Missions ---
+  if (rec.missions && rec.missions.length > 0) {
+    drawSectionTitle('任务回顾', y);
+    y += 28 + 8;
+
+    for (var mi = 0; mi < rec.missions.length; mi++) {
+      var m = rec.missions[mi];
+      var resultText = m.result === 'success' ? '✓ 成功' : m.result === 'fail' ? '✗ 失败' : '--';
+      var resultColor = m.result === 'success' ? '#2e7d32' : m.result === 'fail' ? '#c62828' : '#999';
+      var label = '第' + (mi + 1) + '轮任务';
+
+      drawText(label, PAD, y, 14, '#333', 'left');
+      drawText(resultText, PAD + 100, y, 14, resultColor, 'left');
+
+      // Show failure count if available
+      if (m.result === 'fail' && m.failCount) {
+        drawText('（失败票 ' + m.failCount + '）', PAD + 200, y, 12, '#888', 'left');
+      } else if (m.result === 'success' && m.failCount === 0) {
+        drawText('（全票通过）', PAD + 200, y, 12, '#888', 'left');
+      }
+
+      y += 28;
+    }
+    y += 16 - 28; // paddingBottom, subtract last mission height
+  }
+
+  // --- Key events ---
+  if (hasEvents) {
+    drawSectionTitle('关键事件', y);
+    y += 28 + 8;
+
+    // Lady checks
+    if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+      for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+        var lc = rec.ladyCheckHistory[li];
+        var holderNum = (lc.holder != null) ? (lc.holder + 1) + '号 ' : '';
+        var targetNum = (lc.target != null) ? (lc.target + 1) + '号 ' : '';
+        var roundLabel = lc.round ? '第' + lc.round + '轮：' : '';
+        var text = '湖女查验: ' + roundLabel + holderNum + (lc.holderName || '') + ' 查验 ' + targetNum + (lc.targetName || '') + ' → ' + (lc.result || '?');
+        drawText(text, PAD, y, 13, '#555', 'left');
+        y += 22;
+      }
+    }
+
+    // Excalibur
+    if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
+      for (var exi = 0; exi < rec.excaliburHistory.length; exi++) {
+        var ex = rec.excaliburHistory[exi];
+        var text = '王者之剑: ' + (ex.holderName || ex.holder) + ' → ' + (ex.targetName || ex.target) + (ex.used ? '（已使用）' : '（未使用）');
+        drawText(text, PAD, y, 13, '#555', 'left');
+        y += 22;
+      }
+    }
+
+    // Lancelot flips
+    if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
+      for (var lfKey in rec.lancelotFlips) {
+        if (rec.identities && rec.identities[lfKey]) {
+          var player = rec.identities[lfKey];
+          var playerNum2 = (player.index != null ? player.index : parseInt(lfKey)) + 1;
+          var origRole = player.role || '';
+          var origFaction = ROLE_CATEGORY[origRole] || '';
+          var shortRole = origRole === '兰斯洛特(蓝)' ? '蓝兰斯洛特' : origRole === '兰斯洛特(红)' ? '红兰斯洛特' : origRole;
+          var afterLabel = (origFaction === 'good') ? '红方（坏人）' : (origFaction === 'evil') ? '蓝方（好人）' : '?';
+          var text = '兰斯洛特变节: ' + playerNum2 + '号 ' + shortRole + ' → ' + afterLabel;
+          drawText(text, PAD, y, 13, '#e65100', 'left');
+          y += 22;
+        }
+      }
+    }
+
+    // Assassination
+    if (rec.assassinTarget) {
+      var assassinText = '刺杀: 目标 ' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '命中' : '未命中');
+      drawText(assassinText, PAD, y, 13, '#555', 'left');
+      y += 22;
+    }
+
+    // Force ended
+    if (rec.forceEnded) {
+      drawText('强制结束: ' + (rec.forceEndReason || '未知原因'), PAD, y, 13, '#e65100', 'left');
+      y += 22;
+    }
+
+    // Identity marks
+    if (rec.identityMarks && rec.identityMarks.length > 0) {
+      for (var mi2 = 0; mi2 < rec.identityMarks.length; mi2++) {
+        var mk = rec.identityMarks[mi2];
+        var lvlLabel = mk.level === 'high' ? '高' : mk.level === 'mid' ? '中' : '低';
+        drawText('身份标记: ' + (mk.targetName || mk.target) + ' [' + lvlLabel + ']', PAD, y, 13, '#555', 'left');
+        y += 22;
+      }
+    }
+
+    y += 16;
+  }
+
+  // --- Watermark ---
+  y += 5;
+  ctx.fillStyle = '#bbbbbb';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillText('由 Marvis 生成', W / 2, canvas.height - PAD);
+
+  // Export
+  canvas.toBlob(function(blob) {
+    var dateStr = (rec.date || 'unknown').replace(/[\/\s:]/g, '-');
+    var fileName = '阿瓦隆对局_' + dateStr + '.png';
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
+    alert('截图已生成');
+  }, 'image/png');
 }
 
 /* ==================== HISTORY EDIT ==================== */
