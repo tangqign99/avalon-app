@@ -230,12 +230,14 @@
     <h2>录音播放</h2>
     <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">功能开发中，后续将支持上传录音文件并播放。</p>
     <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">功能开发中</div>
-    <div style="text-align:center;margin-top:4px;padding-top:12px;border-top:1px solid var(--border)">
-      <button class="btn" onclick="toggleTendPanel()" id="tend-toggle-btn">&#9654; 倾向分析</button>
-    </div>
   </div>
 
-  <div id="tend-panel" class="tend-panel">
+  <div class="card" id="tendency-card">
+    <div class="tend-card-header">
+      <h2 style="margin:0">倾向分析</h2>
+      <button class="btn" onclick="toggleTendPanel()" id="tend-toggle-btn">&#9654; 倾向分析</button>
+    </div>
+    <div id="tend-panel" class="tend-panel">
     <div class="card" id="tend-role-card">
       <h2>我的身份</h2>
       <div id="tend-role-grid"></div>
@@ -276,6 +278,7 @@
       <h2>关键证据</h2>
       <div id="tend-evidence-list"></div>
     </div>
+  </div>
   </div>
 </section>
 

@@ -1274,6 +1274,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 /* ===== Tools Page - Recording Playback (开发中) ===== */
 
+/* ===== Tools Page - Tendency Card ===== */
+#tendency-card{padding-bottom:12px}
+.tend-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+
 /* ===== Tools Page - Tendency Collapsible Panel ===== */
 .tend-panel{overflow:hidden;max-height:0;transition:max-height 0.4s ease}
 .tend-panel.open{max-height:3000px}
