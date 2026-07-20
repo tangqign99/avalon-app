@@ -1293,8 +1293,13 @@ function renderScreenshotButton() {
       e.stopPropagation();
       generateLiveScreenshot();
     });
-    var gamePage = document.getElementById('page-game');
-    if (gamePage) gamePage.appendChild(btn);
+    var undoBtn = document.getElementById('undo-float-btn');
+    if (undoBtn && undoBtn.parentNode) {
+      undoBtn.parentNode.insertBefore(btn, undoBtn.nextSibling);
+    } else {
+      var gamePage = document.getElementById('page-game');
+      if (gamePage) gamePage.appendChild(btn);
+    }
   }
 }
 
