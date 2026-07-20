@@ -8159,13 +8159,14 @@ function openHistoryModal(idx) {
   // d) Lady check
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
     h += '<div>';
-    h += '<div class="hci-modal-section-title">湖女查验</div>';
+    h += '<div class="hci-modal-section-title">湖中女神验人</div>';
     for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
       var lc = rec.ladyCheckHistory[li];
       var holderNum = (lc.holder != null) ? (lc.holder + 1) + '号 ' : '';
       var targetNum = (lc.target != null) ? (lc.target + 1) + '号 ' : '';
       var roundLabel = lc.round ? '第' + lc.round + '轮：' : '';
-      h += '<div class="hci-detail-row">' + roundLabel + holderNum + lc.holderName + ' 查验 ' + targetNum + lc.targetName + ' &#8594; <strong>' + (lc.result || '?') + '</strong></div>';
+      var resultLabel = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '坏人' : (lc.result || '?');
+      h += '<div class="hci-detail-row">' + roundLabel + holderNum + lc.holderName + ' 查验 ' + targetNum + lc.targetName + ' &#8594; <strong>' + resultLabel + '</strong></div>';
     }
     h += '</div>';
   }
@@ -8236,7 +8237,7 @@ function openHistoryModal(idx) {
 
   // --- Footer ---
   h += '<div class="hci-modal-footer">';
-  h += '<button class="btn small" onclick="generateGameScreenshot(' + idx + ')">生成截图</button>';
+  h += '<button class="btn small" id="hci-screenshot-btn">生成截图</button>';
   h += '<button class="btn small" onclick="openHistoryEdit(' + idx + ')">编辑记录</button>';
   h += '</div>';
 
@@ -8244,6 +8245,14 @@ function openHistoryModal(idx) {
 
   overlay.innerHTML = h;
   document.body.appendChild(overlay);
+
+  // 截图按钮使用程序化事件绑定，避免内联 onclick 作用域问题
+  var ssBtn = document.getElementById('hci-screenshot-btn');
+  if (ssBtn) {
+    ssBtn.addEventListener('click', function() {
+      generateGameScreenshot(idx);
+    });
+  }
 }
 
 /* ==================== SCREENSHOT GENERATION ==================== */
@@ -8565,7 +8574,8 @@ function generateGameScreenshot(idx) {
           var lc = rec.ladyCheckHistory[li];
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
           var rl = lc.round ? '\u7b2c' + lc.round + '\u8f6e\u540e\uff1a' : '';
-          dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ' + (lc.result || '?'), PAD + 12, ry, 12, TXT_SEC, 'left');
+          var resultLabel2 = lc.result === 'good' ? '\u597d\u4eba' : lc.result === 'evil' ? '\u574f\u4eba' : (lc.result || '?');
+          dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ' + resultLabel2, PAD + 12, ry, 12, TXT_SEC, 'left');
           ry += 18;
         }
         ry += 4;
