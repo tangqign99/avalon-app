@@ -1398,9 +1398,16 @@ function renderStepPanel() {
     h += '<div style="text-align:center;padding:16px">';
     h += '<div style="font-size:52px;margin-bottom:6px">' + (m.result === 'success' ? '&#128737;' : '&#128481;') + '</div>';
     h += '<div style="font-size:17px;color:' + (m.result === 'success' ? '#99ff99' : '#ff9999') + '">';
-    h += '任务' + (m.result === 'success' ? '成功' : '失败');
-    if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
-    if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
+    if (m.result === 'success' && m.shieldedFails) {
+      h += '任务成功（含' + m.shieldedFails + '张失败票）';
+    } else if (m.result === 'success' && !m.failCount) {
+      h += '任务成功（全票通过）';
+    } else if (m.result === 'success') {
+      h += '任务成功';
+    } else {
+      h += '任务失败';
+      if (m.failCount) h += '（' + m.failCount + '张失败票）';
+    }
     h += '</div>';
     if (state.winner) {
       h += '<div style="margin-top:10px;font-size:16px;font-weight:700;color:var(--gold-light)">';
@@ -3025,9 +3032,16 @@ function buildReviewHTML() {
     if (m.result) {
       h += '<div style="margin-top:6px"><strong>任务结果：</strong>';
       h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
-      h += (m.result === 'success' ? '成功' : '失败');
-      if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
-      if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
+      if (m.result === 'success' && m.shieldedFails) {
+        h += '成功（含' + m.shieldedFails + '张失败票）';
+      } else if (m.result === 'success' && !m.failCount) {
+        h += '成功（全票通过）';
+      } else if (m.result === 'success') {
+        h += '成功';
+      } else {
+        h += '失败';
+        if (m.failCount) h += '（' + m.failCount + '张失败票）';
+      }
       h += '</span></div>';
     }
 
@@ -7298,6 +7312,7 @@ function buildReplayTimeline() {
       h += '<p>结果：<strong style="color:' + resultColor + '">' + resultText + '</strong>';
       if (m.result === 'fail' && m.failCount) h += '（' + m.failCount + '张失败票）';
       if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
+      if (m.result === 'success' && !m.shieldedFails && !m.failCount) h += '（全票通过）';
       h += '</p>';
       h += '</div></div>';
     }
@@ -7676,8 +7691,15 @@ function openHistoryModal(idx) {
       h += '<div class="hci-mission-round">';
       h += '第' + (mi + 1) + '轮';
       if (m.result) {
-        h += m.result === 'success' ? ' <span style="color:var(--green-bright)">&#10003; 成功</span>' : ' <span style="color:var(--red-bright)">&#10007; 失败</span>';
-        if (m.result === 'success' && m.shieldedFails) h += ' <span style="color:var(--orange);font-size:11px">（含' + m.shieldedFails + '张失败票）</span>';
+        if (m.result === 'success' && m.shieldedFails) {
+          h += ' <span style="color:var(--green-bright)">&#10003; 成功（含' + m.shieldedFails + '张失败票）</span>';
+        } else if (m.result === 'success' && !m.failCount) {
+          h += ' <span style="color:var(--green-bright)">&#10003; 成功（全票通过）</span>';
+        } else if (m.result === 'success') {
+          h += ' <span style="color:var(--green-bright)">&#10003; 成功</span>';
+        } else {
+          h += ' <span style="color:var(--red-bright)">&#10007; 失败</span>';
+        }
       }
       h += '</div>';
       if (m.launchAttempts && m.launchAttempts.length > 0) {
@@ -7955,7 +7977,7 @@ function generateGameScreenshot(idx) {
       }
       vLine += '  ' + md.approves + ':' + md.rejects;
       if (tw(vLine, 11) > contentW - 36) qh += 18; else qh += 16;
-      if ((m.result === 'fail' && m.failCount) || (m.result === 'success' && m.shieldedFails)) qh += 16;
+      if ((m.result === 'fail' && m.failCount) || (m.result === 'success' && m.shieldedFails) || (m.result === 'success' && !m.failCount && !m.shieldedFails)) qh += 16;
       qh += 10;
       questH += qh + 8;
     }
@@ -8099,6 +8121,8 @@ function generateGameScreenshot(idx) {
       if (!m.result) { qy += 8; continue; }
       var md = prepMission(m);
       var isSuc = m.result === 'success';
+      var isShielded = m.result === 'success' && m.shieldedFails;
+      var isPureSuc = m.result === 'success' && !m.failCount && !m.shieldedFails;
 
       var vLine = '';
       for (var pi = 0; pi < players.length; pi++) {
@@ -8107,7 +8131,7 @@ function generateGameScreenshot(idx) {
       }
       vLine += '  ' + md.approves + ':' + md.rejects + ' ' + (md.approves > md.rejects ? '\u901a\u8fc7' : '\u5426\u51b3');
       var voteH = (tw(vLine, 11) > contentW - 36) ? 18 : 16;
-      var hasFailDetail = (m.result === 'fail' && m.failCount) || (m.result === 'success' && m.shieldedFails);
+      var hasFailDetail = (m.result === 'fail' && m.failCount) || isShielded || isPureSuc;
       var cardH = 10 + 18 + 6 + voteH + 4 + (hasFailDetail ? 16 : 0) + 10;
 
       ctx.fillStyle = 'rgba(255,255,255,0.04)';
@@ -8121,7 +8145,7 @@ function generateGameScreenshot(idx) {
       var cx = PAD + 16;
       dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba', cx, qy + 10, 13, TXT_SEC, 'left');
 
-      var tagText = isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
+      var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
       var tagW = tw(tagText, 11) + 16;
       var tagX = PAD + contentW - 16 - tagW;
       ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)';
@@ -8164,8 +8188,11 @@ function generateGameScreenshot(idx) {
       if (m.result === 'fail' && m.failCount) {
         dt('\u5931\u8d25\u5361\uff1a' + m.failCount + '\u5f20', cx, failY, 11, RED, 'left');
       }
-      if (m.result === 'success' && m.shieldedFails) {
+      if (isShielded) {
         dt('\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09', cx, failY, 11, '#e65100', 'left');
+      }
+      if (isPureSuc) {
+        dt('\u5168\u7968\u901a\u8fc7', cx, failY, 11, TXT_DIM, 'left');
       }
 
       qy += cardH + 8;
