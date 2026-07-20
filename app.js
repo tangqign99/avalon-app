@@ -693,11 +693,13 @@ function showPage(page) {
   }
   if (page === 'tools') {
     renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
+    processOfflineQueues();
   }
   if (page === 'end') renderEnd();
   if (page === 'stats') {
     if (prevPage !== 'stats') state._historyPage = 0;
     renderStats();
+    processOfflineQueues();
   }
 }
 
@@ -4492,12 +4494,12 @@ function saveGameRecord() {
     sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
       if (res.error) {
         console.warn('[Supabase] saveGameRecord failed:', res.error);
-        // 入 pending_queue，下次初始化时重推
+        // 云端保存失败：先存本地（无 _sid），同时入重推队列
         var queue = getPendingQueue();
         queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
         savePendingQueue(queue);
-        toast('云端保存失败，已加入重推队列', 'warn');
-        finishSave();
+        writeLocalAndFinish(null);
+        toast('云端保存失败，记录已保存到本地', 'warn');
       } else if (res.data && res.data.id) {
         writeLocalAndFinish(res.data.id);
       } else {
@@ -4508,16 +4510,24 @@ function saveGameRecord() {
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(function(res) {
       if (res.error) console.warn('[Supabase] save name_pool failed:', res.error);
     });
-    // 超时兜底：5 秒后无论如何跳转
-    setTimeout(finishSave, 5000);
+    // 超时兜底：5 秒后如果还没结束，强制写本地并跳转
+    setTimeout(function() {
+      if (!done) {
+        var q2 = getPendingQueue();
+        q2.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+        savePendingQueue(q2);
+        writeLocalAndFinish(null);
+        toast('云端保存超时，记录已保存到本地', 'warn');
+      }
+    }, 5000);
   } else {
     console.warn('[Supabase] saveGameRecord: no connection');
-    // 入 pending_queue，下次初始化时重推
+    // 无网络：先存本地（无 _sid），同时入重推队列
     var queue = getPendingQueue();
     queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
     savePendingQueue(queue);
-    toast('云端保存失败，已加入重推队列', 'warn');
-    finishSave();
+    writeLocalAndFinish(null);
+    toast('无网络连接，记录已保存到本地', 'warn');
   }
 }
 
@@ -4631,7 +4641,8 @@ function renderStats() {
 
     h += '<div class="history-compact-item">';
     h += '<div class="hci-header" onclick="openHistoryModal(' + i + ')">';
-    h += '<span class="hci-date">' + rec.date + '</span>';
+    var timeStr = rec.startTime ? rec.startTime.slice(11, 16) : '';
+    h += '<span class="hci-date">' + rec.date + (timeStr ? ' ' + timeStr : '') + '</span>';
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
     if (rec.startTime && rec.endTime) {
       var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
@@ -4818,19 +4829,6 @@ function renderStats() {
     if (leaderboardCard) leaderboardCard.style.display = '';
   }
   $('win-rate-leaderboard').innerHTML = lh;
-  // Relationship network
-  var networkCard = document.getElementById('relationship-network-container');
-  if (!networkCard) {
-    var networkDiv = document.createElement('div');
-    networkDiv.id = 'relationship-network-container';
-    var winCard = document.getElementById('win-rate-leaderboard');
-    if (winCard) {
-      var parentCard = winCard.closest('.card') || winCard.parentNode;
-      parentCard.parentNode.insertBefore(networkDiv, parentCard.nextSibling);
-    }
-    networkCard = networkDiv;
-  }
-  networkCard.innerHTML = renderRelationshipNetwork(history);
   renderNamePoolList();
 }
 
@@ -4917,84 +4915,6 @@ function clearHistoryFilter() {
   if (player) player.value = '';
   state._historyPage = 0;
   renderStats();
-}
-
-/* ==================== PLAYER RELATIONSHIP NETWORK ==================== */
-function renderRelationshipNetwork(history) {
-  var pairStats = {};
-  function addPair(name1, name2, isSameTeam) {
-    if (name1 === name2) return;
-    var key = [name1, name2].sort().join('||');
-    if (!pairStats[key]) pairStats[key] = { p1: [name1, name2].sort()[0], p2: [name1, name2].sort()[1], same: 0, diff: 0 };
-    if (isSameTeam) pairStats[key].same++;
-    else pairStats[key].diff++;
-  }
-  for (var i = 0; i < history.length; i++) {
-    var rec = history[i];
-    if (!rec.identities) continue;
-    var goods = [], evils = [];
-    for (var j = 0; j < rec.identities.length; j++) {
-      var id = rec.identities[j];
-      if (!id.role) continue;
-      if (id.role === '混子') continue;
-      if (id.role === '梅林' || id.role === '派西维尔' || id.role === '忠臣' || id.role === '兰斯洛特(蓝)' || id.role === '正方') {
-        goods.push(id.name);
-      } else if (id.role === '莫甘娜' || id.role === '刺客' || id.role === '莫德雷德' || id.role === '奥伯伦' || id.role === '爪牙' || id.role === '兰斯洛特(红)' || id.role === '反方') {
-        evils.push(id.name);
-      }
-    }
-    for (var a = 0; a < goods.length; a++)
-      for (var b = a + 1; b < goods.length; b++)
-        addPair(goods[a], goods[b], true);
-    for (var a = 0; a < evils.length; a++)
-      for (var b = a + 1; b < evils.length; b++)
-        addPair(evils[a], evils[b], true);
-    for (var a = 0; a < goods.length; a++)
-      for (var b = 0; b < evils.length; b++)
-        addPair(goods[a], evils[b], false);
-  }
-  var pairs = Object.values(pairStats);
-  var best = pairs.slice().sort(function(a, b) { return b.same - a.same || a.p1.localeCompare(b.p1); }).slice(0, 5);
-  var rival = pairs.slice().sort(function(a, b) { return b.diff - a.diff || a.p1.localeCompare(b.p1); }).slice(0, 5);
-
-  var circleNums = ['\u2460', '\u2461', '\u2462', '\u2463', '\u2464'];
-
-  function renderList(items, field, color) {
-    if (items.length === 0) {
-      return '<div style="text-align:center;color:var(--text-dim);font-size:12px;padding:10px 0">暂无数据</div>';
-    }
-    var html = '';
-    for (var i = 0; i < items.length; i++) {
-      var p = items[i];
-      var count = p[field];
-      html += '<div style="display:flex;align-items:center;padding:3px 0;font-size:12px">';
-      html += '<span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(201,168,76,0.12);font-size:10px;color:var(--gold);flex-shrink:0;margin-right:6px">' + circleNums[i] + '</span>';
-      html += '<span style="flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.p1 + ' <span style="color:var(--text-dim)">·</span> ' + p.p2 + '</span>';
-      html += '<span style="color:' + color + ';font-weight:600;flex-shrink:0;margin-left:4px">' + count + '次</span>';
-      html += '</div>';
-    }
-    return html;
-  }
-
-  var h = '<div class="card" style="margin-top:12px">';
-  h += '<h2 style="font-size:15px;margin-bottom:10px">\uD83E\uDD1D 玩家关系网</h2>';
-  h += '<div style="display:flex;gap:10px">';
-
-  // Left column — 最佳队友
-  h += '<div style="flex:1;background:rgba(74,201,74,0.04);border-radius:var(--radius-sm,8px);padding:10px;border:1px solid rgba(74,201,74,0.1)">';
-  h += '<div style="font-size:13px;font-weight:600;color:var(--green-bright);margin-bottom:6px;letter-spacing:0.5px">\uD83E\uDD1D 最佳队友</div>';
-  h += renderList(best, 'same', 'var(--green-bright)');
-  h += '</div>';
-
-  // Right column — 宿敌
-  h += '<div style="flex:1;background:rgba(196,74,74,0.04);border-radius:var(--radius-sm,8px);padding:10px;border:1px solid rgba(196,74,74,0.1)">';
-  h += '<div style="font-size:13px;font-weight:600;color:var(--red-bright);margin-bottom:6px;letter-spacing:0.5px">\u2694\uFE0F 宿敌</div>';
-  h += renderList(rival, 'diff', 'var(--red-bright)');
-  h += '</div>';
-
-  h += '</div>';
-  h += '</div>';
-  return h;
 }
 
 /* ==================== PLAYER STAT ==================== */
@@ -5374,10 +5294,34 @@ function renderPlayerProfile() {
   }
   ph += '</div>';
 
-  // Bottom buttons
-  ph += '<div style="display:flex;gap:8px;margin-top:16px">';
-  ph += '<button class="btn" style="flex:1" onclick="closeModal();goToPlayerHistory(\'' + name + '\')">查看历史战绩 &#8594;</button>';
-  ph += '</div>';
+  // Game history list
+  var sortedByRec = data.slice().sort(function(a, b) { return b.recIndex - a.recIndex; });
+  ph += '<div style="margin-bottom:8px">';
+  ph += '<div style="font-size:13px;font-weight:600;margin-bottom:6px;cursor:pointer" onclick="var el=document.getElementById(\'player-game-list\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">&#9660; 参赛记录 (' + total + '场)</div>';
+  ph += '<div id="player-game-list" style="max-height:360px;overflow-y:auto;display:none">';
+  for (var gi = 0; gi < sortedByRec.length; gi++) {
+    var gd = sortedByRec[gi];
+    var gf = getFinalFaction(gd.role, gd.flipped || false);
+    if (gd.role === '混子' && gd.huntFollow != null && gd.recIndex < history.length) {
+      gf = resolveHuntFaction(history[gd.recIndex], gd.huntFollow);
+    }
+    var gw = gd.winner === gf;
+    var gRec = history[gd.recIndex];
+    var gDate = gRec ? gRec.date : '--';
+    var gPlayerCount = gRec ? gRec.playerCount : '?';
+    var gWinner = gRec ? (gRec.winner === 'good' ? '好人方' : '反方') : '?';
+    var gRoleColor = gf === 'evil' ? 'var(--red-bright)' : gf === 'good' ? 'var(--green-bright)' : 'var(--gold-light)';
+    ph += '<div class="history-compact-item">';
+    ph += '<div class="hci-header" onclick="closeModal();openHistoryModal(' + gd.recIndex + ')">';
+    ph += '<span class="hci-date">' + gDate + '</span>';
+    ph += '<span class="hci-players">' + gPlayerCount + '人</span>';
+    ph += '<span style="font-size:12px;color:' + gRoleColor + ';font-weight:600;margin-left:6px">' + gd.role + '</span>';
+    ph += '<div class="hci-right">';
+    ph += '<span class="hci-result" style="color:' + (gRec && gRec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)') + '">' + gWinner + '</span>';
+    ph += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + (gw ? '&#9989;' : '&#10060;') + '</span>';
+    ph += '</div></div></div>';
+  }
+  ph += '</div></div>';
 
   var contentEl = document.getElementById('profile-content');
   if (contentEl) contentEl.innerHTML = ph;
@@ -8024,7 +7968,7 @@ function openHistoryModal(idx) {
 
   // --- Header ---
   h += '<div class="hci-modal-header">';
-  h += '<span class="hci-modal-date">' + (rec.date || '--') + '</span>';
+  h += '<span class="hci-modal-date">' + (rec.date || '--') + (rec.startTime ? ' ' + rec.startTime.slice(11, 16) : '') + '</span>';
   h += '<span class="hci-modal-result ' + winnerColor + '">' + winnerLabel + '</span>';
   h += '<div style="margin-left:auto;display:flex;align-items:center;gap:4px">';
   h += '<button class="hci-modal-del-btn" onclick="deleteGameRecord(' + idx + ');closeHistoryModal()" title="删除">删除</button>';
