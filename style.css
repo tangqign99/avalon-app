@@ -850,6 +850,10 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 /* ==================== SCREENSHOT BUTTON ==================== */
 .screenshot-float-btn {
+  position: fixed;
+  top: 212px;
+  left: 12px;
+  z-index: 100;
   padding: 8px 18px;
   background: linear-gradient(135deg, #5b3d8e, #7c5bbf);
   color: #fff;
@@ -861,7 +865,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   box-shadow: 0 2px 12px rgba(91,61,142,0.4);
   transition: transform 0.15s, box-shadow 0.15s;
   letter-spacing: 1px;
-  margin-top: 6px;
 }
 .screenshot-float-btn:hover {
   transform: scale(1.06);
@@ -951,9 +954,12 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     font-size: 12px;
   }
   .screenshot-float-btn {
+    position: fixed;
+    top: 106px;
+    left: 4px;
+    z-index: 100;
     padding: 5px 10px;
     font-size: 11px;
-    margin-top: 4px;
   }
   .assassin-modal {
     padding: 16px;

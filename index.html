@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v144">
+<link rel="stylesheet" href="./style.css?v=v145">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v144"></script>
+<script defer src="./app.js?v=v145"></script>
 </head>
 <body>
 
@@ -320,10 +320,10 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
   }).then(function(){
-    var SW_VERSION = 'v144';
+    var SW_VERSION = 'v145';
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
   }).then(function(reg){
-    console.log('[SW] ' + ('v144') + ' registered:', reg.scope);
+    console.log('[SW] ' + ('v145') + ' registered:', reg.scope);
     reg.addEventListener('updatefound', function(){
       var newWorker = reg.installing;
       if (!newWorker) return;
