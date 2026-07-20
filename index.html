@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v143">
+<link rel="stylesheet" href="./style.css?v=v144">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v143"></script>
+<script defer src="./app.js?v=v144"></script>
 </head>
 <body>
 
@@ -315,11 +315,15 @@
 </div>
 
 <script>
+// 强制注销所有旧 Service Worker，打破无限刷新循环
 if('serviceWorker' in navigator){
-  var SW_VERSION = 'v143';
-
-  navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
-    console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    return Promise.all(regs.map(function(r){ return r.unregister(); }));
+  }).then(function(){
+    var SW_VERSION = 'v144';
+    return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
+  }).then(function(reg){
+    console.log('[SW] ' + ('v144') + ' registered:', reg.scope);
     reg.addEventListener('updatefound', function(){
       var newWorker = reg.installing;
       if (!newWorker) return;
@@ -327,7 +331,6 @@ if('serviceWorker' in navigator){
       newWorker.addEventListener('statechange', function(){
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
           console.log('[SW] new version installed');
-          // 将 skipWaiting 推迟到用户点击横幅时触发，避免新 SW 立刻接管打断页面运行
           var banner = document.createElement('div');
           banner.id = 'sw-update-banner';
           banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#4CAF50;color:#fff;text-align:center;padding:10px;font-size:14px;cursor:pointer;';
@@ -341,7 +344,7 @@ if('serviceWorker' in navigator){
       });
     });
   }).catch(function(e){
-    console.warn('[SW] registration failed:', e);
+    console.warn('[SW] operation failed:', e);
   });
 }
 </script>
