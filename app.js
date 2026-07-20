@@ -8,6 +8,24 @@ var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰�
 var NEUTRAL_ROLES = ['混子'];
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
 
+/* ============ BEIJING TIME HELPERS (UTC+8) ============ */
+function _bjNow() {
+  var d = new Date();
+  return new Date(d.getTime() + d.getTimezoneOffset() * 60 * 1000 + 8 * 60 * 60 * 1000);
+}
+function _bjTimestamp() {
+  var b = _bjNow();
+  return b.getUTCFullYear() + '-' + String(b.getUTCMonth() + 1).padStart(2, '0') + '-' + String(b.getUTCDate()).padStart(2, '0') + ' ' + String(b.getUTCHours()).padStart(2, '0') + ':' + String(b.getUTCMinutes()).padStart(2, '0') + ':' + String(b.getUTCSeconds()).padStart(2, '0');
+}
+function _bjDate() {
+  var b = _bjNow();
+  return b.getUTCFullYear() + '-' + String(b.getUTCMonth() + 1).padStart(2, '0') + '-' + String(b.getUTCDate()).padStart(2, '0');
+}
+function _bjFileStamp() {
+  var b = _bjNow();
+  return b.getUTCFullYear() + '-' + String(b.getUTCMonth() + 1).padStart(2, '0') + '-' + String(b.getUTCDate()).padStart(2, '0') + '-' + String(b.getUTCHours()).padStart(2, '0') + '-' + String(b.getUTCMinutes()).padStart(2, '0') + '-' + String(b.getUTCSeconds()).padStart(2, '0');
+}
+
 /* ==================== SUPABASE ==================== */
 var SUPABASE_URL = 'https://nzbpopxrxniixnhnqktw.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56YnBvcHhyeG5paXhuaG5xa3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODQ2MzQsImV4cCI6MjA5NzQ2MDYzNH0.wLk-FdQlKha8YObTvgINW2M_9QVSpJk8c91bKJeQO7Q';
@@ -118,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v145';
+var SW_VERSION = 'v146';
 
 /* ---- UUID utility ---- */
 function generateUUID() {
@@ -243,7 +261,7 @@ function initState(n) {
   state.assassinTarget = null;
   state.assassinFromMission = false;
   state.assassinMode = false;
-  state.gameStartTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  state.gameStartTime = _bjTimestamp();
   state._assassinPickTarget = null;
   state._assassinAfterRound = null;
   state.lancelotFlipped = false;
@@ -601,7 +619,7 @@ function clearDeletedKeys() {
 }
 function saveLastGame() {
   var cfg = {
-    date: new Date().toISOString().slice(0, 10),
+    date: _bjDate(),
     playerCount: state.playerCount,
     playerNames: state.playerNames.slice(),
     selfIndex: state.selfIndex
@@ -613,7 +631,7 @@ function loadLastGame() {
     var d = localStorage.getItem('avalon_last_game');
     if (!d) return null;
     var cfg = JSON.parse(d);
-    var today = new Date().toISOString().slice(0, 10);
+    var today = _bjDate();
     if (cfg.date !== today) return null;
     return cfg;
   } catch(e) { return null; }
@@ -1063,7 +1081,7 @@ function doStartGame() {
   state.assassinTarget = null;
   state.assassinFromMission = false;
   state.assassinMode = false;
-  state.gameStartTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  state.gameStartTime = _bjTimestamp();
   state._assassinPickTarget = null;
   state._assassinAfterRound = null;
   state.lancelotFlipped = false;
@@ -1306,6 +1324,7 @@ function renderScreenshotButton() {
 }
 
 function generateLiveScreenshot() {
+  try {
   var W = 750;
   var PAD = 28;
   var contentW = W - PAD * 2;
@@ -1458,7 +1477,7 @@ function generateLiveScreenshot() {
     var ty = y + 28 + 8;
     dt('阿瓦隆（进行中）', W/2, ty, 20, GOLD, 'center');
     var iy = ty + 26 + 4;
-    dt((state.gameStartTime || new Date().toISOString().slice(0, 19)) + ' · ' + state.playerCount + '人局', W/2, iy, 11, TXT_DIM, 'center');
+    dt((state.gameStartTime || _bjTimestamp()) + ' · ' + state.playerCount + '人局', W/2, iy, 11, TXT_DIM, 'center');
   })();
   y += secH[si++];
 
@@ -1645,7 +1664,12 @@ function generateLiveScreenshot() {
   })();
 
   canvas.toBlob(function(blob) {
-    var dateStr = new Date().toISOString().replace(/[\/\s:]/g, '-').slice(0, 19);
+    if (!blob) {
+      console.error('[Screenshot] canvas.toBlob returned null (canvas too large or tainted)');
+      toast('截图失败：画布生成异常，请重试', 'error');
+      return;
+    }
+    var dateStr = _bjFileStamp();
     var fileName = '阿瓦隆进行中_' + dateStr + '.png';
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -1655,6 +1679,11 @@ function generateLiveScreenshot() {
     document.body.removeChild(link);
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
   }, 'image/png');
+  console.log('[Screenshot] Live screenshot generated, canvas=' + canvas.width + 'x' + canvas.height);
+} catch(e) {
+  console.error('[Screenshot] generateLiveScreenshot error:', e);
+  toast('截图失败：' + e.message, 'error');
+}
 }
 
 function enterAssassinMode() {
@@ -4385,9 +4414,9 @@ function saveGameRecord() {
   var history = loadHistory();
   var record = {
     _uuid: _uuid,
-    date: new Date().toISOString().slice(0, 10),
+    date: _bjDate(),
     startTime: state.gameStartTime || '',
-    endTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    endTime: _bjTimestamp(),
     playerCount: state.playerCount,
     winner: state.winner,
     identities: identities,
@@ -5999,7 +6028,7 @@ function exportData() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'avalon-data-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = 'avalon-data-' + _bjDate() + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -7201,7 +7230,7 @@ function saveV7AnalysisToHistory() {
       scores: scores.map(function(s) { return { idx: s.idx, score: s.score, evidence: s.evidence }; }),
       quality: scores._dataQuality || 'unknown',
       totalRounds: scores._totalRounds || 0,
-      savedAt: new Date().toISOString()
+      savedAt: _bjTimestamp()
     };
   }
 
@@ -8201,6 +8230,7 @@ function openHistoryModal(idx) {
 
 /* ==================== SCREENSHOT GENERATION ==================== */
 function generateGameScreenshot(idx) {
+  try {
   var history = loadHistory();
   if (idx < 0 || idx >= history.length) { alert('\u65e0\u6548\u8bb0\u5f55'); return; }
   var recRaw = history[idx];
@@ -8586,6 +8616,11 @@ function generateGameScreenshot(idx) {
   })();
 
   canvas.toBlob(function(blob) {
+    if (!blob) {
+      console.error('[Screenshot] generateGameScreenshot canvas.toBlob returned null');
+      toast('\u622a\u56fe\u5931\u8d25\uff1a\u753b\u5e03\u751f\u6210\u5f02\u5e38\uff0c\u8bf7\u91cd\u8bd5', 'error');
+      return;
+    }
     var dateStr = (rec.date || 'unknown').replace(/[\/\s:]/g, '-');
     var fileName = '\u963f\u74e6\u9686\u7b2c' + (idx + 1) + '\u5c40_' + dateStr + '.png';
     var link = document.createElement('a');
@@ -8596,6 +8631,11 @@ function generateGameScreenshot(idx) {
     document.body.removeChild(link);
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
   }, 'image/png');
+  console.log('[Screenshot] Game screenshot generated, idx=' + idx + ', canvas=' + (canvas ? canvas.width + 'x' + canvas.height : 'null'));
+} catch(e) {
+  console.error('[Screenshot] generateGameScreenshot error:', e);
+  toast('\u622a\u56fe\u5931\u8d25\uff1a' + e.message, 'error');
+}
 }
 /* ==================== HISTORY EDIT ==================== */
 function openHistoryEdit(idx) {
