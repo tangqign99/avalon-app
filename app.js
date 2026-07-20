@@ -7839,296 +7839,461 @@ function generateGameScreenshot(idx) {
   if (!rec) { alert('记录解析失败'); return; }
 
   var W = 750;
-  var PAD = 30;
-  var y = 0;
+  var PAD = 28;
+  var contentW = W - PAD * 2;
 
   var canvas = document.createElement('canvas');
   canvas.width = W;
-  canvas.height = 2000; // temporary, will resize
   var ctx = canvas.getContext('2d');
 
-  // Helper: wrapped text with line height
-  function drawText(text, x, yPos, fontSize, color, align) {
-    ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
-    ctx.fillStyle = color || '#333';
-    ctx.textAlign = align || 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(text, x, yPos);
-  }
+  var players = (rec.identities || []).map(function(id) { return id.name; });
+  var nameToIdx = {};
+  players.forEach(function(n, i) { nameToIdx[n] = i; });
 
-  // Helper: measure text width
-  function textWidth(text, fontSize) {
-    ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
+  var GOLD = '#f4d03f';
+  var GREEN = '#27ae60';
+  var GREEN_BRIGHT = '#2ecc71';
+  var RED = '#e74c3c';
+  var BLUE = '#5dade2';
+  var TXT = '#e8dcc8';
+  var TXT_SEC = '#a89070';
+  var TXT_DIM = '#7a6e5e';
+
+  function tw(text, size) {
+    ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     return ctx.measureText(text).width;
   }
-
-  var contentW = W - PAD * 2;
-
-  // Compute card height first
-  var sections = [];
-
-  // --- Title ---
-  sections.push({ type: 'title', text: '阿瓦隆 对局记录', fontSize: 32, height: 50, paddingBottom: 10 });
-
-  // --- Divider ---
-  sections.push({ type: 'divider', height: 1, paddingTop: 5, paddingBottom: 10 });
-
-  // --- Info line ---
-  var winnerLabel = rec.winner === 'good' ? '好人方胜利' : '反方胜利';
-  var infoText = (rec.date || '--') + '  |  ' + (rec.playerCount || '?') + ' 人  |  ' + winnerLabel;
-  sections.push({ type: 'text', text: infoText, fontSize: 15, height: 24, paddingBottom: 16 });
-
-  // --- Players ---
-  sections.push({ type: 'text', text: '玩家角色', fontSize: 18, bold: true, height: 28, paddingBottom: 8 });
-  var cardW = 220, cardH = 46, cardGap = 10, cardsPerRow = 3;
-  if (rec.identities && rec.identities.length > 0) {
-    var rows = Math.ceil(rec.identities.length / cardsPerRow);
-    sections.push({ type: 'playerCards', rows: rows, height: rows * (cardH + cardGap) - cardGap + 10, paddingBottom: 16 });
+  function dt(text, x, y, size, color, align) {
+    ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.fillStyle = color || TXT;
+    ctx.textAlign = align || 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, x, y);
+  }
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+  function getVote(playerName, votes) {
+    if (!votes) return null;
+    if (votes[playerName] !== undefined) return votes[playerName];
+    var idx = nameToIdx[playerName];
+    if (idx !== undefined && votes[idx] !== undefined) return votes[idx];
+    if (idx !== undefined && votes[String(idx)] !== undefined) return votes[String(idx)];
+    return null;
+  }
+  function prepMission(m) {
+    var team = m.team || [];
+    var leader = m.leader || '';
+    var votes = m.votes || {};
+    var rejectedCount = 0;
+    if (m.launchAttempts && m.launchAttempts.length > 0) {
+      var last = m.launchAttempts[m.launchAttempts.length - 1];
+      if (Object.keys(last.votes).length > 0) votes = last.votes;
+      if (last.team && last.team.length > 0) team = last.team;
+      if (last.leader) leader = last.leader;
+      rejectedCount = m.launchAttempts.length - 1;
+    }
+    if (rejectedCount === 0 && m.launchFailures) rejectedCount = m.launchFailures;
+    var approves = 0, rejects = 0;
+    for (var pi = 0; pi < players.length; pi++) {
+      var v = getVote(players[pi], votes);
+      if (v === 'approve') approves++; else if (v === 'reject') rejects++;
+    }
+    return { team: team, leader: leader, votes: votes, approves: approves, rejects: rejects, rejectedCount: rejectedCount };
   }
 
-  // --- Missions ---
+  var hasLady = rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0;
+  var hasExcalibur = rec.excaliburHistory && rec.excaliburHistory.length > 0;
+  var hasLancelot = rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0;
+  var hasAssassin = !!rec.assassinTarget;
+  var hasForceEnd = !!rec.forceEnded;
+  var hasIdentityMarks = rec.identityMarks && rec.identityMarks.length > 0;
+  var hasAnyRule = hasLady || hasExcalibur || hasLancelot || hasAssassin || hasForceEnd || hasIdentityMarks;
+
+  var goodPlayers = [], evilPlayers = [];
+  if (rec.identities) {
+    for (var pi = 0; pi < rec.identities.length; pi++) {
+      var f = getPlayerFaction(rec.identities[pi].role);
+      if (f === 'good') goodPlayers.push(rec.identities[pi].name);
+      else if (f === 'evil') evilPlayers.push(rec.identities[pi].name);
+    }
+  }
+  var doneMissions = 0, failMissions = 0;
+  for (var mi2 = 0; mi2 < (rec.missions || []).length; mi2++) {
+    if (rec.missions[mi2].result === 'success') doneMissions++;
+    else if (rec.missions[mi2].result === 'fail') failMissions++;
+  }
+
+  // ==== Layout: compute total height ====
+  var secH = [];
+  secH.push(28 + 8 + 26 + 4 + 16 + 16); // 0 header
+  secH.push(16); // 1 divider
+  secH.push(20 + Math.ceil(players.length / 2) * 28 + 4); // 2 players
+  secH.push(16); // 3 divider
+  // 4 quests
+  var questH = 20 + 12;
   if (rec.missions && rec.missions.length > 0) {
-    sections.push({ type: 'text', text: '任务回顾', fontSize: 18, bold: true, height: 28, paddingBottom: 8 });
-    sections.push({ type: 'missions', height: 28 * rec.missions.length + 8, paddingBottom: 16 });
+    for (var qi = 0; qi < rec.missions.length; qi++) {
+      var m = rec.missions[qi];
+      if (!m.result) continue;
+      var md = prepMission(m);
+      var qh = 10 + 18 + 6 + 16 + 4;
+      var vLine = '';
+      for (var pi = 0; pi < players.length; pi++) {
+        var v = getVote(players[pi], md.votes);
+        vLine += players[pi] + (v === 'approve' ? '\u2713' : v === 'reject' ? '\u2717' : '?') + ' ';
+      }
+      vLine += '  ' + md.approves + ':' + md.rejects;
+      if (tw(vLine, 11) > contentW - 36) qh += 18; else qh += 16;
+      if ((m.result === 'fail' && m.failCount) || (m.result === 'success' && m.shieldedFails)) qh += 16;
+      qh += 10;
+      questH += qh + 8;
+    }
+    questH -= 8;
   }
+  secH.push(questH + 8); // 4
+  // 5 rules (optional)
+  var rulesH = 0;
+  if (hasAnyRule) {
+    rulesH += 20 + 8;
+    if (hasLady) rulesH += 18 * rec.ladyCheckHistory.length + 4;
+    if (hasExcalibur) rulesH += 18 * rec.excaliburHistory.length + 4;
+    if (hasLancelot) { var lfc = 0; for (var k in rec.lancelotFlips) lfc++; rulesH += 18 * lfc + 4; }
+    if (hasAssassin) rulesH += 18 + 18 + 18 + 10 + 4;
+    if (hasForceEnd) rulesH += 18 + 4;
+    if (hasIdentityMarks) rulesH += 18 * rec.identityMarks.length + 4;
+    secH.push(rulesH + 8);
+  }
+  secH.push(12); // bottom divider
+  secH.push(18 + 6 + 36 + 16 + 20); // summary + watermark
 
-  // --- Key events ---
-  var hasEvents = false;
-  var eventLines = 0;
-
-  if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
-    hasEvents = true;
-    eventLines += rec.ladyCheckHistory.length;
-  }
-  if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
-    hasEvents = true;
-    eventLines += Object.keys(rec.lancelotFlips).length;
-  }
-  if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
-    hasEvents = true;
-    eventLines += rec.excaliburHistory.length;
-  }
-  if (rec.assassinTarget) {
-    hasEvents = true;
-    eventLines += 1;
-  }
-  if (rec.forceEnded) {
-    hasEvents = true;
-    eventLines += 1;
-  }
-  if (rec.identityMarks && rec.identityMarks.length > 0) {
-    hasEvents = true;
-    eventLines += rec.identityMarks.length;
-  }
-
-  if (hasEvents) {
-    sections.push({ type: 'text', text: '关键事件', fontSize: 18, bold: true, height: 28, paddingBottom: 8 });
-    sections.push({ type: 'events', lines: eventLines, height: Math.max(22 * eventLines + 16, 30), paddingBottom: 16 });
-  }
-
-  // --- Watermark ---
-  sections.push({ type: 'watermark', height: 24, paddingTop: 5 });
-
-  // Calculate total height
   var totalH = PAD * 2;
-  for (var si = 0; si < sections.length; si++) {
-    var sec = sections[si];
-    var top = (sec.paddingTop || 0);
-    var bot = (sec.paddingBottom || 0);
-    totalH += top + sec.height + bot;
-  }
+  for (var si = 0; si < secH.length; si++) totalH += secH[si];
   canvas.height = Math.ceil(totalH);
 
-  // Start drawing
-  // White background
-  ctx.fillStyle = '#ffffff';
+  // ==== DRAW ====
+  var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#1a0e30');
+  grad.addColorStop(0.4, '#120926');
+  grad.addColorStop(1, '#0d0617');
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  y = PAD;
+  var y = PAD;
+  var si = 0; // section index
 
-  // --- Helper: draw a section title ---
-  function drawSectionTitle(text, yPos) {
-    drawText(text, PAD, yPos, 18, '#222', 'left');
-  }
+  // === Header ===
+  (function() {
+    var badgeText = rec.winner === 'good' ? '\u597d\u4eba\u9635\u8425\u83b7\u80dc' : '\u574f\u4eba\u9635\u8425\u83b7\u80dc';
+    var badgeW = tw(badgeText, 15) + 36;
+    var bx = (W - badgeW) / 2;
+    rr(bx, y, badgeW, 28, 14);
+    if (rec.winner === 'good') {
+      var g = ctx.createLinearGradient(bx, 0, bx + badgeW, 0);
+      g.addColorStop(0, '#1a6b3c'); g.addColorStop(1, '#27ae60');
+      ctx.fillStyle = g;
+    } else {
+      var g = ctx.createLinearGradient(bx, 0, bx + badgeW, 0);
+      g.addColorStop(0, '#8e1a1a'); g.addColorStop(1, '#c0392b');
+      ctx.fillStyle = g;
+    }
+    ctx.fill();
+    dt(badgeText, W/2, y + 6, 15, '#fff', 'center');
 
-  // --- Title ---
-  drawText('阿瓦隆 对局记录', W / 2, y, 32, '#1a1a2e', 'center');
-  y += 50 + 10;
+    var ty = y + 28 + 8;
+    dt('\u7b2c' + (idx + 1) + '\u5c40 \u00b7 \u963f\u74e6\u9686', W/2, ty, 20, GOLD, 'center');
 
-  // --- Divider ---
-  ctx.strokeStyle = '#e0e0e0';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(PAD, y);
-  ctx.lineTo(W - PAD, y);
-  ctx.stroke();
-  y += 1 + 10;
+    var iy = ty + 26 + 4;
+    var infoText = (rec.date || '--') + ' \u00b7 ' + (rec.playerCount || '?') + '\u4eba\u5c40';
+    dt(infoText, W/2, iy, 11, TXT_DIM, 'center');
+  })();
+  y += secH[si++];
 
-  // --- Info ---
-  drawText(infoText, PAD, y, 15, '#666', 'left');
-  y += 24 + 16;
+  // === Divider ===
+  (function() {
+    var dy = y + 8;
+    var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+    g.addColorStop(0, 'transparent');
+    g.addColorStop(0.3, '#5b3d8e');
+    g.addColorStop(0.7, '#5b3d8e');
+    g.addColorStop(1, 'transparent');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(PAD, dy);
+    ctx.lineTo(W - PAD, dy);
+    ctx.stroke();
+  })();
+  y += secH[si++];
 
-  // --- Players ---
-  drawSectionTitle('玩家角色', y);
-  y += 28 + 8;
+  // === Identity Reveal ===
+  (function() {
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2);
+    ctx.fill();
+    dt('\u8eab\u4efd\u63ed\u6653', PAD + 12, y + 1, 13, TXT_SEC, 'left');
 
-  // Draw player cards
-  if (rec.identities && rec.identities.length > 0) {
-    for (var pi = 0; pi < rec.identities.length; pi++) {
+    var gridY = y + 20;
+    var colW = (contentW - 12) / 2;
+    for (var pi = 0; pi < players.length; pi++) {
+      var col = pi % 2;
+      var row = Math.floor(pi / 2);
+      var px = PAD + col * (colW + 12);
+      var py = gridY + row * 28;
       var id = rec.identities[pi];
-      var col = pi % cardsPerRow;
-      var row = Math.floor(pi / cardsPerRow);
-      var cx = PAD + col * (cardW + cardGap);
-      var cy = y + row * (cardH + cardGap);
-
-      var faction = getPlayerFaction(id.role || '');
+      var faction = getPlayerFaction(id.role);
       var isEvil = faction === 'evil';
-      var bgColor = isEvil ? '#ffebee' : '#e3f2fd';
-      var borderColor = isEvil ? '#ef9a9a' : '#90caf9';
-      var nameColor = isEvil ? '#c62828' : '#1565c0';
-      var roleColor = isEvil ? '#d32f2f' : '#1976d2';
 
-      // Card background
-      ctx.fillStyle = bgColor;
-      ctx.beginPath();
-      ctx.roundRect(cx, cy, cardW, cardH, 8);
+      ctx.fillStyle = isEvil ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)';
+      rr(px, py, colW, 24, 6);
       ctx.fill();
 
-      // Border
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(cx, cy, cardW, cardH, 8);
-      ctx.stroke();
+      dt(isEvil ? '\u25b2' : '\u2b22', px + 8, py + 5, 10, isEvil ? RED : BLUE, 'left');
+      dt(id.name, px + 22, py + 4, 13, TXT, 'left');
 
-      var playerNum = (id.index != null ? id.index : pi) + 1;
-      drawText(playerNum + '号 ' + id.name, cx + 12, cy + 6, 14, nameColor, 'left');
-
-      var roleText = id.role || '--';
-      // Check lancelot flip
-      var flipped = rec.lancelotFlips && rec.lancelotFlips[id.index != null ? id.index : pi];
-      if (flipped) roleText += ' ↷变节';
-
-      // Draw role on right side
-      ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
-      var roleW = ctx.measureText(roleText).width;
-      drawText(roleText, cx + cardW - 12 - roleW, cy + 9, 12, roleColor, 'left');
+      var roleW = tw(id.role || '', 11);
+      dt(id.role || '', px + colW - 8 - roleW, py + 5, 11, isEvil ? RED : BLUE, 'left');
     }
-    y += rows * (cardH + cardGap) - cardGap + 10;
-    y += 16 - 10; // paddingBottom
-  }
+  })();
+  y += secH[si++];
 
-  // --- Missions ---
-  if (rec.missions && rec.missions.length > 0) {
-    drawSectionTitle('任务回顾', y);
-    y += 28 + 8;
+  // === Divider ===
+  (function() {
+    var dy = y + 8;
+    var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+    g.addColorStop(0, 'transparent');
+    g.addColorStop(0.3, '#5b3d8e');
+    g.addColorStop(0.7, '#5b3d8e');
+    g.addColorStop(1, 'transparent');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(PAD, dy);
+    ctx.lineTo(W - PAD, dy);
+    ctx.stroke();
+  })();
+  y += secH[si++];
 
-    for (var mi = 0; mi < rec.missions.length; mi++) {
-      var m = rec.missions[mi];
-      var resultText = m.result === 'success' ? '✓ 成功' : m.result === 'fail' ? '✗ 失败' : '--';
-      var resultColor = m.result === 'success' ? '#2e7d32' : m.result === 'fail' ? '#c62828' : '#999';
-      var label = '第' + (mi + 1) + '轮任务';
+  // === Quests ===
+  (function() {
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2);
+    ctx.fill();
+    dt('\u4efb\u52a1\u5386\u7a0b', PAD + 12, y + 1, 13, TXT_SEC, 'left');
 
-      drawText(label, PAD, y, 14, '#333', 'left');
-      drawText(resultText, PAD + 100, y, 14, resultColor, 'left');
+    var qy = y + 20 + 12;
+    for (var qi = 0; qi < rec.missions.length; qi++) {
+      var m = rec.missions[qi];
+      if (!m.result) { qy += 8; continue; }
+      var md = prepMission(m);
+      var isSuc = m.result === 'success';
 
-      // Show shielded fails (protection round)
+      var vLine = '';
+      for (var pi = 0; pi < players.length; pi++) {
+        var v = getVote(players[pi], md.votes);
+        vLine += players[pi] + (v === 'approve' ? '\u2713' : v === 'reject' ? '\u2717' : '?') + ' ';
+      }
+      vLine += '  ' + md.approves + ':' + md.rejects + ' ' + (md.approves > md.rejects ? '\u901a\u8fc7' : '\u5426\u51b3');
+      var voteH = (tw(vLine, 11) > contentW - 36) ? 18 : 16;
+      var hasFailDetail = (m.result === 'fail' && m.failCount) || (m.result === 'success' && m.shieldedFails);
+      var cardH = 10 + 18 + 6 + voteH + 4 + (hasFailDetail ? 16 : 0) + 10;
+
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      rr(PAD, qy, contentW, cardH, 8);
+      ctx.fill();
+
+      ctx.fillStyle = isSuc ? GREEN : RED;
+      rr(PAD, qy + 10, 3, cardH - 20, 1.5);
+      ctx.fill();
+
+      var cx = PAD + 16;
+      dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba', cx, qy + 10, 13, TXT_SEC, 'left');
+
+      var tagText = isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
+      var tagW = tw(tagText, 11) + 16;
+      var tagX = PAD + contentW - 16 - tagW;
+      ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)';
+      rr(tagX, qy + 9, tagW, 18, 9);
+      ctx.fill();
+      dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
+
+      var teamY = qy + 10 + 18 + 6;
+      dt('\u2605' + md.leader, cx, teamY, 12, GOLD, 'left');
+      var teamW = tw('\u2605' + md.leader + ' \u9009\u6d3e\uff1a' + md.team.join('\u3001'), 12);
+      dt(' \u9009\u6d3e\uff1a' + md.team.join('\u3001'), cx + teamW, teamY, 12, TXT, 'left');
+
+      if (md.rejectedCount > 0) {
+        var rejectLabel = '(\u524d' + md.rejectedCount + '\u6b21\u88ab\u5426\u51b3)';
+        var rw = tw(rejectLabel, 11);
+        dt(rejectLabel, PAD + contentW - 16 - rw, teamY, 11, TXT_DIM, 'left');
+      }
+
+      var voteY = teamY + 16 + 4;
+      var voteLabel = '\u6295\u7968\uff1a';
+      var vx = cx;
+      dt(voteLabel, vx, voteY, 11, TXT_DIM, 'left');
+      vx += tw(voteLabel, 11);
+
+      for (var pi = 0; pi < players.length; pi++) {
+        var v = getVote(players[pi], md.votes);
+        var vChar = v === 'approve' ? '\u2713' : v === 'reject' ? '\u2717' : '?';
+        var vColor = v === 'approve' ? GREEN_BRIGHT : v === 'reject' ? RED : TXT_DIM;
+        var nameW = tw(players[pi] + vChar, 11);
+        if (vx + nameW > PAD + contentW - 16) { vx = cx; voteY += 18; }
+        dt(players[pi] + vChar, vx, voteY, 11, vColor, 'left');
+        vx += nameW;
+      }
+      var scoreLabel = '  ' + md.approves + ':' + md.rejects + ' ' + (md.approves > md.rejects ? '\u901a\u8fc7' : '\u5426\u51b3');
+      var scoreW = tw(scoreLabel, 11);
+      if (vx + scoreW > PAD + contentW - 16) { vx = cx; voteY += 18; }
+      dt(scoreLabel, vx, voteY, 11, TXT_DIM, 'left');
+
+      var failY = voteY + (voteH > 16 ? 18 : 16) + 4;
+      if (m.result === 'fail' && m.failCount) {
+        dt('\u5931\u8d25\u5361\uff1a' + m.failCount + '\u5f20', cx, failY, 11, RED, 'left');
+      }
       if (m.result === 'success' && m.shieldedFails) {
-        drawText('（含' + m.shieldedFails + '张失败票）', PAD + 200, y, 12, '#e65100', 'left');
-      } else if (m.result === 'fail' && m.failCount) {
-        drawText('（失败票 ' + m.failCount + '）', PAD + 200, y, 12, '#888', 'left');
-      } else if (m.result === 'success' && m.failCount === 0) {
-        drawText('（全票通过）', PAD + 200, y, 12, '#888', 'left');
+        dt('\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09', cx, failY, 11, '#e65100', 'left');
       }
 
-      y += 28;
+      qy += cardH + 8;
     }
-    y += 16 - 28; // paddingBottom, subtract last mission height
-  }
+  })();
+  y += secH[si++];
 
-  // --- Key events ---
-  if (hasEvents) {
-    drawSectionTitle('关键事件', y);
-    y += 28 + 8;
+  // === Optional Rules ===
+  if (hasAnyRule) {
+    (function() {
+      ctx.fillStyle = GOLD;
+      ctx.beginPath();
+      ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2);
+      ctx.fill();
+      var sectionLabel = hasAssassin ? '\u523a\u6740\u9636\u6bb5' : '\u53ef\u9009\u89c4\u5219';
+      dt(sectionLabel, PAD + 12, y + 1, 13, TXT_SEC, 'left');
+      var ry = y + 20 + 8;
 
-    // Lady checks
-    if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
-      for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
-        var lc = rec.ladyCheckHistory[li];
-        var holderNum = (lc.holder != null) ? (lc.holder + 1) + '号 ' : '';
-        var targetNum = (lc.target != null) ? (lc.target + 1) + '号 ' : '';
-        var roundLabel = lc.round ? '第' + lc.round + '轮：' : '';
-        var text = '湖女查验: ' + roundLabel + holderNum + (lc.holderName || '') + ' 查验 ' + targetNum + (lc.targetName || '') + ' → ' + (lc.result || '?');
-        drawText(text, PAD, y, 13, '#555', 'left');
-        y += 22;
+      if (hasLady) {
+        for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+          var lc = rec.ladyCheckHistory[li];
+          var holderNum = (lc.holder != null) ? (lc.holder + 1) + '\u53f7 ' : '';
+          var targetNum = (lc.target != null) ? (lc.target + 1) + '\u53f7 ' : '';
+          var roundLabel = lc.round ? '\u7b2c' + lc.round + '\u8f6e\uff1a' : '';
+          dt(roundLabel + holderNum + (lc.holderName || '') + ' \u67e5\u9a8c ' + targetNum + (lc.targetName || '') + ' \u2192 ' + (lc.result || '?'), PAD + 12, ry, 12, TXT_SEC, 'left');
+          ry += 18;
+        }
+        ry += 4;
       }
-    }
 
-    // Excalibur
-    if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
-      for (var exi = 0; exi < rec.excaliburHistory.length; exi++) {
-        var ex = rec.excaliburHistory[exi];
-        var text = '王者之剑: ' + (ex.holderName || ex.holder) + ' → ' + (ex.targetName || ex.target) + (ex.used ? '（已使用）' : '（未使用）');
-        drawText(text, PAD, y, 13, '#555', 'left');
-        y += 22;
+      if (hasExcalibur) {
+        for (var exi = 0; exi < rec.excaliburHistory.length; exi++) {
+          var ex = rec.excaliburHistory[exi];
+          var exText = (ex.holderName || ex.holder) + ' \u2192 ' + (ex.targetName || ex.target) + (ex.used ? '(\u5df2\u4f7f\u7528)' : '(\u672a\u4f7f\u7528)');
+          dt('\u738b\u8005\u4e4b\u5251: ' + exText, PAD + 12, ry, 12, TXT_SEC, 'left');
+          ry += 18;
+        }
+        ry += 4;
       }
-    }
 
-    // Lancelot flips
-    if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
-      for (var lfKey in rec.lancelotFlips) {
-        if (rec.identities && rec.identities[lfKey]) {
-          var player = rec.identities[lfKey];
-          var playerNum2 = (player.index != null ? player.index : parseInt(lfKey)) + 1;
-          var origRole = player.role || '';
-          var origFaction = ROLE_CATEGORY[origRole] || '';
-          var shortRole = origRole === '兰斯洛特(蓝)' ? '蓝兰斯洛特' : origRole === '兰斯洛特(红)' ? '红兰斯洛特' : origRole;
-          var afterLabel = (origFaction === 'good') ? '红方（坏人）' : (origFaction === 'evil') ? '蓝方（好人）' : '?';
-          var text = '兰斯洛特变节: ' + playerNum2 + '号 ' + shortRole + ' → ' + afterLabel;
-          drawText(text, PAD, y, 13, '#e65100', 'left');
-          y += 22;
+      if (hasLancelot) {
+        for (var lfKey in rec.lancelotFlips) {
+          if (rec.identities && rec.identities[lfKey]) {
+            var player = rec.identities[lfKey];
+            var pn = (player.index != null ? player.index : parseInt(lfKey)) + 1;
+            var origRole = player.role || '';
+            var origFaction = ROLE_CATEGORY[origRole] || '';
+            var shortRole = origRole === '\u5170\u65af\u6d1b\u7279(\u84dd)' ? '\u84dd\u5170\u65af\u6d1b\u7279' : origRole === '\u5170\u65af\u6d1b\u7279(\u7ea2)' ? '\u7ea2\u5170\u65af\u6d1b\u7279' : origRole;
+            var afterLabel = (origFaction === 'good') ? '\u7ea2\u65b9(\u574f\u4eba)' : (origFaction === 'evil') ? '\u84dd\u65b9(\u597d\u4eba)' : '?';
+            dt('\u5170\u65af\u6d1b\u7279\u53d8\u8282: ' + pn + '\u53f7 ' + shortRole + ' \u2192 ' + afterLabel, PAD + 12, ry, 12, '#e65100', 'left');
+            ry += 18;
+          }
+        }
+        ry += 4;
+      }
+
+      if (hasAssassin) {
+        var aboxY = ry - 4;
+        var aboxH = 18 + 18 + 18 + 10;
+        ctx.fillStyle = 'rgba(192,57,43,0.08)';
+        rr(PAD, aboxY, contentW, aboxH, 8);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(192,57,43,0.25)';
+        ctx.lineWidth = 1;
+        rr(PAD, aboxY, contentW, aboxH, 8);
+        ctx.stroke();
+
+        dt('\u597d\u4eba\u5b8c\u6210' + doneMissions + '\u6b21\u4efb\u52a1 \u2192 \u8fdb\u5165\u523a\u6740\u9636\u6bb5', PAD + 12, aboxY + 6, 12, RED, 'left');
+        dt('\u523a\u5ba2' + evilPlayers.join('/') + ' \u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), PAD + 12, aboxY + 6 + 18, 12, TXT, 'left');
+        var hitText = rec.assassinSuccess ? '\u731c\u5bf9\u4e86!' : '\u731c\u9519\u4e86!';
+        var hitColor = rec.assassinSuccess ? RED : GREEN_BRIGHT;
+        dt(hitText, PAD + 12 + tw('\u523a\u5ba2' + evilPlayers.join('/') + ' \u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), 12), aboxY + 6 + 18, 12, hitColor, 'left');
+        dt(rec.assassinSuccess ? '\u574f\u4eba\u901a\u8fc7\u523a\u6740\u6885\u6797\u9006\u8f6c\u83b7\u80dc' : '\u597d\u4eba\u62b5\u5fa1\u523a\u6740\u83b7\u80dc', PAD + 12, aboxY + 6 + 36, 11, TXT_DIM, 'left');
+        ry = aboxY + aboxH + 4;
+      }
+
+      if (hasForceEnd) {
+        dt('\u5f3a\u5236\u7ed3\u675f: ' + (rec.forceEndReason || '\u672a\u77e5\u539f\u56e0'), PAD + 12, ry, 12, '#e65100', 'left');
+        ry += 18 + 4;
+      }
+
+      if (hasIdentityMarks) {
+        for (var mi3 = 0; mi3 < rec.identityMarks.length; mi3++) {
+          var mk = rec.identityMarks[mi3];
+          var lvlLabel = mk.level === 'high' ? '\u9ad8' : mk.level === 'mid' ? '\u4e2d' : '\u4f4e';
+          dt((mk.targetName || mk.target) + ' [' + lvlLabel + ']', PAD + 12, ry, 12, TXT_SEC, 'left');
+          ry += 18;
         }
       }
-    }
-
-    // Assassination
-    if (rec.assassinTarget) {
-      var assassinText = '刺杀: 目标 ' + rec.assassinTarget + ' → ' + (rec.assassinSuccess ? '命中' : '未命中');
-      drawText(assassinText, PAD, y, 13, '#555', 'left');
-      y += 22;
-    }
-
-    // Force ended
-    if (rec.forceEnded) {
-      drawText('强制结束: ' + (rec.forceEndReason || '未知原因'), PAD, y, 13, '#e65100', 'left');
-      y += 22;
-    }
-
-    // Identity marks
-    if (rec.identityMarks && rec.identityMarks.length > 0) {
-      for (var mi2 = 0; mi2 < rec.identityMarks.length; mi2++) {
-        var mk = rec.identityMarks[mi2];
-        var lvlLabel = mk.level === 'high' ? '高' : mk.level === 'mid' ? '中' : '低';
-        drawText('身份标记: ' + (mk.targetName || mk.target) + ' [' + lvlLabel + ']', PAD, y, 13, '#555', 'left');
-        y += 22;
-      }
-    }
-
-    y += 16;
+    })();
+    y += secH[si++];
   }
 
-  // --- Watermark ---
-  y += 5;
-  ctx.fillStyle = '#bbbbbb';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
-  ctx.fillText('由 Marvis 生成', W / 2, canvas.height - PAD);
+  // === Bottom Divider ===
+  (function() {
+    var dy = y + 6;
+    var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+    g.addColorStop(0, 'transparent');
+    g.addColorStop(0.3, '#5b3d8e');
+    g.addColorStop(0.7, '#5b3d8e');
+    g.addColorStop(1, 'transparent');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(PAD, dy);
+    ctx.lineTo(W - PAD, dy);
+    ctx.stroke();
+  })();
+  y += secH[si++];
+
+  // === Footer with summary + watermark ===
+  (function() {
+    dt('\u4efb\u52a1\uff1a' + doneMissions + '\u2713 ' + failMissions + '\u2717', PAD, y, 12, TXT_DIM, 'left');
+    dt('\u597d\u4eba\u9635\u7ebf\uff1a' + goodPlayers.join('\u3001'), PAD, y + 18, 12, TXT_DIM, 'left');
+    dt('\u574f\u4eba\u9635\u7ebf\uff1a' + evilPlayers.join('\u3001'), PAD, y + 36, 12, TXT_DIM, 'left');
+
+    var wy = canvas.height - PAD;
+    ctx.fillStyle = '#5a4e3e';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, wy);
+  })();
 
   // Export
   canvas.toBlob(function(blob) {
     var dateStr = (rec.date || 'unknown').replace(/[\/\s:]/g, '-');
-    var fileName = '阿瓦隆对局_' + dateStr + '.png';
+    var fileName = '\u963f\u74e6\u9686\u7b2c' + (idx + 1) + '\u5c40_' + dateStr + '.png';
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = fileName;
@@ -8136,10 +8301,9 @@ function generateGameScreenshot(idx) {
     link.click();
     document.body.removeChild(link);
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
-    alert('截图已生成');
+    alert('\u622a\u56fe\u5df2\u751f\u6210');
   }, 'image/png');
 }
-
 /* ==================== HISTORY EDIT ==================== */
 function openHistoryEdit(idx) {
   var history = loadHistory();
