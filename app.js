@@ -1393,7 +1393,10 @@ function generateLiveScreenshot() {
       h += (tw(voteLine, 10) > contentW - 28) ? 34 : 16;
       h += 2;
     }
-    if (m.result) h += 18 + 10;
+    if (m.result) {
+      h += 18 + 10;
+      if (m.result === 'success' && m.shieldedFails) h += 18;
+    }
     return h;
   }
 
@@ -1568,7 +1571,22 @@ function generateLiveScreenshot() {
         if (m.result === 'fail') {
           var fs = '任务结果：✗ 失败'; if (m.failCount) fs += '（' + m.failCount + '张失败卡）';
           dt(fs, cx, ay, 12, RED, 'left');
-        } else if (isShielded) { dt('任务结果：✓ 成功（含' + m.shieldedFails + '张失败票，保护轮抵消）', cx, ay, 12, '#e65100', 'left'); }
+        } else if (isShielded) {
+          dt('任务结果：✓ 成功（含' + m.shieldedFails + '张失败票，保护轮抵消）', cx, ay, 12, '#e65100', 'left');
+          ay += 18;
+          // fail card details
+          var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
+          var evilNames = [];
+          if (lastAtt && lastAtt.team && state.identities) {
+            var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+            for (var ei = 0; ei < tArr.length; ei++) {
+              if (getPlayerFaction(state.identities[tArr[ei]].role) === 'evil') evilNames.push(pnShort(tArr[ei]));
+            }
+          }
+          if (evilNames.length > 0) {
+            dt('失败卡：' + m.shieldedFails + '张（' + evilNames.join('、') + '）', cx, ay, 12, RED, 'left');
+          }
+        }
         else if (isPureSuc) { dt('任务结果：✓ 成功（全票通过）', cx, ay, 12, GREEN_BRIGHT, 'left'); }
         else { dt('任务结果：✓ 成功', cx, ay, 12, GREEN_BRIGHT, 'left'); }
       }
@@ -8120,6 +8138,19 @@ function openHistoryModal(idx) {
         h += '结果：' + (m.result === 'success' ? '<span style="color:var(--green-bright)">&#10003;</span>' : '<span style="color:var(--red-bright)">&#10007;</span>');
         h += '</div>';
       }
+      if (m.result === 'success' && m.shieldedFails) {
+        var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
+        var evilNames = [];
+        if (lastAtt && lastAtt.team && rec.identities) {
+          var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+          for (var ei = 0; ei < tArr.length; ei++) {
+            if (getPlayerFaction(rec.identities[tArr[ei]].role) === 'evil') evilNames.push(rec.identities[tArr[ei]].name);
+          }
+        }
+        if (evilNames.length > 0) {
+          h += '<div style="color:var(--red-bright);font-weight:600;margin-top:4px">失败卡：' + m.shieldedFails + '张（' + evilNames.join('、') + '）</div>';
+        }
+      }
       h += '</div>';
     }
     h += '</div></div>';
@@ -8326,7 +8357,10 @@ function generateGameScreenshot(idx) {
       h += (tw(voteLine, 10) > contentW - 28) ? 34 : 16;
       h += 2;
     }
-    if (m.result) h += 18 + 10;
+    if (m.result) {
+      h += 18 + 10;
+      if (m.result === 'success' && m.shieldedFails) h += 18;
+    }
     return h;
   }
 
@@ -8495,7 +8529,22 @@ function generateGameScreenshot(idx) {
         if (m.result === 'fail') {
           var fs = '\u4efb\u52a1\u7ed3\u679c\uff1a\u2717 \u5931\u8d25'; if (m.failCount) fs += '\uff08' + m.failCount + '\u5f20\u5931\u8d25\u5361\uff09';
           dt(fs, cx, ay, 12, RED, 'left');
-        } else if (isShielded) { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff0c\u4fdd\u62a4\u8f6e\u62b5\u6d88\uff09', cx, ay, 12, '#e65100', 'left'); }
+        } else if (isShielded) {
+          dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff0c\u4fdd\u62a4\u8f6e\u62b5\u6d88\uff09', cx, ay, 12, '#e65100', 'left');
+          ay += 18;
+          // fail card details
+          var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
+          var evilNames = [];
+          if (lastAtt && lastAtt.team) {
+            var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+            for (var ei = 0; ei < tArr.length; ei++) {
+              if (isEvil(tArr[ei])) evilNames.push(pnShort(tArr[ei]));
+            }
+          }
+          if (evilNames.length > 0) {
+            dt('\u5931\u8d25\u5361\uff1a' + m.shieldedFails + '\u5f20\uff08' + evilNames.join('\u3001') + '\uff09', cx, ay, 12, RED, 'left');
+          }
+        }
         else if (isPureSuc) { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09', cx, ay, 12, GREEN_BRIGHT, 'left'); }
         else { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f', cx, ay, 12, GREEN_BRIGHT, 'left'); }
         ay += 18 + 10;
