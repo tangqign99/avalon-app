@@ -7855,10 +7855,10 @@ function openHistoryModal(idx) {
 /* ==================== SCREENSHOT GENERATION ==================== */
 function generateGameScreenshot(idx) {
   var history = loadHistory();
-  if (idx < 0 || idx >= history.length) { alert('无效记录'); return; }
+  if (idx < 0 || idx >= history.length) { alert('\u65e0\u6548\u8bb0\u5f55'); return; }
   var recRaw = history[idx];
   var rec = normalizeRecord(recRaw);
-  if (!rec) { alert('记录解析失败'); return; }
+  if (!rec) { alert('\u8bb0\u5f55\u89e3\u6790\u5931\u8d25'); return; }
 
   var W = 750;
   var PAD = 28;
@@ -7868,9 +7868,25 @@ function generateGameScreenshot(idx) {
   canvas.width = W;
   var ctx = canvas.getContext('2d');
 
-  var players = (rec.identities || []).map(function(id) { return id.name; });
-  var nameToIdx = {};
-  players.forEach(function(n, i) { nameToIdx[n] = i; });
+  var ids = rec.identities || [];
+  var pc = ids.length;
+  function pn(idx) { return (idx + 1) + '\u53f7 ' + ids[idx].name; }
+  function pnShort(idx) { return (idx + 1) + ids[idx].name; }
+  function isEvil(idx) { return getPlayerFaction(ids[idx].role) === 'evil'; }
+  function evilColor(idx) { return isEvil(idx) ? '#e74c3c' : '#e8dcc8'; }
+
+  function dtSegments(x, y, segs, sz) {
+    ctx.font = sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.textBaseline = 'top';
+    var cx = x;
+    for (var si = 0; si < segs.length; si++) {
+      ctx.fillStyle = segs[si].color || TXT;
+      ctx.textAlign = 'left';
+      ctx.fillText(segs[si].text, cx, y);
+      cx += tw(segs[si].text, sz);
+    }
+    return cx;
+  }
 
   var GOLD = '#f4d03f';
   var GREEN = '#27ae60';
@@ -7905,34 +7921,6 @@ function generateGameScreenshot(idx) {
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
   }
-  function getVote(playerName, votes) {
-    if (!votes) return null;
-    if (votes[playerName] !== undefined) return votes[playerName];
-    var idx = nameToIdx[playerName];
-    if (idx !== undefined && votes[idx] !== undefined) return votes[idx];
-    if (idx !== undefined && votes[String(idx)] !== undefined) return votes[String(idx)];
-    return null;
-  }
-  function prepMission(m) {
-    var team = m.team || [];
-    var leader = m.leader || '';
-    var votes = m.votes || {};
-    var rejectedCount = 0;
-    if (m.launchAttempts && m.launchAttempts.length > 0) {
-      var last = m.launchAttempts[m.launchAttempts.length - 1];
-      if (Object.keys(last.votes).length > 0) votes = last.votes;
-      if (last.team && last.team.length > 0) team = last.team;
-      if (last.leader) leader = last.leader;
-      rejectedCount = m.launchAttempts.length - 1;
-    }
-    if (rejectedCount === 0 && m.launchFailures) rejectedCount = m.launchFailures;
-    var approves = 0, rejects = 0;
-    for (var pi = 0; pi < players.length; pi++) {
-      var v = getVote(players[pi], votes);
-      if (v === 'approve') approves++; else if (v === 'reject') rejects++;
-    }
-    return { team: team, leader: leader, votes: votes, approves: approves, rejects: rejects, rejectedCount: rejectedCount };
-  }
 
   var hasLady = rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0;
   var hasExcalibur = rec.excaliburHistory && rec.excaliburHistory.length > 0;
@@ -7943,12 +7931,10 @@ function generateGameScreenshot(idx) {
   var hasAnyRule = hasLady || hasExcalibur || hasLancelot || hasAssassin || hasForceEnd || hasIdentityMarks;
 
   var goodPlayers = [], evilPlayers = [];
-  if (rec.identities) {
-    for (var pi = 0; pi < rec.identities.length; pi++) {
-      var f = getPlayerFaction(rec.identities[pi].role);
-      if (f === 'good') goodPlayers.push(rec.identities[pi].name);
-      else if (f === 'evil') evilPlayers.push(rec.identities[pi].name);
-    }
+  for (var pi = 0; pi < ids.length; pi++) {
+    var f = getPlayerFaction(ids[pi].role);
+    if (f === 'good') goodPlayers.push(pn(pi));
+    else if (f === 'evil') evilPlayers.push(pn(pi));
   }
   var doneMissions = 0, failMissions = 0;
   for (var mi2 = 0; mi2 < (rec.missions || []).length; mi2++) {
@@ -7956,35 +7942,45 @@ function generateGameScreenshot(idx) {
     else if (rec.missions[mi2].result === 'fail') failMissions++;
   }
 
-  // ==== Layout: compute total height ====
-  var secH = [];
-  secH.push(28 + 8 + 26 + 4 + 16 + 16); // 0 header
-  secH.push(16); // 1 divider
-  secH.push(20 + Math.ceil(players.length / 2) * 28 + 4); // 2 players
-  secH.push(16); // 3 divider
-  // 4 quests
-  var questH = 20 + 12;
-  if (rec.missions && rec.missions.length > 0) {
-    for (var qi = 0; qi < rec.missions.length; qi++) {
-      var m = rec.missions[qi];
-      if (!m.result) continue;
-      var md = prepMission(m);
-      var qh = 10 + 18 + 6 + 16 + 4;
-      var vLine = '';
-      for (var pi = 0; pi < players.length; pi++) {
-        var v = getVote(players[pi], md.votes);
-        vLine += players[pi] + (v === 'approve' ? '\u2713' : v === 'reject' ? '\u2717' : '?') + ' ';
+  function calcMissionCardH(m) {
+    var attempts = m.launchAttempts || [];
+    if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
+    var h = 10 + 18 + 6;
+    for (var a = 0; a < attempts.length; a++) {
+      var att = attempts[a];
+      h += 18;
+      var voteLine = '\u6295\u7968\uff1a';
+      for (var vi = 0; vi < pc; vi++) {
+        var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : null;
+        voteLine += pnShort(vi) + (vv === 'approve' ? '\u2713' : vv === 'reject' ? '\u2717' : '?') + ' ';
       }
-      vLine += '  ' + md.approves + ':' + md.rejects;
-      if (tw(vLine, 11) > contentW - 36) qh += 18; else qh += 16;
-      if ((m.result === 'fail' && m.failCount) || (m.result === 'success' && m.shieldedFails) || (m.result === 'success' && !m.failCount && !m.shieldedFails)) qh += 16;
-      qh += 10;
-      questH += qh + 8;
+      var approves = 0, rejects = 0;
+      for (var vi2 = 0; vi2 < pc; vi2++) {
+        var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : null;
+        if (vv2 === 'approve') approves++; else if (vv2 === 'reject') rejects++;
+      }
+      voteLine += ' \u2014 ' + approves + ':' + rejects;
+      h += (tw(voteLine, 10) > contentW - 28) ? 34 : 16;
+      h += 2;
+    }
+    if (m.result) h += 18 + 10;
+    return h;
+  }
+
+  var secH = [];
+  secH.push(28 + 8 + 26 + 4 + 16 + 16);
+  secH.push(16);
+  secH.push(20 + Math.ceil(pc / 2) * 28 + 4);
+  secH.push(16);
+  var questH = 20 + 12;
+  if (rec.missions) {
+    for (var qi = 0; qi < rec.missions.length; qi++) {
+      if (!rec.missions[qi].result) continue;
+      questH += calcMissionCardH(rec.missions[qi]) + 8;
     }
     questH -= 8;
   }
-  secH.push(questH + 8); // 4
-  // 5 rules (optional)
+  secH.push(questH + 8);
   var rulesH = 0;
   if (hasAnyRule) {
     rulesH += 20 + 8;
@@ -7996,14 +7992,13 @@ function generateGameScreenshot(idx) {
     if (hasIdentityMarks) rulesH += 18 * rec.identityMarks.length + 4;
     secH.push(rulesH + 8);
   }
-  secH.push(12); // bottom divider
-  secH.push(18 + 6 + 36 + 16 + 20); // summary + watermark
+  secH.push(12);
+  secH.push(18 + 6 + 36 + 16 + 20);
 
   var totalH = PAD * 2;
   for (var si = 0; si < secH.length; si++) totalH += secH[si];
   canvas.height = Math.ceil(totalH);
 
-  // ==== DRAW ====
   var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
   grad.addColorStop(0, '#1a0e30');
   grad.addColorStop(0.4, '#120926');
@@ -8012,7 +8007,7 @@ function generateGameScreenshot(idx) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   var y = PAD;
-  var si = 0; // section index
+  var si = 0;
 
   // === Header ===
   (function() {
@@ -8031,13 +8026,10 @@ function generateGameScreenshot(idx) {
     }
     ctx.fill();
     dt(badgeText, W/2, y + 6, 15, '#fff', 'center');
-
     var ty = y + 28 + 8;
     dt('\u7b2c' + (idx + 1) + '\u5c40 \u00b7 \u963f\u74e6\u9686', W/2, ty, 20, GOLD, 'center');
-
     var iy = ty + 26 + 4;
-    var infoText = (rec.date || '--') + ' \u00b7 ' + (rec.playerCount || '?') + '\u4eba\u5c40';
-    dt(infoText, W/2, iy, 11, TXT_DIM, 'center');
+    dt((rec.date || '--') + ' \u00b7 ' + (rec.playerCount || '?') + '\u4eba\u5c40', W/2, iy, 11, TXT_DIM, 'center');
   })();
   y += secH[si++];
 
@@ -8045,156 +8037,106 @@ function generateGameScreenshot(idx) {
   (function() {
     var dy = y + 8;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent');
-    g.addColorStop(0.3, '#5b3d8e');
-    g.addColorStop(0.7, '#5b3d8e');
-    g.addColorStop(1, 'transparent');
-    ctx.strokeStyle = g;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PAD, dy);
-    ctx.lineTo(W - PAD, dy);
-    ctx.stroke();
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
 
   // === Identity Reveal ===
   (function() {
-    ctx.fillStyle = GOLD;
-    ctx.beginPath();
-    ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
     dt('\u8eab\u4efd\u63ed\u6653', PAD + 12, y + 1, 13, TXT_SEC, 'left');
-
     var gridY = y + 20;
     var colW = (contentW - 12) / 2;
-    for (var pi = 0; pi < players.length; pi++) {
-      var col = pi % 2;
-      var row = Math.floor(pi / 2);
-      var px = PAD + col * (colW + 12);
-      var py = gridY + row * 28;
-      var id = rec.identities[pi];
-      var faction = getPlayerFaction(id.role);
-      var isEvil = faction === 'evil';
-
-      ctx.fillStyle = isEvil ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)';
-      rr(px, py, colW, 24, 6);
-      ctx.fill();
-
-      dt(isEvil ? '\u25b2' : '\u2b22', px + 8, py + 5, 10, isEvil ? RED : BLUE, 'left');
-      dt(id.name, px + 22, py + 4, 13, TXT, 'left');
-
-      var roleW = tw(id.role || '', 11);
-      dt(id.role || '', px + colW - 8 - roleW, py + 5, 11, isEvil ? RED : BLUE, 'left');
+    for (var pi = 0; pi < pc; pi++) {
+      var col = pi % 2, row = Math.floor(pi / 2);
+      var px = PAD + col * (colW + 12), py = gridY + row * 28;
+      var id = ids[pi], evil = getPlayerFaction(id.role) === 'evil';
+      ctx.fillStyle = evil ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)';
+      rr(px, py, colW, 24, 6); ctx.fill();
+      dt(evil ? '\u25b2' : '\u2b22', px + 8, py + 5, 10, evil ? RED : BLUE, 'left');
+      dt(pn(pi), px + 22, py + 4, 13, TXT, 'left');
+      dt(id.role || '', px + colW - 8 - tw(id.role || '', 11), py + 5, 11, evil ? RED : BLUE, 'left');
     }
   })();
   y += secH[si++];
 
-  // === Divider ===
+  // === Divider === (same as before)
   (function() {
     var dy = y + 8;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent');
-    g.addColorStop(0.3, '#5b3d8e');
-    g.addColorStop(0.7, '#5b3d8e');
-    g.addColorStop(1, 'transparent');
-    ctx.strokeStyle = g;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PAD, dy);
-    ctx.lineTo(W - PAD, dy);
-    ctx.stroke();
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
 
-  // === Quests ===
+  // === Missions ===
   (function() {
-    ctx.fillStyle = GOLD;
-    ctx.beginPath();
-    ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
     dt('\u4efb\u52a1\u5386\u7a0b', PAD + 12, y + 1, 13, TXT_SEC, 'left');
-
     var qy = y + 20 + 12;
     for (var qi = 0; qi < rec.missions.length; qi++) {
       var m = rec.missions[qi];
       if (!m.result) { qy += 8; continue; }
-      var md = prepMission(m);
-      var isSuc = m.result === 'success';
-      var isShielded = m.result === 'success' && m.shieldedFails;
-      var isPureSuc = m.result === 'success' && !m.failCount && !m.shieldedFails;
-
-      var vLine = '';
-      for (var pi = 0; pi < players.length; pi++) {
-        var v = getVote(players[pi], md.votes);
-        vLine += players[pi] + (v === 'approve' ? '\u2713' : v === 'reject' ? '\u2717' : '?') + ' ';
-      }
-      vLine += '  ' + md.approves + ':' + md.rejects + ' ' + (md.approves > md.rejects ? '\u901a\u8fc7' : '\u5426\u51b3');
-      var voteH = (tw(vLine, 11) > contentW - 36) ? 18 : 16;
-      var hasFailDetail = (m.result === 'fail' && m.failCount) || isShielded || isPureSuc;
-      var cardH = 10 + 18 + 6 + voteH + 4 + (hasFailDetail ? 16 : 0) + 10;
-
-      ctx.fillStyle = 'rgba(255,255,255,0.04)';
-      rr(PAD, qy, contentW, cardH, 8);
-      ctx.fill();
-
-      ctx.fillStyle = isSuc ? GREEN : RED;
-      rr(PAD, qy + 10, 3, cardH - 20, 1.5);
-      ctx.fill();
-
+      var isSuc = m.result === 'success', isShielded = m.result === 'success' && m.shieldedFails, isPureSuc = m.result === 'success' && !m.failCount && !m.shieldedFails;
+      var attempts = m.launchAttempts || [];
+      if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
+      var cardH = calcMissionCardH(m);
       var cx = PAD + 16;
-      dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba', cx, qy + 10, 13, TXT_SEC, 'left');
-
+      ctx.fillStyle = 'rgba(255,255,255,0.04)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
+      ctx.fillStyle = isSuc ? GREEN : RED; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
+      dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba\u51fa\u6218', cx, qy + 10, 13, TXT_SEC, 'left');
       var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
-      var tagW = tw(tagText, 11) + 16;
-      var tagX = PAD + contentW - 16 - tagW;
-      ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)';
-      rr(tagX, qy + 9, tagW, 18, 9);
-      ctx.fill();
+      var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
+      ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
       dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
-
-      var teamY = qy + 10 + 18 + 6;
-      dt('\u2605' + md.leader, cx, teamY, 12, GOLD, 'left');
-      var teamW = tw('\u2605' + md.leader + ' \u9009\u6d3e\uff1a' + md.team.join('\u3001'), 12);
-      dt(' \u9009\u6d3e\uff1a' + md.team.join('\u3001'), cx + teamW, teamY, 12, TXT, 'left');
-
-      if (md.rejectedCount > 0) {
-        var rejectLabel = '(\u524d' + md.rejectedCount + '\u6b21\u88ab\u5426\u51b3)';
-        var rw = tw(rejectLabel, 11);
-        dt(rejectLabel, PAD + contentW - 16 - rw, teamY, 11, TXT_DIM, 'left');
+      var ay = qy + 10 + 18 + 8;
+      for (var a = 0; a < attempts.length; a++) {
+        var att = attempts[a], isLast = (a === attempts.length - 1);
+        var approves = 0, rejects = 0;
+        for (var vk = 0; vk < pc; vk++) {
+          var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : null;
+          if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
+        }
+        var passed = approves > pc / 2;
+        var leader = (typeof att.leader === 'number') ? att.leader : 0;
+        var teamIndices = att.team || [];
+        if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
+        // Draw attempt header: "第N次组队 ★X号NAME提议：A、B、C"
+        var hSegs = [{ text: '\u7b2c' + (a + 1) + '\u6b21\u7ec4\u961f ', color: TXT_DIM }, { text: '\u2605' + pnShort(leader), color: GOLD }, { text: '\u63d0\u8bae\uff1a', color: TXT_DIM }];
+        for (var ti = 0; ti < teamIndices.length; ti++) {
+          var tiVal = (typeof teamIndices[ti] === 'number') ? teamIndices[ti] : parseInt(teamIndices[ti]);
+          if (ti > 0) hSegs.push({ text: '\u3001', color: TXT_DIM });
+          hSegs.push({ text: pnShort(tiVal), color: evilColor(tiVal) });
+        }
+        dtSegments(cx, ay, hSegs, 11);
+        ay += 18;
+        // Draw vote line
+        var vSegs = [{ text: '\u6295\u7968\uff1a', color: TXT_DIM }];
+        for (var vi = 0; vi < pc; vi++) {
+          var vvv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : null;
+          vSegs.push({ text: pnShort(vi), color: evilColor(vi) });
+          vSegs.push({ text: (vvv === 'approve' ? '\u2713' : vvv === 'reject' ? '\u2717' : '?') + ' ', color: vvv === 'approve' ? GREEN_BRIGHT : vvv === 'reject' ? RED : TXT_DIM });
+        }
+        vSegs.push({ text: ' \u2014 ' + approves + ':' + rejects + ' ' + (passed ? '\u901a\u8fc7' : '\u5426\u51b3') + ' ' + (passed ? '\u2713' : '\u2717'), color: passed ? GREEN_BRIGHT : RED });
+        var voteFull = ''; for (var vsi = 0; vsi < vSegs.length; vsi++) voteFull += vSegs[vsi].text;
+        if (tw(voteFull, 10) > contentW - 28) {
+          var v1Segs = [vSegs[0]];
+          for (var vi = 0; vi < pc; vi++) { v1Segs.push(vSegs[vi * 2 + 1]); v1Segs.push(vSegs[vi * 2 + 2]); }
+          dtSegments(cx, ay, v1Segs, 10); ay += 16;
+          dtSegments(cx, ay, [vSegs[vSegs.length - 1]], 10); ay += 18 + 2;
+        } else { dtSegments(cx, ay, vSegs, 10); ay += 16 + 2; }
       }
-
-      var voteY = teamY + 16 + 4;
-      var voteLabel = '\u6295\u7968\uff1a';
-      var vx = cx;
-      dt(voteLabel, vx, voteY, 11, TXT_DIM, 'left');
-      vx += tw(voteLabel, 11);
-
-      for (var pi = 0; pi < players.length; pi++) {
-        var v = getVote(players[pi], md.votes);
-        var vChar = v === 'approve' ? '\u2713' : v === 'reject' ? '\u2717' : '?';
-        var vColor = v === 'approve' ? GREEN_BRIGHT : v === 'reject' ? RED : TXT_DIM;
-        var nameW = tw(players[pi] + vChar, 11);
-        if (vx + nameW > PAD + contentW - 16) { vx = cx; voteY += 18; }
-        dt(players[pi] + vChar, vx, voteY, 11, vColor, 'left');
-        vx += nameW;
+      // Mission result line
+      if (m.result) {
+        if (m.result === 'fail') {
+          var fs = '\u4efb\u52a1\u7ed3\u679c\uff1a\u2717 \u5931\u8d25'; if (m.failCount) fs += '\uff08' + m.failCount + '\u5f20\u5931\u8d25\u5361\uff09';
+          dt(fs, cx, ay, 12, RED, 'left');
+        } else if (isShielded) { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff0c\u4fdd\u62a4\u8f6e\u62b5\u6d88\uff09', cx, ay, 12, '#e65100', 'left'); }
+        else if (isPureSuc) { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09', cx, ay, 12, GREEN_BRIGHT, 'left'); }
+        else { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f', cx, ay, 12, GREEN_BRIGHT, 'left'); }
+        ay += 18 + 10;
       }
-      var scoreLabel = '  ' + md.approves + ':' + md.rejects + ' ' + (md.approves > md.rejects ? '\u901a\u8fc7' : '\u5426\u51b3');
-      var scoreW = tw(scoreLabel, 11);
-      if (vx + scoreW > PAD + contentW - 16) { vx = cx; voteY += 18; }
-      dt(scoreLabel, vx, voteY, 11, TXT_DIM, 'left');
-
-      var failY = voteY + (voteH > 16 ? 18 : 16) + 4;
-      if (m.result === 'fail' && m.failCount) {
-        dt('\u5931\u8d25\u5361\uff1a' + m.failCount + '\u5f20', cx, failY, 11, RED, 'left');
-      }
-      if (isShielded) {
-        dt('\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09', cx, failY, 11, '#e65100', 'left');
-      }
-      if (isPureSuc) {
-        dt('\u5168\u7968\u901a\u8fc7', cx, failY, 11, TXT_DIM, 'left');
-      }
-
       qy += cardH + 8;
     }
   })();
@@ -8203,82 +8145,55 @@ function generateGameScreenshot(idx) {
   // === Optional Rules ===
   if (hasAnyRule) {
     (function() {
-      ctx.fillStyle = GOLD;
-      ctx.beginPath();
-      ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2);
-      ctx.fill();
-      var sectionLabel = hasAssassin ? '\u523a\u6740\u9636\u6bb5' : '\u53ef\u9009\u89c4\u5219';
-      dt(sectionLabel, PAD + 12, y + 1, 13, TXT_SEC, 'left');
+      ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+      dt(hasAssassin ? '\u523a\u6740\u9636\u6bb5' : '\u53ef\u9009\u89c4\u5219', PAD + 12, y + 1, 13, TXT_SEC, 'left');
       var ry = y + 20 + 8;
-
       if (hasLady) {
         for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
           var lc = rec.ladyCheckHistory[li];
-          var holderNum = (lc.holder != null) ? (lc.holder + 1) + '\u53f7 ' : '';
-          var targetNum = (lc.target != null) ? (lc.target + 1) + '\u53f7 ' : '';
-          var roundLabel = lc.round ? '\u7b2c' + lc.round + '\u8f6e\uff1a' : '';
-          dt(roundLabel + holderNum + (lc.holderName || '') + ' \u67e5\u9a8c ' + targetNum + (lc.targetName || '') + ' \u2192 ' + (lc.result || '?'), PAD + 12, ry, 12, TXT_SEC, 'left');
+          var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
+          var rl = lc.round ? '\u7b2c' + lc.round + '\u8f6e\u540e\uff1a' : '';
+          dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ' + (lc.result || '?'), PAD + 12, ry, 12, TXT_SEC, 'left');
           ry += 18;
         }
         ry += 4;
       }
-
       if (hasExcalibur) {
         for (var exi = 0; exi < rec.excaliburHistory.length; exi++) {
           var ex = rec.excaliburHistory[exi];
-          var exText = (ex.holderName || ex.holder) + ' \u2192 ' + (ex.targetName || ex.target) + (ex.used ? '(\u5df2\u4f7f\u7528)' : '(\u672a\u4f7f\u7528)');
-          dt('\u738b\u8005\u4e4b\u5251: ' + exText, PAD + 12, ry, 12, TXT_SEC, 'left');
-          ry += 18;
+          var desc = '\u738b\u8005\u4e4b\u5251\uff1a' + (ex.holderName || '') + ' \u6388\u4e88 ' + (ex.targetName || '') + (ex.used ? '\uff08\u5df2\u4f7f\u7528\uff09' : '\uff08\u672a\u4f7f\u7528\uff09');
+          dt(desc, PAD + 12, ry, 12, TXT_SEC, 'left'); ry += 18;
         }
         ry += 4;
       }
-
       if (hasLancelot) {
         for (var lfKey in rec.lancelotFlips) {
-          if (rec.identities && rec.identities[lfKey]) {
-            var player = rec.identities[lfKey];
-            var pn = (player.index != null ? player.index : parseInt(lfKey)) + 1;
-            var origRole = player.role || '';
-            var origFaction = ROLE_CATEGORY[origRole] || '';
-            var shortRole = origRole === '\u5170\u65af\u6d1b\u7279(\u84dd)' ? '\u84dd\u5170\u65af\u6d1b\u7279' : origRole === '\u5170\u65af\u6d1b\u7279(\u7ea2)' ? '\u7ea2\u5170\u65af\u6d1b\u7279' : origRole;
-            var afterLabel = (origFaction === 'good') ? '\u7ea2\u65b9(\u574f\u4eba)' : (origFaction === 'evil') ? '\u84dd\u65b9(\u597d\u4eba)' : '?';
-            dt('\u5170\u65af\u6d1b\u7279\u53d8\u8282: ' + pn + '\u53f7 ' + shortRole + ' \u2192 ' + afterLabel, PAD + 12, ry, 12, '#e65100', 'left');
+          if (ids[lfKey]) {
+            var pIdx = (ids[lfKey].index != null ? ids[lfKey].index : parseInt(lfKey));
+            var origF = getPlayerFaction(ids[lfKey].role);
+            var afterL = (origF === 'good') ? '\u7ea2\u65b9(\u574f\u4eba)' : (origF === 'evil') ? '\u84dd\u65b9(\u597d\u4eba)' : '?';
+            dt('\u5170\u65af\u6d1b\u7279\u53d8\u8282: ' + pn(pIdx) + ' ' + ids[lfKey].role + ' \u2192 ' + afterL, PAD + 12, ry, 12, '#e65100', 'left');
             ry += 18;
           }
         }
         ry += 4;
       }
-
       if (hasAssassin) {
-        var aboxY = ry - 4;
-        var aboxH = 18 + 18 + 18 + 10;
-        ctx.fillStyle = 'rgba(192,57,43,0.08)';
-        rr(PAD, aboxY, contentW, aboxH, 8);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(192,57,43,0.25)';
-        ctx.lineWidth = 1;
-        rr(PAD, aboxY, contentW, aboxH, 8);
-        ctx.stroke();
-
+        var aboxY = ry - 4, aboxH = 18 + 18 + 18 + 10;
+        ctx.fillStyle = 'rgba(192,57,43,0.08)'; rr(PAD, aboxY, contentW, aboxH, 8); ctx.fill();
+        ctx.strokeStyle = 'rgba(192,57,43,0.25)'; ctx.lineWidth = 1; rr(PAD, aboxY, contentW, aboxH, 8); ctx.stroke();
         dt('\u597d\u4eba\u5b8c\u6210' + doneMissions + '\u6b21\u4efb\u52a1 \u2192 \u8fdb\u5165\u523a\u6740\u9636\u6bb5', PAD + 12, aboxY + 6, 12, RED, 'left');
-        dt('\u523a\u5ba2' + evilPlayers.join('/') + ' \u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), PAD + 12, aboxY + 6 + 18, 12, TXT, 'left');
-        var hitText = rec.assassinSuccess ? '\u731c\u5bf9\u4e86!' : '\u731c\u9519\u4e86!';
-        var hitColor = rec.assassinSuccess ? RED : GREEN_BRIGHT;
-        dt(hitText, PAD + 12 + tw('\u523a\u5ba2' + evilPlayers.join('/') + ' \u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), 12), aboxY + 6 + 18, 12, hitColor, 'left');
+        dt('\u523a\u5ba2\u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), PAD + 12, aboxY + 6 + 18, 12, TXT, 'left');
+        var hitT = rec.assassinSuccess ? '\u731c\u5bf9\u4e86!' : '\u731c\u9519\u4e86!';
+        dt(hitT, PAD + 12 + tw('\u523a\u5ba2\u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), 12), aboxY + 6 + 18, 12, rec.assassinSuccess ? RED : GREEN_BRIGHT, 'left');
         dt(rec.assassinSuccess ? '\u574f\u4eba\u901a\u8fc7\u523a\u6740\u6885\u6797\u9006\u8f6c\u83b7\u80dc' : '\u597d\u4eba\u62b5\u5fa1\u523a\u6740\u83b7\u80dc', PAD + 12, aboxY + 6 + 36, 11, TXT_DIM, 'left');
         ry = aboxY + aboxH + 4;
       }
-
-      if (hasForceEnd) {
-        dt('\u5f3a\u5236\u7ed3\u675f: ' + (rec.forceEndReason || '\u672a\u77e5\u539f\u56e0'), PAD + 12, ry, 12, '#e65100', 'left');
-        ry += 18 + 4;
-      }
-
+      if (hasForceEnd) { dt('\u5f3a\u5236\u7ed3\u675f: ' + (rec.forceEndReason || '\u672a\u77e5\u539f\u56e0'), PAD + 12, ry, 12, '#e65100', 'left'); ry += 18 + 4; }
       if (hasIdentityMarks) {
         for (var mi3 = 0; mi3 < rec.identityMarks.length; mi3++) {
           var mk = rec.identityMarks[mi3];
-          var lvlLabel = mk.level === 'high' ? '\u9ad8' : mk.level === 'mid' ? '\u4e2d' : '\u4f4e';
-          dt((mk.targetName || mk.target) + ' [' + lvlLabel + ']', PAD + 12, ry, 12, TXT_SEC, 'left');
+          dt((mk.targetName || mk.target) + ' [' + (mk.level === 'high' ? '\u9ad8' : mk.level === 'mid' ? '\u4e2d' : '\u4f4e') + ']', PAD + 12, ry, 12, TXT_SEC, 'left');
           ry += 18;
         }
       }
@@ -8286,38 +8201,24 @@ function generateGameScreenshot(idx) {
     y += secH[si++];
   }
 
-  // === Bottom Divider ===
+  // === Bottom Divider === (same)
   (function() {
     var dy = y + 6;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent');
-    g.addColorStop(0.3, '#5b3d8e');
-    g.addColorStop(0.7, '#5b3d8e');
-    g.addColorStop(1, 'transparent');
-    ctx.strokeStyle = g;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PAD, dy);
-    ctx.lineTo(W - PAD, dy);
-    ctx.stroke();
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
 
-  // === Footer with summary + watermark ===
+  // === Footer ===
   (function() {
     dt('\u4efb\u52a1\uff1a' + doneMissions + '\u2713 ' + failMissions + '\u2717', PAD, y, 12, TXT_DIM, 'left');
     dt('\u597d\u4eba\u9635\u7ebf\uff1a' + goodPlayers.join('\u3001'), PAD, y + 18, 12, TXT_DIM, 'left');
     dt('\u574f\u4eba\u9635\u7ebf\uff1a' + evilPlayers.join('\u3001'), PAD, y + 36, 12, TXT_DIM, 'left');
-
-    var wy = canvas.height - PAD;
-    ctx.fillStyle = '#5a4e3e';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
-    ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, wy);
+    ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, canvas.height - PAD);
   })();
 
-  // Export
   canvas.toBlob(function(blob) {
     var dateStr = (rec.date || 'unknown').replace(/[\/\s:]/g, '-');
     var fileName = '\u963f\u74e6\u9686\u7b2c' + (idx + 1) + '\u5c40_' + dateStr + '.png';
@@ -8328,7 +8229,6 @@ function generateGameScreenshot(idx) {
     link.click();
     document.body.removeChild(link);
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
-    alert('\u622a\u56fe\u5df2\u751f\u6210');
   }, 'image/png');
 }
 /* ==================== HISTORY EDIT ==================== */
