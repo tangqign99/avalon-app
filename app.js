@@ -485,7 +485,7 @@ function toRecordV2(record) {
   if (record.currentRound !== undefined) v2.cr = record.currentRound;
   if (record.identityMarks) v2.im = record.identityMarks.map(function(m) { return { t: m.target, tn: m.targetName, l: m.level, ts: m.timestamp }; });
   if (record.missions) v2.ms = record.missions.map(function(m) {
-    var vm = { r: m.round, s: m.size, ld: m.leader, t: m.team, res: m.result, fc: m.failCount };
+    var vm = { r: m.round, s: m.size, ld: m.leader, t: m.team, res: m.result, fc: m.failCount, sf: m.shieldedFails };
     if (m.launchFailures !== undefined) vm.lf2 = m.launchFailures;
     if (m.launchAttempts) vm.la = m.launchAttempts.map(function(att) {
       return { t: att.team, v: att.votes, ld: att.leader };
@@ -541,7 +541,7 @@ function fromRecordV2(v2) {
   rec.currentRound = v2.cr != null ? v2.cr : 0;
   rec.identityMarks = (v2.im || []).map(function(m) { return { target: m.t, targetName: m.tn, level: m.l, timestamp: m.ts }; });
   rec.missions = (v2.ms || []).map(function(m) {
-    var rm = { round: m.r, size: m.s, leader: m.ld, team: m.t || [], result: m.res, failCount: m.fc || 0 };
+    var rm = { round: m.r, size: m.s, leader: m.ld, team: m.t || [], result: m.res, failCount: m.fc || 0, shieldedFails: m.sf || 0 };
     if (m.lf2 !== undefined) rm.launchFailures = m.lf2;
     if (m.la) rm.launchAttempts = m.la.map(function(att) { return { team: att.t || [], votes: att.v || {}, leader: att.ld }; });
     if (m.v) rm.votes = m.v;
@@ -1052,7 +1052,7 @@ function doStartGame() {
     if (!state.playerNames[pn]) state.playerNames[pn] = '玩家' + (pn + 1);
   }
   state.missions = MISSION_COUNTS[state.playerCount].map(function(size, i) {
-    return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, launchFailures: 0, launchAttempts: [] };
+    return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, shieldedFails: 0, launchFailures: 0, launchAttempts: [] };
   });
   state.currentRound = 0;
   state.winner = null;
@@ -1400,6 +1400,7 @@ function renderStepPanel() {
     h += '<div style="font-size:17px;color:' + (m.result === 'success' ? '#99ff99' : '#ff9999') + '">';
     h += '任务' + (m.result === 'success' ? '成功' : '失败');
     if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
+    if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
     h += '</div>';
     if (state.winner) {
       h += '<div style="margin-top:10px;font-size:16px;font-weight:700;color:var(--gold-light)">';
@@ -3026,6 +3027,7 @@ function buildReviewHTML() {
       h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
       h += (m.result === 'success' ? '成功' : '失败');
       if (m.result === 'fail' && m.failCount) h += ' (' + m.failCount + '张失败票)';
+      if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
       h += '</span></div>';
     }
 
@@ -3396,6 +3398,7 @@ function finalizeMission() {
   if (state.currentRound === 3 && m.result === 'fail' && (m.failCount || 0) === 1 && state.playerCount !== 6) {
     m.result = 'success';
     m.failCount = 1;
+    m.shieldedFails = 1;
     toast('第4轮保护轮：1张失败票，任务仍成功');
   }
 
@@ -4011,6 +4014,7 @@ function saveGameRecord() {
         team: m.team.map(function(i) { return playerLabel(i); }),
         result: m.result,
         failCount: m.failCount,
+        shieldedFails: m.shieldedFails || 0,
         launchFailures: m.launchFailures,
         launchAttempts: (m.launchAttempts || []).map(function(att) {
           return {
@@ -7293,6 +7297,7 @@ function buildReplayTimeline() {
       var resultText = m.result === 'success' ? '成功' : '失败';
       h += '<p>结果：<strong style="color:' + resultColor + '">' + resultText + '</strong>';
       if (m.result === 'fail' && m.failCount) h += '（' + m.failCount + '张失败票）';
+      if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
       h += '</p>';
       h += '</div></div>';
     }
@@ -7672,6 +7677,7 @@ function openHistoryModal(idx) {
       h += '第' + (mi + 1) + '轮';
       if (m.result) {
         h += m.result === 'success' ? ' <span style="color:var(--green-bright)">&#10003; 成功</span>' : ' <span style="color:var(--red-bright)">&#10007; 失败</span>';
+        if (m.result === 'success' && m.shieldedFails) h += ' <span style="color:var(--orange);font-size:11px">（含' + m.shieldedFails + '张失败票）</span>';
       }
       h += '</div>';
       if (m.launchAttempts && m.launchAttempts.length > 0) {
@@ -8026,8 +8032,10 @@ function generateGameScreenshot(idx) {
       drawText(label, PAD, y, 14, '#333', 'left');
       drawText(resultText, PAD + 100, y, 14, resultColor, 'left');
 
-      // Show failure count if available
-      if (m.result === 'fail' && m.failCount) {
+      // Show shielded fails (protection round)
+      if (m.result === 'success' && m.shieldedFails) {
+        drawText('（含' + m.shieldedFails + '张失败票）', PAD + 200, y, 12, '#e65100', 'left');
+      } else if (m.result === 'fail' && m.failCount) {
         drawText('（失败票 ' + m.failCount + '）', PAD + 200, y, 12, '#888', 'left');
       } else if (m.result === 'success' && m.failCount === 0) {
         drawText('（全票通过）', PAD + 200, y, 12, '#888', 'left');
