@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>阿瓦隆辅�?/title>
+<title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./style.css?v=v142">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
@@ -14,7 +14,7 @@
 <body>
 
 <header>
-  <h1>阿瓦�?/h1>
+  <h1>阿瓦隆</h1>
   <div class="nav-btns">
     <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
     <button id="nav-game" onclick="goToGame()">游戏</button>
@@ -28,7 +28,7 @@
 
 <section class="page active" id="page-setup">
   <div style="text-align:center;margin-bottom:12px">
-    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌�?/div>
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌游</div>
     <div style="font-size:15px;color:var(--gold);letter-spacing:2px">全场唯一真亚瑟版</div>
   </div>
   <div class="card">
@@ -36,7 +36,7 @@
     <div class="count-grid" id="count-grid"></div>
   </div>
   <div class="card">
-    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择�?/span></h2>
+    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择）</span></h2>
     <div id="player-names"></div>
   </div>
   <div class="card">
@@ -44,8 +44,8 @@
     <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
   </div>
   <div class="card">
-    <h2 style="text-align:center">可选规�?/h2>
-    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button><button id="excalibur-row" class="lady-toggle-btn" onclick="toggleExcalibur()">王者之�?/button></div>
+    <h2 style="text-align:center">可选规则</h2>
+    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">湖中女神</button><button id="excalibur-row" class="lady-toggle-btn" onclick="toggleExcalibur()">王者之剑</button></div>
     <div class="timer-setup" id="timer-setup">
       <h3>计时模式</h3>
       <div class="timer-mode-row">
@@ -68,36 +68,36 @@
         <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
           style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
           onchange="setTimerSecondsInput()" onfocus="this.select()">
-        <span style="color:var(--text-dim);font-size:13px">�?/span>
+        <span style="color:var(--text-dim);font-size:13px">秒</span>
       </div>
     </div>
   </div>
   <div class="card" style="text-align:center">
     <p style="color:var(--text-dim);font-size:14px;margin-bottom:8px">
-      任务轮次�?span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
+      任务轮次：<span id="mission-info" style="color:var(--gold-light);font-weight:600">请先选择人数</span>
     </p>
-    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游�?/button>
+    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游戏</button>
   </div>
   <div class="card" style="text-align:center">
     <h2>玩家姓名管理</h2>
     <div class="add-name-row" style="margin-bottom:8px">
-      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字�? maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
+      <input class="add-name-input" id="stats-add-name-input" placeholder="输入新玩家名字…" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
       <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">新增玩家</button>
     </div>
-    <button class="btn" onclick="showNamePoolModal()">管理所有姓�?/button>
+    <button class="btn" onclick="showNamePoolModal()">管理所有姓名</button>
   </div>
   <div class="card" style="text-align:center">
     <h2>数据管理</h2>
     <div class="btn-row" style="justify-content:center">
       <button class="btn small" onclick="clearDeletedKeys()" title="清理 localStorage 中残留的删除标记">清理删除标记</button>
     </div>
-    <p style="font-size:12px;color:var(--text-dim);margin-top:6px">清理后已删除的对局记录将恢复正常显�?/p>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:6px">清理后已删除的对局记录将恢复正常显示</p>
   </div>
 </section>
 
 <section class="page" id="page-game">
   <div style="text-align:center;margin-bottom:12px" id="game-title">
-    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌�?/div>
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">阿瓦隆桌游</div>
     <div style="font-size:15px;color:var(--gold);letter-spacing:2px">全场唯一真亚瑟版</div>
   </div>
   <div class="round-tracker" id="round-tracker"></div>
@@ -142,11 +142,11 @@
     <h2>刺客刺杀环节</h2>
     <div id="end-assassin-pick-area"></div>
     <div id="end-assassin-resolve-area" style="display:none">
-      <p style="font-size:14px;margin-bottom:8px">刺杀目标�?strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
+      <p style="font-size:14px;margin-bottom:8px">刺杀目标：<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
       <p style="font-size:14px;margin-bottom:10px">刺杀目标是不是梅林？</p>
       <div class="winner-toggle">
-        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅�?�?反方�?/button>
-        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 �?好人方胜</button>
+        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; 是梅林 → 反方胜</button>
+        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; 不是梅林 → 好人方胜</button>
       </div>
     </div>
   </div>
@@ -158,11 +158,11 @@
 
   <div class="card">
     <h2>游戏结束</h2>
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果�?span id="end-round-summary" style="color:var(--gold-light)"></span></p>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">本轮任务结果：<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
     <div class="winner-toggle" id="winner-toggle"></div>
   </div>
   <div class="card">
-    <h2>记录身份 <span style="font-size:12px;color:var(--text-dim)">（游戏后填入各人真实身份�?/span></h2>
+    <h2>记录身份 <span style="font-size:12px;color:var(--text-dim)">（游戏后填入各人真实身份）</span></h2>
     <div id="end-identity-grid"></div>
   </div>
   <div style="text-align:center">
@@ -176,26 +176,26 @@
     <div class="stat-grid" id="stats-overview"></div>
   </div>
   <div class="card">
-    <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情�?/span></h2>
+    <h2>历史对局 <span style="font-size:12px;color:var(--text-dim)">（点击展开详情）</span></h2>
     <div class="history-filter-bar" id="history-filter-bar">
       <div class="filter-row">
         <label class="filter-label">日期</label>
         <input type="date" class="filter-input" id="filter-date-from" onchange="applyHistoryFilter()" title="起始日期">
-        <span class="filter-sep">�?/span>
+        <span class="filter-sep">至</span>
         <input type="date" class="filter-input" id="filter-date-to" onchange="applyHistoryFilter()" title="结束日期">
       </div>
       <div class="filter-row">
         <label class="filter-label">胜负</label>
         <select class="filter-select" id="filter-winner" onchange="applyHistoryFilter()">
           <option value="">全部</option>
-          <option value="good">好人�?/option>
-          <option value="evil">反方�?/option>
+          <option value="good">好人胜</option>
+          <option value="evil">反方胜</option>
         </select>
         <label class="filter-label">玩家</label>
         <select class="filter-select" id="filter-player" onchange="applyHistoryFilter()">
           <option value="">全部</option>
         </select>
-        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛�?>清除</button>
+        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="清除筛选">清除</button>
       </div>
     </div>
     <div id="history-compact-list" class="history-compact-list"></div>
@@ -211,7 +211,7 @@
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
   </div>
   <div class="card">
-    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（选择查看�?/span></h2>
+    <h2>玩家统计 <span style="font-size:12px;color:var(--text-dim)">（选择查看）</span></h2>
     <div class="btn-row" id="player-stat-btns"></div>
     <div id="player-stat-detail"></div>
   </div>
@@ -225,10 +225,10 @@
 
 <!-- ===== 工具 ===== -->
 <section class="page" id="page-tools">
-  <h2 style="color:var(--gold-light);text-align:center;margin-bottom:8px">工具�?/h2>
+  <h2 style="color:var(--gold-light);text-align:center;margin-bottom:8px">工具箱</h2>
   <div class="card">
     <h2>录音播放</h2>
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">功能开发中，后续将支持上传录音文件并播放�?/p>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">功能开发中，后续将支持上传录音文件并播放。</p>
     <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">功能开发中</div>
   </div>
 
@@ -257,14 +257,14 @@
       <div id="v7-engine-steps" class="v7-step-grid"></div>
       <div class="v7-formula">
         <span style="color:var(--accent)">&#9888;</span>
-        <strong>评分公式</strong>：分�?= 好人证据 / (好人证据 + 坏人证据) &#215; 100
+        <strong>评分公式</strong>：分数 = 好人证据 / (好人证据 + 坏人证据) &#215; 100
         &nbsp;|&nbsp; 先验 10:10，随轮次推进逐步收敛
       </div>
     </div>
 
     <div class="card" id="known-identity-card">
       <h2>已知身份标注</h2>
-      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范�?/p>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范围</p>
       <div id="known-identity-grid"></div>
     </div>
 
@@ -283,7 +283,7 @@
 
 </section>
 
-<!-- 复盘弹窗（全局�?-->
+<!-- 复盘弹窗（全局） -->
 <div class="modal-overlay" id="replay-modal-overlay" style="display:none" onclick="closeReplayModal(event)">
   <div class="modal replay-modal" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
