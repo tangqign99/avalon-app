@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v150';
+var SW_VERSION = 'v151';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -432,6 +432,7 @@ function loadHistory() {
         // 写回 localStorage 作为缓存
         saveHistory(merged);
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
+        if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4', 'info');
         return merged.slice();
       }
     } catch(e) {
@@ -481,6 +482,7 @@ function loadHistoryLocal() {
     _historyCache = raw;
     _normalizedHistoryRawCache = null;
     _normalizedHistoryCache = null;
+    if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4', 'info');
     return raw.slice();
   } catch(e) { return []; }
 }
@@ -495,9 +497,14 @@ function loadNormalizedHistory() {
 }
 // 迁移旧记录的 UTC 时间到北京时间（UTC+8），仅对 v2 格式生效
 function migrateUtcToBeijingV2(rec) {
-  if (!rec || !rec.st) return false;
+  if (!rec || !rec.st) {
+    if (rec) console.log('[migrateUtcToBeijing] SKIP: no st field, keys=' + Object.keys(rec).join(','));
+    return false;
+  }
   // 检测 st 是否为 ISO UTC 格式（如 "2026-07-20T14:30:00.000Z"）
-  if (typeof rec.st !== 'string' || rec.st.indexOf('T') === -1 || rec.st.indexOf('Z') === -1) return false;
+  var isUtc = typeof rec.st === 'string' && rec.st.indexOf('T') !== -1 && rec.st.indexOf('Z') !== -1;
+  console.log('[migrateUtcToBeijing] st=' + rec.st + ' isUtc=' + isUtc + ' d=' + rec.d);
+  if (!isUtc) return false;
   try {
     var utcDate = new Date(rec.st);
     if (isNaN(utcDate.getTime())) return false;
@@ -1405,8 +1412,8 @@ function generateLiveScreenshot() {
   for (var i = 0; i < pc; i++) {
     ids.push({ name: state.playerNames[i] || ('玩家' + (i + 1)), role: '' });
   }
-  function pn(idx) { return (idx + 1) + '号 ' + ids[idx].name; }
-  function pnShort(idx) { return (idx + 1) + ids[idx].name; }
+  function pn(idx) { var p = ids[idx]; return (idx + 1) + '\u53f7 ' + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+  function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
   function tw(text, size) {
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     return ctx.measureText(text).width;
@@ -8356,6 +8363,11 @@ function generateGameScreenshot(idx) {
   // 防御：每个 identity 必须有 name 和 role，缺少 index 则用数组下标
   for (var ri = 0; ri < rec.identities.length; ri++) {
     var id = rec.identities[ri];
+    if (!id) {
+      console.warn('[Screenshot] identity[' + ri + '] is null/undefined, replacing');
+      rec.identities[ri] = { name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri };
+      continue;
+    }
     if (!id.name) id.name = '\u73a9\u5bb6' + (ri + 1);
     if (!id.role) id.role = '';
     if (id.index == null) id.index = ri;
@@ -8378,9 +8390,9 @@ function generateGameScreenshot(idx) {
 
   var ids = rec.identities || [];
   var pc = ids.length;
-  function pn(idx) { return (idx + 1) + '\u53f7 ' + ids[idx].name; }
-  function pnShort(idx) { return (idx + 1) + ids[idx].name; }
-  function isEvil(idx) { return getPlayerFaction(ids[idx].role) === 'evil'; }
+  function pn(idx) { var p = ids[idx]; return (idx + 1) + '\u53f7 ' + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+  function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+  function isEvil(idx) { var p = ids[idx]; return p && getPlayerFaction(p.role) === 'evil'; }
   function evilColor(idx) { return isEvil(idx) ? '#e74c3c' : '#e8dcc8'; }
 
   function dtSegments(x, y, segs, sz) {
