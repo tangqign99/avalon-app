@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v148';
+var SW_VERSION = 'v149';
 
 /* ---- UUID utility ---- */
 function generateUUID() {
