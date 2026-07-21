@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v154';
+var SW_VERSION = 'v155';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -501,8 +501,6 @@ function migrateUtcToBeijingV2(rec) {
     if (rec) console.log('[migrateUtcToBeijing] SKIP: no st field, keys=' + Object.keys(rec).join(','));
     return false;
   }
-  // 已迁移标记，防止重复转换
-  if (rec._tzMigrated) return false;
 
   // 检测 st 是否为 ISO UTC 格式（如 "2026-07-20T14:30:00.000Z"）
   var isUtc = typeof rec.st === 'string' && rec.st.indexOf('T') !== -1 && rec.st.indexOf('Z') !== -1;
@@ -510,14 +508,40 @@ function migrateUtcToBeijingV2(rec) {
   // 检测空间分隔格式（如 "2026-07-20 13:00:00"），可能来自旧版 UTC 时间存储
   var isSpaceFmt = !isUtc && typeof rec.st === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rec.st);
 
-  // 空间分隔格式：如果日期部分与 rec.d 一致，说明已是北京时间（已迁移或新记录），仅标记跳过
-  if (isSpaceFmt && rec.d && rec.st.slice(0, 10) === rec.d) {
-    rec._tzMigrated = true;
-    return false;
+  console.log('[migrateUtcToBeijing] st=' + rec.st + ' isUtc=' + isUtc + ' isSpaceFmt=' + isSpaceFmt + ' d=' + rec.d + ' _tzMigrated=' + !!rec._tzMigrated);
+  if (!isUtc && !isSpaceFmt) return false;
+
+  // 已迁移标记：做交叉验证，检测是否曾被错误标记（旧版代码可能标记了但未实际转换）
+  if (rec._tzMigrated) {
+    if (isSpaceFmt) {
+      var origSt = rec.st;
+      var origD = rec.d;
+      var testDate = new Date(origSt.replace(' ', 'T') + '.000Z');
+      if (!isNaN(testDate.getTime())) {
+        var bjMs = testDate.getTime() + 8 * 3600000;
+        var bjDate = new Date(bjMs);
+        var bjY = bjDate.getUTCFullYear();
+        var bjMo = String(bjDate.getUTCMonth() + 1).padStart(2, '0');
+        var bjD = String(bjDate.getUTCDate()).padStart(2, '0');
+        var bjH = String(bjDate.getUTCHours()).padStart(2, '0');
+        var bjMi = String(bjDate.getUTCMinutes()).padStart(2, '0');
+        var bjS = String(bjDate.getUTCSeconds()).padStart(2, '0');
+        var newSt = bjY + '-' + bjMo + '-' + bjD + ' ' + bjH + ':' + bjMi + ':' + bjS;
+        // 如果转换后时间不同且日期与现有 d 一致，说明是 UTC 记录被错误标记
+        if (newSt !== origSt && (bjY + '-' + bjMo + '-' + bjD) === origD) {
+          console.log('[migrateUtcToBeijing] _tzMigrated but time=' + origSt.slice(11,16) + ' looks like UTC, forcing re-convert');
+          delete rec._tzMigrated;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    } else {
+      return false;
+    }
   }
 
-  console.log('[migrateUtcToBeijing] st=' + rec.st + ' isUtc=' + isUtc + ' isSpaceFmt=' + isSpaceFmt + ' d=' + rec.d);
-  if (!isUtc && !isSpaceFmt) return false;
   try {
     // 空间分隔格式构造为 ISO 再解析
     var dateStr = isUtc ? rec.st : rec.st.replace(' ', 'T') + '.000Z';
@@ -531,8 +555,29 @@ function migrateUtcToBeijingV2(rec) {
     var h = String(bjDate.getUTCHours()).padStart(2, '0');
     var mi = String(bjDate.getUTCMinutes()).padStart(2, '0');
     var s = String(bjDate.getUTCSeconds()).padStart(2, '0');
-    rec.st = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
-    rec.d = y + '-' + mo + '-' + d;
+    var newSt = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
+    var newD = y + '-' + mo + '-' + d;
+
+    // 如果转换后与原始一致，说明已是北京时间，仅标记跳过
+    if (newSt === rec.st && newD === rec.d) {
+      rec._tzMigrated = true;
+      return false;
+    }
+
+    // 对于空间格式：检查转换有效性
+    // 如果转换后日期与原始日期相同（说明是北京时间当天游戏，UTC时间未跨越日期边界）→ 是旧UTC记录，转换有效
+    // 如果转换后日期不同（北京21:00→UTC+8h=次日05:00）→ 原始已是北京时间，需回滚
+    if (isSpaceFmt && !isUtc) {
+      if (newD !== rec.d) {
+        // 转换导致日期变化 → 原已是北京时间，不要转换
+        rec._tzMigrated = true;
+        return false;
+      }
+      // newD === rec.d 且时间不同 → 旧UTC记录，需要转换
+    }
+
+    rec.st = newSt;
+    rec.d = newD;
     // 转换 endTime
     var parseTimeParam = function(t) {
       if (t && typeof t === 'string') {
@@ -8440,7 +8485,7 @@ function generateGameScreenshot(idx) {
   var pc = ids.length;
   function pn(idx) { var p = ids[idx]; return (idx + 1) + '\u53f7 ' + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
   function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
-  function isEvil(idx) { var p = ids[idx]; return p && getPlayerFaction(p.role) === 'evil'; }
+  function isEvil(idx) { var p = ids[idx]; return p && getFinalFaction(p.role, rec.lancelotFlips && rec.lancelotFlips[idx]) === 'evil'; }
   function evilColor(idx) { return isEvil(idx) ? '#e74c3c' : '#e8dcc8'; }
 
   function dtSegments(x, y, segs, sz) {
@@ -8500,7 +8545,7 @@ function generateGameScreenshot(idx) {
 
   var goodPlayers = [], evilPlayers = [];
   for (var pi = 0; pi < ids.length; pi++) {
-    var f = getPlayerFaction(ids[pi].role);
+    var f = getFinalFaction(ids[pi].role, rec.lancelotFlips && rec.lancelotFlips[pi]);
     if (f === 'good') goodPlayers.push(pn(pi));
     else if (f === 'evil') evilPlayers.push(pn(pi));
   }
@@ -8519,12 +8564,12 @@ function generateGameScreenshot(idx) {
       h += 18;
       var voteLine = '\u6295\u7968\uff1a';
       for (var vi = 0; vi < pc; vi++) {
-        var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : null;
+        var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : (att.votes[pn(vi)] !== undefined) ? att.votes[pn(vi)] : null;
         voteLine += pnShort(vi) + (vv === 'approve' ? '\u2713' : vv === 'reject' ? '\u2717' : '?') + ' ';
       }
       var approves = 0, rejects = 0;
       for (var vi2 = 0; vi2 < pc; vi2++) {
-        var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : null;
+        var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : (att.votes[pn(vi2)] !== undefined) ? att.votes[pn(vi2)] : null;
         if (vv2 === 'approve') approves++; else if (vv2 === 'reject') rejects++;
       }
       voteLine += ' \u2014 ' + approves + ':' + rejects;
@@ -8687,7 +8732,7 @@ function generateGameScreenshot(idx) {
         // Draw vote line
         var vSegs = [{ text: '\u6295\u7968\uff1a', color: TXT_DIM }];
         for (var vi = 0; vi < pc; vi++) {
-          var vvv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : null;
+          var vvv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : (att.votes[pn(vi)] !== undefined) ? att.votes[pn(vi)] : null;
           vSegs.push({ text: pnShort(vi), color: evilColor(vi) });
           vSegs.push({ text: (vvv === 'approve' ? '\u2713' : vvv === 'reject' ? '\u2717' : '?') + ' ', color: vvv === 'approve' ? GREEN_BRIGHT : vvv === 'reject' ? RED : TXT_DIM });
         }
@@ -8825,6 +8870,28 @@ function generateGameScreenshot(idx) {
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
   }, 'image/png');
   console.log('[Screenshot] Game screenshot generated, idx=' + idx + ', canvas=' + (canvas ? canvas.width + 'x' + canvas.height : 'null'));
+  // 调试：输出文字版任务和投票数据
+  var debugText = '[Screenshot DEBUG] idx=' + idx + ' players=' + ids.length + '\n';
+  for (var mi4 = 0; mi4 < rec.missions.length; mi4++) {
+    var m2 = rec.missions[mi4];
+    debugText += '  Mission ' + (mi4+1) + ' (size=' + m2.size + ', result=' + (m2.result||'?') + '):\n';
+    var atts2 = m2.launchAttempts || [];
+    if (atts2.length === 0) atts2 = [{ leader: m2.leader, team: m2.team, votes: m2.votes || {} }];
+    for (var a2 = 0; a2 < atts2.length; a2++) {
+      var att2 = atts2[a2];
+      debugText += '    Attempt ' + (a2+1) + ' leader=' + att2.leader + ' team=[' + (att2.team||[]).join(',') + ']\n';
+      var voteKeys = Object.keys(att2.votes || {});
+      debugText += '    votes keys: [' + voteKeys.join(',') + ']\n';
+      for (var vi3 = 0; vi3 < ids.length; vi3++) {
+        var pnLabel = pn(vi3);
+        var v1 = att2.votes[vi3];
+        var vS = att2.votes[String(vi3)];
+        var vPN = att2.votes[pnLabel];
+        debugText += '      p' + vi3 + ' (' + pnLabel + '): n=' + v1 + ' s=' + vS + ' pn=' + vPN + '\n';
+      }
+    }
+  }
+  console.log(debugText);
 } catch(e) {
   console.error('[Screenshot] generateGameScreenshot error:', e);
   toast('\u622a\u56fe\u5931\u8d25\uff1a' + e.message, 'error');
