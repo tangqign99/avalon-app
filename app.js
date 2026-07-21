@@ -136,7 +136,8 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v149';
+var SW_VERSION = 'v150';
+var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
 function generateUUID() {
@@ -425,7 +426,7 @@ function loadHistory() {
         if (merged.length > 0) console.log('[Time] cloud+local before migrate:', merged[0].st);
         var tzMigrated = false;
         for (var ti = 0; ti < merged.length; ti++) {
-          if (migrateUtcToBeijingV2(merged[ti])) tzMigrated = true;
+          if (migrateUtcToBeijingV2(merged[ti])) { tzMigrated = true; _migratedCount++; }
         }
         if (tzMigrated && merged.length > 0) console.log('[Time] cloud+local after migrate:', merged[0].st);
         // 写回 localStorage 作为缓存
@@ -468,7 +469,7 @@ function loadHistoryLocal() {
     if (raw.length > 0) console.log('[Time] local-only before migrate:', raw[0].st);
     var tzMigratedLocal = false;
     for (var ti = 0; ti < raw.length; ti++) {
-      if (migrateUtcToBeijingV2(raw[ti])) tzMigratedLocal = true;
+      if (migrateUtcToBeijingV2(raw[ti])) { tzMigratedLocal = true; _migratedCount++; }
     }
     if (tzMigratedLocal) migrated = true;
     if (tzMigratedLocal && raw.length > 0) console.log('[Time] local-only after migrate:', raw[0].st);
@@ -4709,6 +4710,21 @@ function renderStats() {
   var start = state._historyPage * ps;
   var end = Math.min(filtered.length, start + ps);
 
+  // 调试信息：已加载记录数和 UTC 转北京时间统计
+  var debugInfo = $('history-debug-info');
+  if (!debugInfo) {
+    var histCard = document.getElementById('history-card');
+    if (histCard) {
+      debugInfo = document.createElement('div');
+      debugInfo.id = 'history-debug-info';
+      debugInfo.style.cssText = 'font-size:10px;color:#7a6e5e;padding:4px 12px;text-align:center';
+      histCard.insertBefore(debugInfo, histCard.firstChild.nextSibling);
+    }
+  }
+  if (debugInfo) {
+    debugInfo.textContent = '\u5df2\u52a0\u8f7d ' + total + ' \u6761\u8bb0\u5f55\uff0c\u5176\u4e2d ' + _migratedCount + ' \u6761\u5df2\u8f6c\u6362\u4e3a\u5317\u4eac\u65f6\u95f4';
+  }
+
   var cl = $('history-compact-list');
   h = '';
   for (var fi = start; fi < end; fi++) {
@@ -4748,6 +4764,7 @@ function renderStats() {
     h += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + oneLiner + '</span>';
 
     h += '</div></div>';
+    h += '<div style="font-size:8px;color:#7a6e5e;padding:0 12px 4px 12px;margin-top:-2px">\u539f\u59cb: ' + (rec.startTime || '\u65e0') + '</div>';
     h += '</div>';
   }
   cl.innerHTML = h;
@@ -8332,7 +8349,7 @@ function generateGameScreenshot(idx) {
     if (rebuilt) {
       rec.identities = rebuilt;
     } else {
-      alert('\u8bb0\u5f55\u4e2d\u7f3a\u5c11\u8eab\u4efd\u4fe1\u606f\uff0c\u65e0\u6cd5\u751f\u6210\u622a\u56fe');
+      toast('\u622a\u56fe\u5931\u8d25\uff1aidentities \u4e3a\u7a7a', 'error');
       return;
     }
   }
@@ -8354,6 +8371,10 @@ function generateGameScreenshot(idx) {
   var canvas = document.createElement('canvas');
   canvas.width = W;
   var ctx = canvas.getContext('2d');
+  if (!ctx) {
+    toast('\u622a\u56fe\u5931\u8d25\uff1aCanvas \u6e32\u67d3\u5f02\u5e38', 'error');
+    return;
+  }
 
   var ids = rec.identities || [];
   var pc = ids.length;
@@ -8728,7 +8749,7 @@ function generateGameScreenshot(idx) {
   canvas.toBlob(function(blob) {
     if (!blob) {
       console.error('[Screenshot] generateGameScreenshot canvas.toBlob returned null');
-      toast('\u622a\u56fe\u5931\u8d25\uff1a\u753b\u5e03\u751f\u6210\u5f02\u5e38\uff0c\u8bf7\u91cd\u8bd5', 'error');
+      toast('\u622a\u56fe\u5931\u8d25\uff1ablob \u4e3a\u7a7a', 'error');
       return;
     }
     var dateStr = (rec.date || 'unknown').replace(/[\/\s:]/g, '-');
