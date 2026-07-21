@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v151';
+var SW_VERSION = 'v152';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -432,7 +432,7 @@ function loadHistory() {
         // 写回 localStorage 作为缓存
         saveHistory(merged);
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
-        if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4', 'info');
+        if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u4ee5\u5e94\u7528\u4fee\u6539', 'info');
         return merged.slice();
       }
     } catch(e) {
@@ -482,7 +482,7 @@ function loadHistoryLocal() {
     _historyCache = raw;
     _normalizedHistoryRawCache = null;
     _normalizedHistoryCache = null;
-    if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4', 'info');
+    if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u4ee5\u5e94\u7528\u4fee\u6539', 'info');
     return raw.slice();
   } catch(e) { return []; }
 }
@@ -4771,7 +4771,6 @@ function renderStats() {
     h += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + oneLiner + '</span>';
 
     h += '</div></div>';
-    h += '<div style="font-size:8px;color:#7a6e5e;padding:0 12px 4px 12px;margin-top:-2px">\u539f\u59cb: ' + (rec.startTime || '\u65e0') + '</div>';
     h += '</div>';
   }
   cl.innerHTML = h;
@@ -5117,17 +5116,28 @@ function togglePlayerStat(name) {
   h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--red-bright)">' + evilRate + '%</div><div class="stat-label" style="font-size:13px">反方胜率</div></div>';
   h += '</div>';
   h += '<div style="font-size:14px;color:var(--text-dim);margin-bottom:6px">好人 ' + winsGood + '/' + gamesGood + ' · 反方 ' + winsEvil + '/' + gamesEvil + '</div>';
-  h += '<div style="font-size:15px;font-weight:600;margin-bottom:6px">各身份胜率</div>';
+  // \u9635\u8425\u8fc7\u6ee4\u6309\u94ae
+  var factionFilter = state._playerStatFaction || 'all';
+  h += '<div style="display:flex;gap:4px;margin-bottom:6px">';
+  h += '<button class="btn small" style="' + (factionFilter === 'all' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="state._playerStatFaction=\'all\';var sel=document.getElementById(\'player-stat-select\');if(sel)togglePlayerStat(sel.value)">\u5168\u90e8</button>';
+  h += '<button class="btn small" style="' + (factionFilter === 'good' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="state._playerStatFaction=\'good\';var sel=document.getElementById(\'player-stat-select\');if(sel)togglePlayerStat(sel.value)">\u597d\u4eba</button>';
+  h += '<button class="btn small" style="' + (factionFilter === 'evil' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="state._playerStatFaction=\'evil\';var sel=document.getElementById(\'player-stat-select\');if(sel)togglePlayerStat(sel.value)">\u53cd\u65b9</button>';
+  h += '</div>';
+  h += '<div style="font-size:15px;font-weight:600;margin-bottom:6px">\u5404\u8eab\u4efd\u80dc\u7387</div>';
   h += '<table style="width:100%;font-size:14px">';
-  var roleList = (state.activeRoles && state.activeRoles.length > 0) ? state.activeRoles : ALL_ROLES;
+  var roleList = (state.activeRoles && state.activeRoles.length > 0) ? state.activeRoles.slice() : ALL_ROLES.slice();
+  // \u8865\u5168 roleStats \u4e2d\u6709\u573a\u6b21\u4f46\u4e0d\u5728\u5217\u8868\u4e2d\u7684\u8eab\u4efd\uff083c\uff09
+  for (var rsr in roleStats) { if (roleList.indexOf(rsr) === -1) roleList.push(rsr); }
   for (var j = 0; j < roleList.length; j++) {
     var r = roleList[j];
     var rs = roleStats[r];
-    if (rs) {
-      h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + rs.wins + '/' + rs.total + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
-    } else {
-      h += '<tr><td style="padding:4px 8px;color:var(--text-dim)">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--text-dim)">-</td><td style="padding:4px 8px;text-align:right;color:var(--text-dim)">-</td></tr>';
-    }
+    // \u8df3\u8fc7 0 \u573a\u6b21\u7684\u8eab\u4efd\uff083b\uff09
+    if (!rs || rs.total === 0) continue;
+    // \u9635\u8425\u8fc7\u6ee4\uff083a\uff09
+    var naturalFaction = getFinalFaction(r, false);
+    if (factionFilter === 'good' && naturalFaction !== 'good') continue;
+    if (factionFilter === 'evil' && naturalFaction !== 'evil') continue;
+    h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + rs.wins + '/' + rs.total + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
   }
   h += '</table>';
 
@@ -8607,7 +8617,9 @@ function generateGameScreenshot(idx) {
       var cardH = calcMissionCardH(m);
       var cx = PAD + 16;
       ctx.fillStyle = 'rgba(255,255,255,0.04)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
-      ctx.fillStyle = isSuc ? GREEN : RED; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
+      // \u6210\u529f\u8f6e\u6b21\u7528\u91d1\u8272\u5de6\u8fb9\u6761+\u91d1\u8272\u8fb9\u6846\u9ad8\u4eae
+      ctx.fillStyle = isSuc ? GOLD : RED; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
+      if (isSuc) { ctx.strokeStyle = 'rgba(201,168,76,0.35)'; ctx.lineWidth = 1; rr(PAD, qy, contentW, cardH, 8); ctx.stroke(); }
       dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba\u51fa\u6218', cx, qy + 10, 13, TXT_SEC, 'left');
       var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
       var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;

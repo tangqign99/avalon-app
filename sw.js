@@ -1,11 +1,11 @@
-/* ==================== Service Worker v151 ==================== */
+/* ==================== Service Worker v152 ==================== */
 // SW strategy: stale-while-revalidate
-var CACHE_NAME = 'avalon-pwa-v151';
+var CACHE_NAME = 'avalon-pwa-v152';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v151',
-  './app.js?v=v151',
+  './style.css?v=v152',
+  './app.js?v=v152',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
