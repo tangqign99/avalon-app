@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v153';
+var SW_VERSION = 'v154';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -501,12 +501,27 @@ function migrateUtcToBeijingV2(rec) {
     if (rec) console.log('[migrateUtcToBeijing] SKIP: no st field, keys=' + Object.keys(rec).join(','));
     return false;
   }
+  // 已迁移标记，防止重复转换
+  if (rec._tzMigrated) return false;
+
   // 检测 st 是否为 ISO UTC 格式（如 "2026-07-20T14:30:00.000Z"）
   var isUtc = typeof rec.st === 'string' && rec.st.indexOf('T') !== -1 && rec.st.indexOf('Z') !== -1;
-  console.log('[migrateUtcToBeijing] st=' + rec.st + ' isUtc=' + isUtc + ' d=' + rec.d);
-  if (!isUtc) return false;
+
+  // 检测空间分隔格式（如 "2026-07-20 13:00:00"），可能来自旧版 UTC 时间存储
+  var isSpaceFmt = !isUtc && typeof rec.st === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rec.st);
+
+  // 空间分隔格式：如果日期部分与 rec.d 一致，说明已是北京时间（已迁移或新记录），仅标记跳过
+  if (isSpaceFmt && rec.d && rec.st.slice(0, 10) === rec.d) {
+    rec._tzMigrated = true;
+    return false;
+  }
+
+  console.log('[migrateUtcToBeijing] st=' + rec.st + ' isUtc=' + isUtc + ' isSpaceFmt=' + isSpaceFmt + ' d=' + rec.d);
+  if (!isUtc && !isSpaceFmt) return false;
   try {
-    var utcDate = new Date(rec.st);
+    // 空间分隔格式构造为 ISO 再解析
+    var dateStr = isUtc ? rec.st : rec.st.replace(' ', 'T') + '.000Z';
+    var utcDate = new Date(dateStr);
     if (isNaN(utcDate.getTime())) return false;
     var bjMs = utcDate.getTime() + 8 * 3600000;
     var bjDate = new Date(bjMs);
@@ -519,20 +534,31 @@ function migrateUtcToBeijingV2(rec) {
     rec.st = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
     rec.d = y + '-' + mo + '-' + d;
     // 转换 endTime
-    if (rec.et && typeof rec.et === 'string' && rec.et.indexOf('T') !== -1 && rec.et.indexOf('Z') !== -1) {
-      var utcEt = new Date(rec.et);
-      if (!isNaN(utcEt.getTime())) {
-        var bjEtMs = utcEt.getTime() + 8 * 3600000;
-        var bjEt = new Date(bjEtMs);
-        var ety = bjEt.getUTCFullYear();
-        var etmo = String(bjEt.getUTCMonth() + 1).padStart(2, '0');
-        var etd = String(bjEt.getUTCDate()).padStart(2, '0');
-        var eth = String(bjEt.getUTCHours()).padStart(2, '0');
-        var etmi = String(bjEt.getUTCMinutes()).padStart(2, '0');
-        var ets = String(bjEt.getUTCSeconds()).padStart(2, '0');
-        rec.et = ety + '-' + etmo + '-' + etd + ' ' + eth + ':' + etmi + ':' + ets;
+    var parseTimeParam = function(t) {
+      if (t && typeof t === 'string') {
+        if (t.indexOf('T') !== -1 && t.indexOf('Z') !== -1) return t;
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(t)) return t.replace(' ', 'T') + '.000Z';
+      }
+      return null;
+    };
+    if (rec.et) {
+      var etStr = parseTimeParam(rec.et);
+      if (etStr) {
+        var utcEt = new Date(etStr);
+        if (!isNaN(utcEt.getTime())) {
+          var bjEtMs = utcEt.getTime() + 8 * 3600000;
+          var bjEt = new Date(bjEtMs);
+          var ety = bjEt.getUTCFullYear();
+          var etmo = String(bjEt.getUTCMonth() + 1).padStart(2, '0');
+          var etd = String(bjEt.getUTCDate()).padStart(2, '0');
+          var eth = String(bjEt.getUTCHours()).padStart(2, '0');
+          var etmi = String(bjEt.getUTCMinutes()).padStart(2, '0');
+          var ets = String(bjEt.getUTCSeconds()).padStart(2, '0');
+          rec.et = ety + '-' + etmo + '-' + etd + ' ' + eth + ':' + etmi + ':' + ets;
+        }
       }
     }
+    rec._tzMigrated = true;
     console.log('[migrateUtcToBeijing] converted record, st=' + rec.st);
     return true;
   } catch(e) {
@@ -1476,12 +1502,12 @@ function generateLiveScreenshot() {
       h += 18;
       var voteLine = '投票：';
       for (var vi = 0; vi < pc; vi++) {
-        var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : null;
+        var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : (att.votes[pn(vi)] !== undefined) ? att.votes[pn(vi)] : null;
         voteLine += pnShort(vi) + (vv === 'approve' ? '✓' : vv === 'reject' ? '✗' : '?') + ' ';
       }
       var approves = 0, rejects = 0;
       for (var vi2 = 0; vi2 < pc; vi2++) {
-        var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : null;
+        var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : (att.votes[pn(vi2)] !== undefined) ? att.votes[pn(vi2)] : null;
         if (vv2 === 'approve') approves++; else if (vv2 === 'reject') rejects++;
       }
       voteLine += ' — ' + approves + ':' + rejects;
@@ -1628,7 +1654,7 @@ function generateLiveScreenshot() {
         var att = attempts[a], isLast = (a === attempts.length - 1);
         var approves = 0, rejects = 0;
         for (var vk = 0; vk < pc; vk++) {
-          var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : null;
+          var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : (att.votes[pn(vk)] !== undefined) ? att.votes[pn(vk)] : null;
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
@@ -5057,11 +5083,23 @@ function togglePlayerStat(name) {
   var safeId = 'ps-' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
   var existing = document.getElementById(safeId);
 
-  // Close if clicking the same player
-  if (existing) {
+  // 追踪阵营过滤状态，区分"关闭"和"切换过滤"
+  var currentFaction = state._playerStatFaction || 'all';
+  var filterChanged = state._lastStatPlayer === name && state._lastStatFaction !== currentFaction;
+
+  // Close if clicking the same player (same filter toggle)
+  if (existing && !filterChanged) {
     existing.remove();
+    state._lastStatPlayer = null;
+    state._lastStatFaction = null;
     return;
   }
+  // 过滤切换：移除旧元素，重新渲染
+  if (existing) {
+    existing.remove();
+  }
+  state._lastStatPlayer = name;
+  state._lastStatFaction = currentFaction;
 
   // Close any other open detail
   var allDetails = detailEl.querySelectorAll('.player-stat-expand');
@@ -8630,7 +8668,7 @@ function generateGameScreenshot(idx) {
         var att = attempts[a], isLast = (a === attempts.length - 1);
         var approves = 0, rejects = 0;
         for (var vk = 0; vk < pc; vk++) {
-          var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : null;
+          var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : (att.votes[pn(vk)] !== undefined) ? att.votes[pn(vk)] : null;
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
