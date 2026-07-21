@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v147';
+var SW_VERSION = 'v148';
 
 /* ---- UUID utility ---- */
 function generateUUID() {
@@ -773,6 +773,9 @@ function showPage(page) {
     renderStats();
     processOfflineQueues();
   }
+  // 更新底部版本号
+  var fv = document.getElementById('page-footer-version');
+  if (fv) fv.textContent = '版本: ' + SW_VERSION;
 }
 
 // 游戏导航入口：未开始游戏则提示先去 setup 配置
@@ -866,6 +869,9 @@ function renderSetup() {
     if (state.excaliburEnabled) { excaliburRow.classList.add('checked'); }
     else { excaliburRow.classList.remove('checked'); }
   }
+  // 设置版本号
+  var vi = document.getElementById('version-info');
+  if (vi) vi.textContent = '版本: ' + SW_VERSION;
 }
 
 function setPlayerCount(n) {
