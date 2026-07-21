@@ -422,10 +422,12 @@ function loadHistory() {
         // 按内容指纹去重，只保留一份
         merged = deduplicateHistory(merged);
         // 迁移旧记录的 UTC 时间到北京时间
+        if (merged.length > 0) console.log('[Time] cloud+local before migrate:', merged[0].st);
         var tzMigrated = false;
         for (var ti = 0; ti < merged.length; ti++) {
           if (migrateUtcToBeijingV2(merged[ti])) tzMigrated = true;
         }
+        if (tzMigrated && merged.length > 0) console.log('[Time] cloud+local after migrate:', merged[0].st);
         // 写回 localStorage 作为缓存
         saveHistory(merged);
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
@@ -463,9 +465,13 @@ function loadHistoryLocal() {
       localStorage.setItem('avalon_history_v2', rawText);
     }
     // 迁移旧记录的 UTC 时间到北京时间
+    if (raw.length > 0) console.log('[Time] local-only before migrate:', raw[0].st);
+    var tzMigratedLocal = false;
     for (var ti = 0; ti < raw.length; ti++) {
-      if (migrateUtcToBeijingV2(raw[ti])) migrated = true;
+      if (migrateUtcToBeijingV2(raw[ti])) tzMigratedLocal = true;
     }
+    if (tzMigratedLocal) migrated = true;
+    if (tzMigratedLocal && raw.length > 0) console.log('[Time] local-only after migrate:', raw[0].st);
     if (migrated) {
       rawText = JSON.stringify(raw);
       localStorage.setItem('avalon_history_v2', rawText);
@@ -8298,18 +8304,33 @@ function generateGameScreenshot(idx) {
   var recRaw = history[idx];
   var rec = normalizeRecord(recRaw);
   if (!rec) { alert('\u8bb0\u5f55\u89e3\u6790\u5931\u8d25'); return; }
+  console.log('[Screenshot] rec:', rec);
 
   // 防御：检查 identities 并尝试修复
   if (!rec.identities || !Array.isArray(rec.identities) || rec.identities.length === 0) {
-    console.error('[Screenshot] rec.identities missing or empty for idx=' + idx + ', raw keys:', Object.keys(recRaw));
-    // 尝试从 missions 提取玩家信息
-    if (rec.missions && rec.missions.length > 0 && rec.playerCount) {
-      var rebuilt = [];
+    console.error('[Screenshot] rec.identities missing or empty for idx=' + idx + ', raw keys:', Object.keys(recRaw), 'raw v2 ids:', recRaw.ids);
+    // 从 raw v2 格式直接提取 ids
+    var rebuilt = null;
+    if (recRaw.ids && Array.isArray(recRaw.ids) && recRaw.ids.length > 0) {
+      rebuilt = recRaw.ids.map(function(id, ri) {
+        return { name: id.n || '\u73a9\u5bb6' + (ri + 1), role: id.r || '', index: id.i != null ? id.i : ri };
+      });
+      console.log('[Screenshot] rebuilt identities from recRaw.ids, count=' + rebuilt.length);
+    } else if (rec.missions && rec.missions.length > 0 && rec.playerCount) {
+      rebuilt = [];
       for (var ri = 0; ri < rec.playerCount; ri++) {
         rebuilt.push({ name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri });
       }
-      rec.identities = rebuilt;
       console.log('[Screenshot] rebuilt identities from playerCount=' + rec.playerCount);
+    } else if (recRaw.pc) {
+      rebuilt = [];
+      for (var ri = 0; ri < recRaw.pc; ri++) {
+        rebuilt.push({ name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri });
+      }
+      console.log('[Screenshot] rebuilt identities from recRaw.pc=' + recRaw.pc);
+    }
+    if (rebuilt) {
+      rec.identities = rebuilt;
     } else {
       alert('\u8bb0\u5f55\u4e2d\u7f3a\u5c11\u8eab\u4efd\u4fe1\u606f\uff0c\u65e0\u6cd5\u751f\u6210\u622a\u56fe');
       return;
