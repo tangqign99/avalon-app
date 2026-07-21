@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v155';
+var SW_VERSION = 'v156';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -8487,6 +8487,20 @@ function generateGameScreenshot(idx) {
   function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
   function isEvil(idx) { var p = ids[idx]; return p && getFinalFaction(p.role, rec.lancelotFlips && rec.lancelotFlips[idx]) === 'evil'; }
   function evilColor(idx) { return isEvil(idx) ? '#e74c3c' : '#e8dcc8'; }
+  // 投票值查找：从 votes 对象中按多种 key 格式匹配玩家 vi 的投票
+  function getVoteValue(votes, vi) {
+    if (!votes) return null;
+    if (votes[vi] !== undefined) return votes[vi];
+    if (votes[String(vi)] !== undefined) return votes[String(vi)];
+    var label = pn(vi);
+    if (votes[label] !== undefined) return votes[label];
+    // 兜底：按 "N号" 前缀扫描所有 key，应对记录时名字与 identities 不一致的边界情况
+    var prefix = (vi + 1) + '\u53f7 ';
+    for (var k in votes) {
+      if (k.indexOf(prefix) === 0) return votes[k];
+    }
+    return null;
+  }
 
   function dtSegments(x, y, segs, sz) {
     ctx.font = sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
@@ -8564,12 +8578,12 @@ function generateGameScreenshot(idx) {
       h += 18;
       var voteLine = '\u6295\u7968\uff1a';
       for (var vi = 0; vi < pc; vi++) {
-        var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : (att.votes[pn(vi)] !== undefined) ? att.votes[pn(vi)] : null;
+        var vv = getVoteValue(att.votes, vi);
         voteLine += pnShort(vi) + (vv === 'approve' ? '\u2713' : vv === 'reject' ? '\u2717' : '?') + ' ';
       }
       var approves = 0, rejects = 0;
       for (var vi2 = 0; vi2 < pc; vi2++) {
-        var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : (att.votes[pn(vi2)] !== undefined) ? att.votes[pn(vi2)] : null;
+        var vv2 = getVoteValue(att.votes, vi2);
         if (vv2 === 'approve') approves++; else if (vv2 === 'reject') rejects++;
       }
       voteLine += ' \u2014 ' + approves + ':' + rejects;
@@ -8713,7 +8727,7 @@ function generateGameScreenshot(idx) {
         var att = attempts[a], isLast = (a === attempts.length - 1);
         var approves = 0, rejects = 0;
         for (var vk = 0; vk < pc; vk++) {
-          var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : (att.votes[pn(vk)] !== undefined) ? att.votes[pn(vk)] : null;
+          var vv = getVoteValue(att.votes, vk);
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
@@ -8732,7 +8746,7 @@ function generateGameScreenshot(idx) {
         // Draw vote line
         var vSegs = [{ text: '\u6295\u7968\uff1a', color: TXT_DIM }];
         for (var vi = 0; vi < pc; vi++) {
-          var vvv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : (att.votes[pn(vi)] !== undefined) ? att.votes[pn(vi)] : null;
+          var vvv = getVoteValue(att.votes, vi);
           vSegs.push({ text: pnShort(vi), color: evilColor(vi) });
           vSegs.push({ text: (vvv === 'approve' ? '\u2713' : vvv === 'reject' ? '\u2717' : '?') + ' ', color: vvv === 'approve' ? GREEN_BRIGHT : vvv === 'reject' ? RED : TXT_DIM });
         }
