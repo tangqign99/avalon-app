@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v155">
+<link rel="stylesheet" href="./style.css?v=v156">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v155"></script>
+<script defer src="./app.js?v=v156"></script>
 </head>
 <body>
 
@@ -93,7 +93,7 @@
     </div>
     <p style="font-size:12px;color:var(--text-dim);margin-top:6px">清理后已删除的对局记录将恢复正常显示</p>
   </div>
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v155</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v156</div>
 </section>
 
 <section class="page" id="page-game">
@@ -303,7 +303,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- 全局页面底部版本号 -->
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v155</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v156</div>
 
 <!-- 夜间模式切换按钮 -->
 <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="切换夜间模式">&#9790;</button>
@@ -324,10 +324,10 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
   }).then(function(){
-    var SW_VERSION = 'v155';
+    var SW_VERSION = 'v156';
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
   }).then(function(reg){
-    console.log('[SW] ' + ('v155') + ' registered:', reg.scope);
+    console.log('[SW] ' + ('v156') + ' registered:', reg.scope);
     reg.addEventListener('updatefound', function(){
       var newWorker = reg.installing;
       if (!newWorker) return;
