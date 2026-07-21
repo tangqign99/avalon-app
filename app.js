@@ -421,6 +421,11 @@ function loadHistory() {
         }
         // 按内容指纹去重，只保留一份
         merged = deduplicateHistory(merged);
+        // 迁移旧记录的 UTC 时间到北京时间
+        var tzMigrated = false;
+        for (var ti = 0; ti < merged.length; ti++) {
+          if (migrateUtcToBeijingV2(merged[ti])) tzMigrated = true;
+        }
         // 写回 localStorage 作为缓存
         saveHistory(merged);
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
@@ -457,6 +462,14 @@ function loadHistoryLocal() {
       rawText = JSON.stringify(raw);
       localStorage.setItem('avalon_history_v2', rawText);
     }
+    // 迁移旧记录的 UTC 时间到北京时间
+    for (var ti = 0; ti < raw.length; ti++) {
+      if (migrateUtcToBeijingV2(raw[ti])) migrated = true;
+    }
+    if (migrated) {
+      rawText = JSON.stringify(raw);
+      localStorage.setItem('avalon_history_v2', rawText);
+    }
     _historyRawCache = rawText;
     _historyCache = raw;
     _normalizedHistoryRawCache = null;
@@ -473,6 +486,47 @@ function loadNormalizedHistory() {
   _normalizedHistoryCache = history;
   return history.slice();
 }
+// 迁移旧记录的 UTC 时间到北京时间（UTC+8），仅对 v2 格式生效
+function migrateUtcToBeijingV2(rec) {
+  if (!rec || !rec.st) return false;
+  // 检测 st 是否为 ISO UTC 格式（如 "2026-07-20T14:30:00.000Z"）
+  if (typeof rec.st !== 'string' || rec.st.indexOf('T') === -1 || rec.st.indexOf('Z') === -1) return false;
+  try {
+    var utcDate = new Date(rec.st);
+    if (isNaN(utcDate.getTime())) return false;
+    var bjMs = utcDate.getTime() + 8 * 3600000;
+    var bjDate = new Date(bjMs);
+    var y = bjDate.getUTCFullYear();
+    var mo = String(bjDate.getUTCMonth() + 1).padStart(2, '0');
+    var d = String(bjDate.getUTCDate()).padStart(2, '0');
+    var h = String(bjDate.getUTCHours()).padStart(2, '0');
+    var mi = String(bjDate.getUTCMinutes()).padStart(2, '0');
+    var s = String(bjDate.getUTCSeconds()).padStart(2, '0');
+    rec.st = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
+    rec.d = y + '-' + mo + '-' + d;
+    // 转换 endTime
+    if (rec.et && typeof rec.et === 'string' && rec.et.indexOf('T') !== -1 && rec.et.indexOf('Z') !== -1) {
+      var utcEt = new Date(rec.et);
+      if (!isNaN(utcEt.getTime())) {
+        var bjEtMs = utcEt.getTime() + 8 * 3600000;
+        var bjEt = new Date(bjEtMs);
+        var ety = bjEt.getUTCFullYear();
+        var etmo = String(bjEt.getUTCMonth() + 1).padStart(2, '0');
+        var etd = String(bjEt.getUTCDate()).padStart(2, '0');
+        var eth = String(bjEt.getUTCHours()).padStart(2, '0');
+        var etmi = String(bjEt.getUTCMinutes()).padStart(2, '0');
+        var ets = String(bjEt.getUTCSeconds()).padStart(2, '0');
+        rec.et = ety + '-' + etmo + '-' + etd + ' ' + eth + ':' + etmi + ':' + ets;
+      }
+    }
+    console.log('[migrateUtcToBeijing] converted record, st=' + rec.st);
+    return true;
+  } catch(e) {
+    console.warn('[migrateUtcToBeijing] error:', e);
+    return false;
+  }
+}
+
 function saveHistory(data) {
   var rawText = JSON.stringify(data);
   localStorage.setItem('avalon_history_v2', rawText);
@@ -5011,7 +5065,9 @@ function togglePlayerStat(name) {
 
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
     roleStats[role].total++;
-    if (d.winner === finalFaction) roleStats[role].wins++;
+    // 身份胜率使用自然阵营判定（忽略反转），确保兰斯洛特各身份胜率不随反转变化
+    var naturalFaction = getFinalFaction(role, false);
+    if (d.winner === naturalFaction) roleStats[role].wins++;
   }
 
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
@@ -8236,6 +8292,33 @@ function generateGameScreenshot(idx) {
   var recRaw = history[idx];
   var rec = normalizeRecord(recRaw);
   if (!rec) { alert('\u8bb0\u5f55\u89e3\u6790\u5931\u8d25'); return; }
+
+  // 防御：检查 identities 并尝试修复
+  if (!rec.identities || !Array.isArray(rec.identities) || rec.identities.length === 0) {
+    console.error('[Screenshot] rec.identities missing or empty for idx=' + idx + ', raw keys:', Object.keys(recRaw));
+    // 尝试从 missions 提取玩家信息
+    if (rec.missions && rec.missions.length > 0 && rec.playerCount) {
+      var rebuilt = [];
+      for (var ri = 0; ri < rec.playerCount; ri++) {
+        rebuilt.push({ name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri });
+      }
+      rec.identities = rebuilt;
+      console.log('[Screenshot] rebuilt identities from playerCount=' + rec.playerCount);
+    } else {
+      alert('\u8bb0\u5f55\u4e2d\u7f3a\u5c11\u8eab\u4efd\u4fe1\u606f\uff0c\u65e0\u6cd5\u751f\u6210\u622a\u56fe');
+      return;
+    }
+  }
+  // 防御：每个 identity 必须有 name 和 role，缺少 index 则用数组下标
+  for (var ri = 0; ri < rec.identities.length; ri++) {
+    var id = rec.identities[ri];
+    if (!id.name) id.name = '\u73a9\u5bb6' + (ri + 1);
+    if (!id.role) id.role = '';
+    if (id.index == null) id.index = ri;
+    if (!id.name || !id.role) {
+      console.warn('[Screenshot] identity[' + ri + '] missing fields:', JSON.stringify(id));
+    }
+  }
 
   var W = 750;
   var PAD = 28;
