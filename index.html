@@ -204,6 +204,7 @@
     <div class="btn-row" style="justify-content:center;margin-top:10px">
       <button class="btn small" onclick="exportData()">导出数据</button>
       <button class="btn small" onclick="importData()">导入数据</button>
+      <button class="btn small" onclick="openSupplementModal()" style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none">补录对局</button>
     </div>
     <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">暂无对局记录</p>
   </div>
@@ -301,9 +302,7 @@
 </main>
 
 <div class="toast" id="toast"></div>
-
-<!-- 全局页面底部版本号 -->
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v156</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v159</div>
 
 <!-- 夜间模式切换按钮 -->
 <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="切换夜间模式">&#9790;</button>
@@ -318,16 +317,61 @@
   </div>
 </div>
 
+<!-- 补录对局弹窗 -->
+<div class="modal-overlay" id="supplement-modal-overlay" style="display:none" onclick="closeSupplementModal(event)">
+  <div class="modal" style="max-width:580px;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
+    <h2>补录对局</h2>
+    <div style="margin-top:12px">
+      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">对局时间</label>
+      <input type="datetime-local" id="supplement-time" class="filter-input" style="width:100%;box-sizing:border-box">
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">玩家人数</label>
+      <select id="supplement-pc" class="filter-select" style="width:100%;box-sizing:border-box" onchange="onSuppPcChange()">
+        <option value="5">5人</option>
+        <option value="6">6人</option>
+        <option value="7" selected>7人</option>
+        <option value="8">8人</option>
+        <option value="9">9人</option>
+        <option value="10">10人</option>
+      </select>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">角色分配（选择后填入玩家姓名）</label>
+      <div id="supplement-roles" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">身份配置（可选，不选默认与人数匹配）</label>
+      <div id="supplement-active-roles" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">胜负结果</label>
+      <select id="supplement-winner" class="filter-select" style="width:100%;box-sizing:border-box">
+        <option value="good">好人方胜</option>
+        <option value="evil">反方胜</option>
+      </select>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">备注（可选）</label>
+      <input type="text" id="supplement-note" class="filter-input" style="width:100%;box-sizing:border-box" placeholder="例如：线下局、网杀补录">
+    </div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn small" onclick="closeSupplementModal()">取消</button>
+      <button class="btn small" onclick="submitSupplement()" style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none">确认补录</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // 强制注销所有旧 Service Worker，打破无限刷新循环
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
   }).then(function(){
-    var SW_VERSION = 'v156';
+    var SW_VERSION = 'v159';
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
   }).then(function(reg){
-    console.log('[SW] ' + ('v156') + ' registered:', reg.scope);
+    console.log('[SW] ' + ('v159') + ' registered:', reg.scope);
     reg.addEventListener('updatefound', function(){
       var newWorker = reg.installing;
       if (!newWorker) return;

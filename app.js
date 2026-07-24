@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v156';
+var SW_VERSION = 'v159';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -422,6 +422,18 @@ function loadHistory() {
         }
         // 按内容指纹去重，只保留一份
         merged = deduplicateHistory(merged);
+        // 从本地记录复制 _tzMigrated 标记到云端记录，避免每次加载都重复触发时区迁移
+        var localTzMigratedSids = {};
+        for (var li = 0; li < localRaw.length; li++) {
+          var lr2 = localRaw[li];
+          if (!isRecordV2(lr2)) lr2 = toRecordV2(lr2);
+          if (lr2._sid && lr2._tzMigrated) localTzMigratedSids[lr2._sid] = true;
+        }
+        for (var mi = 0; mi < merged.length; mi++) {
+          if (merged[mi]._sid && localTzMigratedSids[merged[mi]._sid]) {
+            merged[mi]._tzMigrated = true;
+          }
+        }
         // 迁移旧记录的 UTC 时间到北京时间
         if (merged.length > 0) console.log('[Time] cloud+local before migrate:', merged[0].st);
         var tzMigrated = false;
@@ -1471,11 +1483,12 @@ function renderScreenshotButton() {
 function generateLiveScreenshot() {
   try {
   var W = 750;
+  var SCALE = 6;
   var PAD = 28;
   var contentW = W - PAD * 2;
 
   var canvas = document.createElement('canvas');
-  canvas.width = W;
+  canvas.width = W * SCALE;
   var ctx = canvas.getContext('2d');
 
   var pc = state.playerCount;
@@ -1595,14 +1608,15 @@ function generateLiveScreenshot() {
 
   var totalH = PAD * 2;
   for (var si = 0; si < secH.length; si++) totalH += secH[si];
-  canvas.height = Math.ceil(totalH);
+  canvas.height = Math.ceil(totalH * SCALE);
+  ctx.scale(SCALE, SCALE);
 
-  var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  var grad = ctx.createLinearGradient(0, 0, 0, totalH);
   grad.addColorStop(0, '#1a0e30');
   grad.addColorStop(0.4, '#120926');
   grad.addColorStop(1, '#0d0617');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, W, totalH);
 
   var y = PAD;
   var si = 0;
@@ -1805,7 +1819,7 @@ function generateLiveScreenshot() {
     for (var pi = 0; pi < pc; pi++) { namesStr += pnShort(pi); if (pi < pc - 1) namesStr += '、'; }
     dt('玩家：' + namesStr, PAD, y + 18, 12, TXT_DIM, 'left');
     ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
-    ctx.fillText('阿瓦隆 · The Resistance Avalon', W / 2, canvas.height - PAD);
+    ctx.fillText('阿瓦隆 · The Resistance Avalon', W / 2, totalH - PAD);
   })();
 
   canvas.toBlob(function(blob) {
@@ -5170,6 +5184,11 @@ function togglePlayerStat(name) {
       var rec = history[d.recIndex];
       finalFaction = resolveHuntFaction(rec, d.huntFollow);
     }
+    // 菜头调试：输出每局胜负和阵营归属
+    if (name === '菜头') {
+      var recDebug = history[d.recIndex];
+      console.log('[菜头调试] 局#' + d.recIndex + ' 日期=' + (recDebug ? recDebug.date : '?') + ' 身份=' + role + ' 翻转=' + flipped + ' 最终阵营=' + finalFaction + ' 胜方=' + d.winner + ' 是否胜利=' + (d.winner === finalFaction ? 'YES' : 'NO'));
+    }
 
     if (finalFaction === 'good') {
       gamesGood++;
@@ -5183,9 +5202,8 @@ function togglePlayerStat(name) {
 
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
     roleStats[role].total++;
-    // 身份胜率使用自然阵营判定（忽略反转），确保兰斯洛特各身份胜率不随反转变化
-    var naturalFaction = getFinalFaction(role, false);
-    if (d.winner === naturalFaction) roleStats[role].wins++;
+    // 身份胜率使用最终阵营判定（考虑翻转），确保兰斯洛特变节后按实际阵营计算
+    if (d.winner === finalFaction) roleStats[role].wins++;
   }
 
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
@@ -5458,22 +5476,6 @@ function renderPlayerProfile() {
   ph += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
   ph += '</div>';
 
-  // Recent performance
-  ph += '<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">近期表现</div>';
-  ph += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
-  var periods = [
-    { key: 'd7', label: '7天' },
-    { key: 'd15', label: '15天' },
-    { key: 'd30', label: '30天' }
-  ];
-  for (var pi = 0; pi < periods.length; pi++) {
-    var prd = periods[pi];
-    var r = recent[prd.key];
-    var rate = r.total > 0 ? Math.round(r.wins / r.total * 100) : 0;
-    ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">' + prd.label + '</div><div style="font-size:20px;font-weight:700;color:var(--gold-light)">' + rate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + r.total + '场</div></div>';
-  }
-  ph += '</div></div>';
-
   // Role performance tabs
   var goodRoles = [], evilRoles = [];
   for (var rn in roleStats) {
@@ -5622,6 +5624,7 @@ function showGameDetail(idx) {
   for (var ii = 0; ii < rec.identities.length; ii++) {
     var idt = rec.identities[ii];
     nameByIndex[idt.index] = idt.name;
+    nameByIndex[(idt.index + 1) + '号 ' + idt.name] = idt.name;
     var faction = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
     if (idt.role === '混子' && rec.huntFollow != null) {
       faction = resolveHuntFaction(rec, rec.huntFollow);
@@ -8470,11 +8473,12 @@ function generateGameScreenshot(idx) {
   }
 
   var W = 750;
+  var SCALE = 6;
   var PAD = 28;
   var contentW = W - PAD * 2;
 
   var canvas = document.createElement('canvas');
-  canvas.width = W;
+  canvas.width = W * SCALE;
   var ctx = canvas.getContext('2d');
   if (!ctx) {
     toast('\u622a\u56fe\u5931\u8d25\uff1aCanvas \u6e32\u67d3\u5f02\u5e38', 'error');
@@ -8627,14 +8631,15 @@ function generateGameScreenshot(idx) {
 
   var totalH = PAD * 2;
   for (var si = 0; si < secH.length; si++) totalH += secH[si];
-  canvas.height = Math.ceil(totalH);
+  canvas.height = Math.ceil(totalH * SCALE);
+  ctx.scale(SCALE, SCALE);
 
-  var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  var grad = ctx.createLinearGradient(0, 0, 0, totalH);
   grad.addColorStop(0, '#1a0e30');
   grad.addColorStop(0.4, '#120926');
   grad.addColorStop(1, '#0d0617');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, W, totalH);
 
   var y = PAD;
   var si = 0;
@@ -8681,7 +8686,7 @@ function generateGameScreenshot(idx) {
     for (var pi = 0; pi < pc; pi++) {
       var col = pi % 2, row = Math.floor(pi / 2);
       var px = PAD + col * (colW + 12), py = gridY + row * 28;
-      var id = ids[pi], evil = getPlayerFaction(id.role) === 'evil';
+      var id = ids[pi], flippedS = rec.lancelotFlips && rec.lancelotFlips[pi], evil = getFinalFaction(id.role, flippedS) === 'evil';
       ctx.fillStyle = evil ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)';
       rr(px, py, colW, 24, 6); ctx.fill();
       dt(evil ? '\u25b2' : '\u2b22', px + 8, py + 5, 10, evil ? RED : BLUE, 'left');
@@ -8864,7 +8869,7 @@ function generateGameScreenshot(idx) {
     dt('\u597d\u4eba\u9635\u7ebf\uff1a' + goodPlayers.join('\u3001'), PAD, y + 18, 12, TXT_DIM, 'left');
     dt('\u574f\u4eba\u9635\u7ebf\uff1a' + evilPlayers.join('\u3001'), PAD, y + 36, 12, TXT_DIM, 'left');
     ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
-    ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, canvas.height - PAD);
+    ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, totalH - PAD);
   })();
 
   canvas.toBlob(function(blob) {
@@ -9079,6 +9084,196 @@ function saveHistoryEdit(idx) {
   toast('已保存');
   closeHistoryModal();
   openHistoryModal(idx);
+}
+
+/* ==================== 补录对局 ==================== */
+function openSupplementModal() {
+  var overlay = document.getElementById('supplement-modal-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  var now = new Date();
+  var dtLocal = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+  document.getElementById('supplement-time').value = dtLocal;
+  renderSuppRoles();
+  renderSuppActiveRoles();
+}
+
+function closeSupplementModal(e) {
+  if (e && e.target !== document.getElementById('supplement-modal-overlay')) return;
+  document.getElementById('supplement-modal-overlay').style.display = 'none';
+}
+
+function onSuppPcChange() {
+  renderSuppRoles();
+  renderSuppActiveRoles();
+}
+
+function renderSuppRoles() {
+  var pc = parseInt(document.getElementById('supplement-pc').value) || 7;
+  var container = document.getElementById('supplement-roles');
+  if (!container) return;
+  var h = '';
+  for (var i = 0; i < pc; i++) {
+    h += '<div style="display:flex;align-items:center;gap:4px">';
+    h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">' + (i + 1) + '号</span>';
+    h += '<input type="text" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名">';
+    h += '<select id="supp-role-' + i + '" class="filter-select" style="width:110px;flex-shrink:0;box-sizing:border-box"></select>';
+    h += '</div>';
+  }
+  container.innerHTML = h;
+  fillSuppRoleOptions(pc);
+}
+
+function fillSuppRoleOptions(pc) {
+  var defaultAssign = [];
+  if (pc === 5) defaultAssign = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
+  else if (pc === 6) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客'];
+  else if (pc === 7) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客','奥伯伦'];
+  else if (pc === 8) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','忠臣','莫甘娜','刺客','爪牙'];
+  else if (pc === 9) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德'];
+  else defaultAssign = ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦'];
+
+  for (var i = 0; i < pc; i++) {
+    var sel = document.getElementById('supp-role-' + i);
+    if (!sel) continue;
+    var prevVal = sel.value;
+    sel.innerHTML = '';
+    for (var r = 0; r < ALL_ROLES.length; r++) {
+      var role = ALL_ROLES[r];
+      sel.innerHTML += '<option value="' + escAttr(role) + '"' + (role === defaultAssign[i] ? ' selected' : '') + '>' + role + '</option>';
+    }
+    if (prevVal) sel.value = prevVal;
+  }
+}
+
+function renderSuppActiveRoles() {
+  var container = document.getElementById('supplement-active-roles');
+  if (!container) return;
+  var pc = parseInt(document.getElementById('supplement-pc').value) || 7;
+  var defaultSet = {};
+  if (pc === 5) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true};
+  else if (pc === 6) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true};
+  else if (pc === 7) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'奥伯伦':true};
+  else if (pc === 8) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'爪牙':true};
+  else if (pc === 9) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'莫德雷德':true};
+  else defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'莫德雷德':true,'奥伯伦':true};
+
+  var h = '';
+  for (var r = 0; r < ALL_ROLES.length; r++) {
+    var role = ALL_ROLES[r];
+    var checked = defaultSet[role] ? ' checked' : '';
+    h += '<label style="font-size:12px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;user-select:none">';
+    h += '<input type="checkbox" id="supp-ar-' + r + '" value="' + escAttr(role) + '"' + checked + '> ' + role;
+    h += '</label>';
+  }
+  container.innerHTML = h;
+}
+
+function submitSupplement() {
+  var dt = document.getElementById('supplement-time').value;
+  if (!dt) { toast('请选择对局时间', 'warn'); return; }
+
+  var pc = parseInt(document.getElementById('supplement-pc').value) || 7;
+  var winner = document.getElementById('supplement-winner').value;
+  var note = document.getElementById('supplement-note').value.trim();
+
+  var identities = [];
+  var playerNames = [];
+  for (var i = 0; i < pc; i++) {
+    var nameInput = document.getElementById('supp-name-' + i);
+    var roleSel = document.getElementById('supp-role-' + i);
+    var name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : ('玩家' + (i + 1));
+    var role = roleSel ? roleSel.value : '';
+    playerNames.push(name);
+    identities.push({ index: i, name: name, role: role });
+  }
+
+  var activeRoles = [];
+  for (var r = 0; r < ALL_ROLES.length; r++) {
+    var cb = document.getElementById('supp-ar-' + r);
+    if (cb && cb.checked) activeRoles.push(ALL_ROLES[r]);
+  }
+  if (activeRoles.length === 0) {
+    for (var i2 = 0; i2 < identities.length; i2++) {
+      if (identities[i2].role && activeRoles.indexOf(identities[i2].role) === -1) {
+        activeRoles.push(identities[i2].role);
+      }
+    }
+  }
+
+  var parts = dt.split('T');
+  var dateStr = parts[0];
+  var timeStr = (parts[1] || '00:00') + ':00';
+  var startTime = dateStr + ' ' + timeStr;
+  var endTime = startTime;
+
+  var dirty = false;
+  for (var i3 = 0; i3 < Math.min(pc, 10); i3++) {
+    if (playerNames[i3] && playerNames[i3] !== ('玩家' + (i3 + 1))) {
+      namePool[i3] = playerNames[i3];
+      dirty = true;
+    }
+  }
+  if (dirty) saveNamePool();
+
+  var record = {
+    playerCount: pc,
+    playerNames: playerNames,
+    identities: identities,
+    activeRoles: activeRoles,
+    winner: winner,
+    date: dateStr,
+    startTime: startTime,
+    endTime: endTime,
+    missions: [],
+    roundTendencies: [],
+    _isSupplement: true,
+    _note: note || ''
+  };
+
+  var history = loadRawHistoryForSupplement();
+  history.push(record);
+  localStorage.setItem('avalon_history_v2', JSON.stringify(history));
+  invalidateHistoryCache();
+
+  var sb = getSupabase();
+  if (sb) {
+    var v2 = toRecordV2(record);
+    if (!v2._uuid) v2._uuid = generateUUID();
+    v2._note = note || '';
+    v2._isSupplement = true;
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', SUPABASE_URL + '/rest/v1/game_records', false);
+      xhr.setRequestHeader('apikey', SUPABASE_KEY);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Prefer', 'return=representation');
+      xhr.send(JSON.stringify({ game_data_v2: v2 }));
+    } catch(e) {
+      console.warn('[Supplement] Supabase sync failed:', e);
+    }
+  }
+
+  toast('补录成功！');
+  closeSupplementModal();
+  renderStats();
+}
+
+function loadRawHistoryForSupplement() {
+  try {
+    return JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
+  } catch(e) {
+    return [];
+  }
+}
+
+function escAttr(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function pad2(n) {
+  return n < 10 ? '0' + n : '' + n;
 }
 
 
