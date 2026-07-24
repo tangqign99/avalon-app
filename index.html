@@ -1,403 +1,720 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
+
 <html lang="zh-CN">
+
 <head>
+
 <meta charset="UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
 <meta name="apple-mobile-web-app-capable" content="yes">
+
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>°¢ÍßÂ¡¸¨Öú</title>
+
+<title>é˜¿ç“¦éš†è¾…åŠ©</title>
+
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v159">
+
+<link rel="stylesheet" href="./style.css?v=v160">
+
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v159"></script>
+
+<script defer src="./app.js?v=v160"></script>
+
 </head>
+
 <body>
 
+
+
 <header>
-  <h1>°¢ÍßÂ¡</h1>
+
+  <h1>é˜¿ç“¦éš†</h1>
+
   <div class="nav-btns">
-    <button id="nav-setup" class="active" onclick="showPage('setup')">ÉèÖÃ</button>
-    <button id="nav-game" onclick="goToGame()">ÓÎÏ·</button>
-    <button id="nav-tools" onclick="showPage('tools')">¹¤¾ß</button>
-    <button id="nav-end" onclick="showPage('end')">½áÊø</button>
-    <button id="nav-stats" onclick="showPage('stats')">Í³¼Æ</button>
+
+    <button id="nav-setup" class="active" onclick="showPage('setup')">è®¾ç½®</button>
+
+    <button id="nav-game" onclick="goToGame()">æ¸¸æˆ</button>
+
+    <button id="nav-tools" onclick="showPage('tools')">å·¥å…·</button>
+
+    <button id="nav-end" onclick="showPage('end')">ç»“æŸ</button>
+
+    <button id="nav-stats" onclick="showPage('stats')">ç»Ÿè®¡</button>
+
   </div>
+
 </header>
+
+
 
 <main id="main-content">
 
+
+
 <section class="page active" id="page-setup">
+
   <div style="text-align:center;margin-bottom:12px">
-    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">°¢ÍßÂ¡×ÀÓÎ</div>
-    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">È«³¡Î¨Ò»ÕæÑÇÉª°æ</div>
+
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">é˜¿ç“¦éš†æ¡Œæ¸¸</div>
+
+    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">å…¨åœºå”¯ä¸€çœŸäºšç‘Ÿç‰ˆ</div>
+
   </div>
+
   <div class="card">
-    <h2>Íæ¼ÒÈËÊý</h2>
+
+    <h2>çŽ©å®¶äººæ•°</h2>
+
     <div class="count-grid" id="count-grid"></div>
+
   </div>
+
   <div class="card">
-    <h2>Íæ¼ÒÃû³Æ <span style="font-size:12px;color:var(--text-dim)">£¨ÏÂÀ­Ñ¡Ôñ£©</span></h2>
+
+    <h2>çŽ©å®¶åç§° <span style="font-size:12px;color:var(--text-dim)">ï¼ˆä¸‹æ‹‰é€‰æ‹©ï¼‰</span></h2>
+
     <div id="player-names"></div>
+
   </div>
+
   <div class="card">
-    <h2>±¾¾Ö½ÇÉ« <span style="font-size:12px;color:var(--text-dim);font-weight:400">£¨¹´Ñ¡µÄ²Å»á³öÏÖÔÚ½áÊøÃæ°åÉí·ÝÑ¡ÏîÖÐ£©</span></h2>
+
+    <h2>æœ¬å±€è§’è‰² <span style="font-size:12px;color:var(--text-dim);font-weight:400">ï¼ˆå‹¾é€‰çš„æ‰ä¼šå‡ºçŽ°åœ¨ç»“æŸé¢æ¿èº«ä»½é€‰é¡¹ä¸­ï¼‰</span></h2>
+
     <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
+
   </div>
+
   <div class="card">
-    <h2 style="text-align:center">¿ÉÑ¡¹æÔò</h2>
-    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">ºþÖÐÅ®Éñ</button><button id="excalibur-row" class="lady-toggle-btn" onclick="toggleExcalibur()">ÍõÕßÖ®½£</button></div>
+
+    <h2 style="text-align:center">å¯é€‰è§„åˆ™</h2>
+
+    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap"><button id="lady-check-row" class="lady-toggle-btn" onclick="toggleLadyOfLake()">æ¹–ä¸­å¥³ç¥ž</button><button id="excalibur-row" class="lady-toggle-btn" onclick="toggleExcalibur()">çŽ‹è€…ä¹‹å‰‘</button></div>
+
     <div class="timer-setup" id="timer-setup">
-      <h3>¼ÆÊ±Ä£Ê½</h3>
+
+      <h3>è®¡æ—¶æ¨¡å¼</h3>
+
       <div class="timer-mode-row">
-        <button class="timer-mode-btn" id="timer-mode-off" onclick="setTimerMode('off')">¹Ø±Õ¼ÆÊ±</button>
-        <button class="timer-mode-btn selected" id="timer-mode-all" onclick="setTimerMode('all')">È«Ìå·¢ÑÔ</button>
-        <button class="timer-mode-btn" id="timer-mode-per" onclick="setTimerMode('per')">ÂÖÁ÷·¢ÑÔ</button>
+
+        <button class="timer-mode-btn" id="timer-mode-off" onclick="setTimerMode('off')">å…³é—­è®¡æ—¶</button>
+
+        <button class="timer-mode-btn selected" id="timer-mode-all" onclick="setTimerMode('all')">å…¨ä½“å‘è¨€</button>
+
+        <button class="timer-mode-btn" id="timer-mode-per" onclick="setTimerMode('per')">è½®æµå‘è¨€</button>
+
       </div>
+
       <div class="timer-options-row" id="timer-all-options">
-        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">Ê±³¤</span>
-        <button class="timer-opt-btn" id="timer-all-opt-180" onclick="setAllTimerSeconds(180)">3·ÖÖÓ</button>
-        <button class="timer-opt-btn" id="timer-all-opt-240" onclick="setAllTimerSeconds(240)">4·ÖÖÓ</button>
-        <button class="timer-opt-btn selected" id="timer-all-opt-300" onclick="setAllTimerSeconds(300)">5·ÖÖÓ</button>
+
+        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">æ—¶é•¿</span>
+
+        <button class="timer-opt-btn" id="timer-all-opt-180" onclick="setAllTimerSeconds(180)">3åˆ†é’Ÿ</button>
+
+        <button class="timer-opt-btn" id="timer-all-opt-240" onclick="setAllTimerSeconds(240)">4åˆ†é’Ÿ</button>
+
+        <button class="timer-opt-btn selected" id="timer-all-opt-300" onclick="setAllTimerSeconds(300)">5åˆ†é’Ÿ</button>
+
       </div>
+
       <div class="timer-options-row" id="timer-per-options" style="display:none">
-        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">Ã¿ÈË</span>
+
+        <span style="color:var(--text-dim);font-size:13px;display:flex;align-items:center">æ¯äºº</span>
+
         <button class="timer-opt-btn" id="timer-per-opt-45" onclick="setTimerSeconds(45)">45s</button>
+
         <button class="timer-opt-btn selected" id="timer-per-opt-60" onclick="setTimerSeconds(60)">60s</button>
+
         <button class="timer-opt-btn" id="timer-per-opt-75" onclick="setTimerSeconds(75)">75s</button>
+
         <button class="timer-opt-btn" id="timer-per-opt-90" onclick="setTimerSeconds(90)">90s</button>
+
         <input type="number" id="timer-seconds-input" value="60" min="10" max="300" step="5"
+
           style="width:64px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;text-align:center;min-height:40px;outline:none"
+
           onchange="setTimerSecondsInput()" onfocus="this.select()">
-        <span style="color:var(--text-dim);font-size:13px">Ãë</span>
+
+        <span style="color:var(--text-dim);font-size:13px">ç§’</span>
+
       </div>
+
     </div>
+
   </div>
+
   <div class="card" style="text-align:center">
+
     <p style="color:var(--text-dim);font-size:14px;margin-bottom:8px">
-      ÈÎÎñÂÖ´Î£º<span id="mission-info" style="color:var(--gold-light);font-weight:600">ÇëÏÈÑ¡ÔñÈËÊý</span>
+
+      ä»»åŠ¡è½®æ¬¡ï¼š<span id="mission-info" style="color:var(--gold-light);font-weight:600">è¯·å…ˆé€‰æ‹©äººæ•°</span>
+
     </p>
-    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">¿ªÊ¼ÓÎÏ·</button>
+
+    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">å¼€å§‹æ¸¸æˆ</button>
+
   </div>
+
   <div class="card" style="text-align:center">
-    <h2>Íæ¼ÒÐÕÃû¹ÜÀí</h2>
+
+    <h2>çŽ©å®¶å§“åç®¡ç†</h2>
+
     <div class="add-name-row" style="margin-bottom:8px">
-      <input class="add-name-input" id="stats-add-name-input" placeholder="ÊäÈëÐÂÍæ¼ÒÃû×Ö¡­" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
-      <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">ÐÂÔöÍæ¼Ò</button>
+
+      <input class="add-name-input" id="stats-add-name-input" placeholder="è¾“å…¥æ–°çŽ©å®¶åå­—â€¦" maxlength="10" style="font-size:16px;padding:8px 10px;width:160px;max-width:55vw">
+
+      <button class="btn" onclick="statsAddName()" style="padding:4px 8px;min-width:18px">æ–°å¢žçŽ©å®¶</button>
+
     </div>
-    <button class="btn" onclick="showNamePoolModal()">¹ÜÀíËùÓÐÐÕÃû</button>
+
+    <button class="btn" onclick="showNamePoolModal()">ç®¡ç†æ‰€æœ‰å§“å</button>
+
   </div>
+
   <div class="card" style="text-align:center">
-    <h2>Êý¾Ý¹ÜÀí</h2>
+
+    <h2>æ•°æ®ç®¡ç†</h2>
+
     <div class="btn-row" style="justify-content:center">
-      <button class="btn small" onclick="clearDeletedKeys()" title="ÇåÀí localStorage ÖÐ²ÐÁôµÄÉ¾³ý±ê¼Ç">ÇåÀíÉ¾³ý±ê¼Ç</button>
+
+      <button class="btn small" onclick="clearDeletedKeys()" title="æ¸…ç† localStorage ä¸­æ®‹ç•™çš„åˆ é™¤æ ‡è®°">æ¸…ç†åˆ é™¤æ ‡è®°</button>
+
     </div>
-    <p style="font-size:12px;color:var(--text-dim);margin-top:6px">ÇåÀíºóÒÑÉ¾³ýµÄ¶Ô¾Ö¼ÇÂ¼½«»Ö¸´Õý³£ÏÔÊ¾</p>
+
+    <p style="font-size:12px;color:var(--text-dim);margin-top:6px">æ¸…ç†åŽå·²åˆ é™¤çš„å¯¹å±€è®°å½•å°†æ¢å¤æ­£å¸¸æ˜¾ç¤º</p>
+
   </div>
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">°æ±¾: v159</div>
+
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">ç‰ˆæœ¬: v160</div>
+
 </section>
+
+
 
 <section class="page" id="page-game">
+
   <div style="text-align:center;margin-bottom:12px" id="game-title">
-    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">°¢ÍßÂ¡×ÀÓÎ</div>
-    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">È«³¡Î¨Ò»ÕæÑÇÉª°æ</div>
+
+    <div style="font-size:26px;font-weight:700;color:var(--gold-light);letter-spacing:3px;line-height:1.5">é˜¿ç“¦éš†æ¡Œæ¸¸</div>
+
+    <div style="font-size:15px;color:var(--gold);letter-spacing:2px">å…¨åœºå”¯ä¸€çœŸäºšç‘Ÿç‰ˆ</div>
+
   </div>
+
   <div class="round-tracker" id="round-tracker"></div>
+
   <div class="lancelot-flip-tracker" id="lancelot-flip-tracker" style="display:none"></div>
+
   <div id="launch-fail-area"></div>
+
   <div class="timer-display" id="timer-display" style="display:none">
+
     <div class="timer-value" id="timer-value">01:00</div>
-    <div class="timer-label" id="timer-label">·¢ÑÔ¼ÆÊ±</div>
+
+    <div class="timer-label" id="timer-label">å‘è¨€è®¡æ—¶</div>
+
     <div id="timer-speaker-name" style="font-size:16px;color:var(--gold-light);margin-top:4px;font-weight:700"></div>
+
     <div class="btn-row" style="justify-content:center;margin-top:6px" id="timer-btns" hidden>
-      <button class="btn small success" onclick="speakEnd()">·¢ÑÔ½áÊø</button>
-      <button class="btn small" onclick="resetTimer()">ÖØÖÃÊ±¼ä</button>
-      <button class="btn small" onclick="reopenCombinedModal()" style="color:var(--gold-light);border-color:var(--gold)">ÌîÐ´·´À¡</button>
-      <button class="btn small danger" onclick="endAllSpeak()">½áÊøËùÓÐ·¢ÑÔ</button>
+
+      <button class="btn small success" onclick="speakEnd()">å‘è¨€ç»“æŸ</button>
+
+      <button class="btn small" onclick="resetTimer()">é‡ç½®æ—¶é—´</button>
+
+      <button class="btn small" onclick="reopenCombinedModal()" style="color:var(--gold-light);border-color:var(--gold)">å¡«å†™åé¦ˆ</button>
+
+      <button class="btn small danger" onclick="endAllSpeak()">ç»“æŸæ‰€æœ‰å‘è¨€</button>
+
     </div>
+
   </div>
+
   <div class="game-layout">
+
     <div class="game-main">
+
       <div class="card" id="step-container"></div>
+
       <div class="review-section" id="review-section" style="display:none">
-        <button class="btn" onclick="showReplay()">¸´ÅÌ»Ø·Å</button>
+
+        <button class="btn" onclick="showReplay()">å¤ç›˜å›žæ”¾</button>
+
         <div id="review-panel" style="display:none;margin-top:8px"></div>
+
       </div>
+
     </div>
+
     <div class="game-side">
+
       <div id="lady-lake-holder-info" style="display:none;padding:8px 12px;background:linear-gradient(135deg,rgba(74,144,217,0.12),rgba(74,144,217,0.03));border:2px solid var(--blue);border-radius:var(--radius);margin-bottom:8px;text-align:center;font-size:14px;font-weight:700;color:var(--blue-light, #99bbff)"></div>
+
       <div class="card" style="padding:10px">
+
         <div id="lady-lake-results" style="margin-top:6px"></div>
+
       </div>
+
       <div id="lady-lake-entry" style="display:none">
+
         <div class="card lady-check-entry">
-          <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">ºþÖÐÅ®ÉñÑéÈË</button>
+
+          <button class="btn" onclick="showLadyCheck()" style="border-color:var(--gold);color:var(--gold)">æ¹–ä¸­å¥³ç¥žéªŒäºº</button>
+
         </div>
+
       </div>
+
     </div>
+
   </div>
+
   
+
 </section>
+
+
 
 <section class="page" id="page-end">
+
   <div class="card" id="end-assassin-card" style="display:none">
-    <h2>´Ì¿Í´ÌÉ±»·½Ú</h2>
+
+    <h2>åˆºå®¢åˆºæ€çŽ¯èŠ‚</h2>
+
     <div id="end-assassin-pick-area"></div>
+
     <div id="end-assassin-resolve-area" style="display:none">
-      <p style="font-size:14px;margin-bottom:8px">´ÌÉ±Ä¿±ê£º<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
-      <p style="font-size:14px;margin-bottom:10px">´ÌÉ±Ä¿±êÊÇ²»ÊÇÃ·ÁÖ£¿</p>
+
+      <p style="font-size:14px;margin-bottom:8px">åˆºæ€ç›®æ ‡ï¼š<strong id="end-target-name" style="color:var(--red-bright)"></strong></p>
+
+      <p style="font-size:14px;margin-bottom:10px">åˆºæ€ç›®æ ‡æ˜¯ä¸æ˜¯æ¢…æž—ï¼Ÿ</p>
+
       <div class="winner-toggle">
-        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; ÊÇÃ·ÁÖ ¡ú ·´·½Ê¤</button>
-        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; ²»ÊÇÃ·ÁÖ ¡ú ºÃÈË·½Ê¤</button>
+
+        <button class="winner-btn good" onclick="resolveAssassin(true)">&#9989; æ˜¯æ¢…æž— â†’ åæ–¹èƒœ</button>
+
+        <button class="winner-btn evil" onclick="resolveAssassin(false)">&#10060; ä¸æ˜¯æ¢…æž— â†’ å¥½äººæ–¹èƒœ</button>
+
       </div>
+
     </div>
+
   </div>
+
+
 
   <div class="card" id="end-review-card">
-    <h2>¶Ô¾Ö¸´ÅÌ</h2>
+
+    <h2>å¯¹å±€å¤ç›˜</h2>
+
     <div id="end-review-content"></div>
+
+  </div>
+
+
+
+  <div class="card">
+
+    <h2>æ¸¸æˆç»“æŸ</h2>
+
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">æœ¬è½®ä»»åŠ¡ç»“æžœï¼š<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
+
+    <div class="winner-toggle" id="winner-toggle"></div>
+
   </div>
 
   <div class="card">
-    <h2>ÓÎÏ·½áÊø</h2>
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">±¾ÂÖÈÎÎñ½á¹û£º<span id="end-round-summary" style="color:var(--gold-light)"></span></p>
-    <div class="winner-toggle" id="winner-toggle"></div>
-  </div>
-  <div class="card">
-    <h2>¼ÇÂ¼Éí·Ý <span style="font-size:12px;color:var(--text-dim)">£¨ÓÎÏ·ºóÌîÈë¸÷ÈËÕæÊµÉí·Ý£©</span></h2>
+
+    <h2>è®°å½•èº«ä»½ <span style="font-size:12px;color:var(--text-dim)">ï¼ˆæ¸¸æˆåŽå¡«å…¥å„äººçœŸå®žèº«ä»½ï¼‰</span></h2>
+
     <div id="end-identity-grid"></div>
+
   </div>
+
   <div style="text-align:center">
-    <button class="btn primary" onclick="saveGameRecord()" style="font-size:18px;padding:13px 40px">±£´æ¶Ô¾Ö¼ÇÂ¼</button>
+
+    <button class="btn primary" onclick="saveGameRecord()" style="font-size:18px;padding:13px 40px">ä¿å­˜å¯¹å±€è®°å½•</button>
+
   </div>
+
 </section>
+
+
 
 <section class="page" id="page-stats">
+
   <div class="card">
-    <h2>Õ½¼¨¸ÅÀÀ</h2>
+
+    <h2>æˆ˜ç»©æ¦‚è§ˆ</h2>
+
     <div class="stat-grid" id="stats-overview"></div>
+
   </div>
+
   <div class="card">
-    <h2>ÀúÊ·¶Ô¾Ö <span style="font-size:12px;color:var(--text-dim)">£¨µã»÷Õ¹¿ªÏêÇé£©</span></h2>
+
+    <h2>åŽ†å²å¯¹å±€ <span style="font-size:12px;color:var(--text-dim)">ï¼ˆç‚¹å‡»å±•å¼€è¯¦æƒ…ï¼‰</span></h2>
+
     <div class="history-filter-bar" id="history-filter-bar">
+
       <div class="filter-row">
-        <label class="filter-label">ÈÕÆÚ</label>
-        <input type="date" class="filter-input" id="filter-date-from" onchange="applyHistoryFilter()" title="ÆðÊ¼ÈÕÆÚ">
-        <span class="filter-sep">ÖÁ</span>
-        <input type="date" class="filter-input" id="filter-date-to" onchange="applyHistoryFilter()" title="½áÊøÈÕÆÚ">
+
+        <label class="filter-label">æ—¥æœŸ</label>
+
+        <input type="date" class="filter-input" id="filter-date-from" onchange="applyHistoryFilter()" title="èµ·å§‹æ—¥æœŸ">
+
+        <span class="filter-sep">è‡³</span>
+
+        <input type="date" class="filter-input" id="filter-date-to" onchange="applyHistoryFilter()" title="ç»“æŸæ—¥æœŸ">
+
       </div>
+
       <div class="filter-row">
-        <label class="filter-label">Ê¤¸º</label>
+
+        <label class="filter-label">èƒœè´Ÿ</label>
+
         <select class="filter-select" id="filter-winner" onchange="applyHistoryFilter()">
-          <option value="">È«²¿</option>
-          <option value="good">ºÃÈËÊ¤</option>
-          <option value="evil">·´·½Ê¤</option>
+
+          <option value="">å…¨éƒ¨</option>
+
+          <option value="good">å¥½äººèƒœ</option>
+
+          <option value="evil">åæ–¹èƒœ</option>
+
         </select>
-        <label class="filter-label">Íæ¼Ò</label>
+
+        <label class="filter-label">çŽ©å®¶</label>
+
         <select class="filter-select" id="filter-player" onchange="applyHistoryFilter()">
-          <option value="">È«²¿</option>
+
+          <option value="">å…¨éƒ¨</option>
+
         </select>
-        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="Çå³ýÉ¸Ñ¡">Çå³ý</button>
+
+        <button class="filter-clear-btn" onclick="clearHistoryFilter()" title="æ¸…é™¤ç­›é€‰">æ¸…é™¤</button>
+
       </div>
+
     </div>
+
     <div id="history-compact-list" class="history-compact-list"></div>
+
     <div id="pagination-area"></div>
+
     <div class="btn-row" style="justify-content:center;margin-top:10px">
-      <button class="btn small" onclick="exportData()">µ¼³öÊý¾Ý</button>
-      <button class="btn small" onclick="importData()">µ¼ÈëÊý¾Ý</button>
-      <button class="btn small" onclick="openSupplementModal()" style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none">²¹Â¼¶Ô¾Ö</button>
+
+      <button class="btn small" onclick="exportData()">å¯¼å‡ºæ•°æ®</button>
+
+      <button class="btn small" onclick="importData()">å¯¼å…¥æ•°æ®</button>
+      <button class="btn small" onclick="openSupplementModal()" style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none">è¡¥å½•å¯¹å±€</button>
+
     </div>
-    <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">ÔÝÎÞ¶Ô¾Ö¼ÇÂ¼</p>
+
+    <p id="no-history" style="color:var(--text-dim);text-align:center;padding:16px">æš‚æ— å¯¹å±€è®°å½•</p>
+
   </div>
+
   <div class="card">
-    <h2>½ñÈÕÊ¤ÂÊ</h2>
+
+    <h2>ä»Šæ—¥èƒœçŽ‡</h2>
+
     <div id="win-rate-leaderboard" class="win-rate-cards"></div>
+
   </div>
+
   <div class="card">
-    <h2>Íæ¼ÒÍ³¼Æ <span style="font-size:12px;color:var(--text-dim)">£¨Ñ¡Ôñ²é¿´£©</span></h2>
+
+    <h2>çŽ©å®¶ç»Ÿè®¡ <span style="font-size:12px;color:var(--text-dim)">ï¼ˆé€‰æ‹©æŸ¥çœ‹ï¼‰</span></h2>
+
     <div class="btn-row" id="player-stat-btns"></div>
+
     <div id="player-stat-detail"></div>
+
   </div>
+
   <div class="card">
-    <h2>¸öÈËÖ÷Ò³</h2>
+
+    <h2>ä¸ªäººä¸»é¡µ</h2>
+
     <div id="player-profile-row"></div>
+
   </div>
+
+
+
 
 
 </section>
 
-<!-- ===== ¹¤¾ß ===== -->
+
+
+<!-- ===== å·¥å…· ===== -->
+
 <section class="page" id="page-tools">
-  <h2 style="color:var(--gold-light);text-align:center;margin-bottom:8px">¹¤¾ßÏä</h2>
+
+  <h2 style="color:var(--gold-light);text-align:center;margin-bottom:8px">å·¥å…·ç®±</h2>
+
   <div class="card">
-    <h2>Â¼Òô²¥·Å</h2>
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">¹¦ÄÜ¿ª·¢ÖÐ£¬ºóÐø½«Ö§³ÖÉÏ´«Â¼ÒôÎÄ¼þ²¢²¥·Å¡£</p>
-    <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">¹¦ÄÜ¿ª·¢ÖÐ</div>
+
+    <h2>å½•éŸ³æ’­æ”¾</h2>
+
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">åŠŸèƒ½å¼€å‘ä¸­ï¼ŒåŽç»­å°†æ”¯æŒä¸Šä¼ å½•éŸ³æ–‡ä»¶å¹¶æ’­æ”¾ã€‚</p>
+
+    <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">åŠŸèƒ½å¼€å‘ä¸­</div>
+
   </div>
+
+
 
   <div class="card" id="tendency-card">
+
     <div class="tend-card-header">
-      <h2 style="margin:0">ÇãÏò·ÖÎö</h2>
-      <button class="btn" onclick="toggleTendPanel()" id="tend-toggle-btn">&#9654; ÇãÏò·ÖÎö</button>
+
+      <h2 style="margin:0">å€¾å‘åˆ†æž</h2>
+
+      <button class="btn" onclick="toggleTendPanel()" id="tend-toggle-btn">&#9654; å€¾å‘åˆ†æž</button>
+
     </div>
+
     <div id="tend-panel" class="tend-panel">
+
     <div class="card" id="tend-role-card">
-      <h2>ÎÒµÄÉí·Ý</h2>
+
+      <h2>æˆ‘çš„èº«ä»½</h2>
+
       <div id="tend-role-grid"></div>
+
     </div>
+
+
 
     <div class="card" id="tend-perspective-card">
-      <h2 id="tend-perspective-title">ÇãÏò·ÖÎö</h2>
+
+      <h2 id="tend-perspective-title">å€¾å‘åˆ†æž</h2>
+
       <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
+
     </div>
+
+
 
     <div class="card" id="v7-engine-card">
+
       <div class="v7-card-header">
-        <h2 style="margin:0">&#9883; v7 Ëã·¨Ãæ°å</h2>
+
+        <h2 style="margin:0">&#9883; v7 ç®—æ³•é¢æ¿</h2>
+
         <span class="v7-version-badge">v110</span>
+
       </div>
+
       <div id="v7-engine-status" class="v7-status-bar"></div>
+
       <div id="v7-engine-steps" class="v7-step-grid"></div>
+
       <div class="v7-formula">
+
         <span style="color:var(--accent)">&#9888;</span>
-        <strong>ÆÀ·Ö¹«Ê½</strong>£º·ÖÊý = ºÃÈËÖ¤¾Ý / (ºÃÈËÖ¤¾Ý + »µÈËÖ¤¾Ý) &#215; 100
-        &nbsp;|&nbsp; ÏÈÑé 10:10£¬ËæÂÖ´ÎÍÆ½øÖð²½ÊÕÁ²
+
+        <strong>è¯„åˆ†å…¬å¼</strong>ï¼šåˆ†æ•° = å¥½äººè¯æ® / (å¥½äººè¯æ® + åäººè¯æ®) &#215; 100
+
+        &nbsp;|&nbsp; å…ˆéªŒ 10:10ï¼Œéšè½®æ¬¡æŽ¨è¿›é€æ­¥æ”¶æ•›
+
       </div>
+
     </div>
+
+
 
     <div class="card" id="known-identity-card">
-      <h2>ÒÑÖªÉí·Ý±ê×¢</h2>
-      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">±ê¼Ç100%È·ÈÏµÄÍæ¼ÒÉí·Ý£¨¿ÉËæÊ±Ôö¸Ä£©£¬ÓÃÓÚËõÐ¡·ÖÎö·¶Î§</p>
+
+      <h2>å·²çŸ¥èº«ä»½æ ‡æ³¨</h2>
+
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">æ ‡è®°100%ç¡®è®¤çš„çŽ©å®¶èº«ä»½ï¼ˆå¯éšæ—¶å¢žæ”¹ï¼‰ï¼Œç”¨äºŽç¼©å°åˆ†æžèŒƒå›´</p>
+
       <div id="known-identity-grid"></div>
+
     </div>
+
+
 
     <div class="card" id="tend-result-card">
-      <h2 id="tend-result-title">·ÖÎö½á¹û</h2>
+
+      <h2 id="tend-result-title">åˆ†æžç»“æžœ</h2>
+
       <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px" id="tend-result-desc"></p>
+
       <div id="tend-result-list"></div>
+
     </div>
 
+
+
     <div class="card" id="tend-evidence-card">
-      <h2>¹Ø¼üÖ¤¾Ý</h2>
+
+      <h2>å…³é”®è¯æ®</h2>
+
       <div id="tend-evidence-list"></div>
+
     </div>
+
   </div>
+
   </div>
+
+
 
 </section>
 
-<!-- ¸´ÅÌµ¯´°£¨È«¾Ö£© -->
+
+
+<!-- å¤ç›˜å¼¹çª—ï¼ˆå…¨å±€ï¼‰ -->
+
 <div class="modal-overlay" id="replay-modal-overlay" style="display:none" onclick="closeReplayModal(event)">
+
   <div class="modal replay-modal" onclick="event.stopPropagation()">
+
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h2>¶Ô¾Ö¸´ÅÌ»Ø·Å</h2>
-      <button class="btn small" onclick="closeReplayModal()">¹Ø±Õ</button>
+
+      <h2>å¯¹å±€å¤ç›˜å›žæ”¾</h2>
+
+      <button class="btn small" onclick="closeReplayModal()">å…³é—­</button>
+
     </div>
+
     <div id="replay-timeline"></div>
+
     <div class="replay-chart-container" id="replay-chart-container" style="display:none">
+
       <canvas id="replay-chart-canvas"></canvas>
+
     </div>
+
   </div>
+
 </div>
+
+
 
 </main>
 
-<div class="toast" id="toast"></div>
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">°æ±¾: v159</div>
 
-<!-- Ò¹¼äÄ£Ê½ÇÐ»»°´Å¥ -->
-<button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="ÇÐ»»Ò¹¼äÄ£Ê½">&#9790;</button>
+
+<div class="toast" id="toast"></div>
+
+
+
+<!-- å…¨å±€é¡µé¢åº•éƒ¨ç‰ˆæœ¬å· -->
+
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">ç‰ˆæœ¬: v160</div>
+
+
+
+<!-- å¤œé—´æ¨¡å¼åˆ‡æ¢æŒ‰é’® -->
+
+<button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="åˆ‡æ¢å¤œé—´æ¨¡å¼">&#9790;</button>
+
+
 
 <div class="modal-overlay" id="name-pool-modal-overlay" onclick="closeNamePoolModal(event)">
+
   <div class="modal name-pool-modal" onclick="event.stopPropagation()">
-    <h2>Íæ¼ÒÐÕÃû¹ÜÀí</h2>
+
+    <h2>çŽ©å®¶å§“åç®¡ç†</h2>
+
     <div id="name-pool-list" style="margin-top:10px"></div>
+
     <div class="modal-actions">
-      <button class="btn small" onclick="closeNamePoolModal()">¹Ø±Õ</button>
+
+      <button class="btn small" onclick="closeNamePoolModal()">å…³é—­</button>
+
     </div>
+
   </div>
+
 </div>
 
-<!-- ²¹Â¼¶Ô¾Öµ¯´° -->
-<div class="modal-overlay" id="supplement-modal-overlay" style="display:none" onclick="closeSupplementModal(event)">
-  <div class="modal" style="max-width:580px;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
-    <h2>²¹Â¼¶Ô¾Ö</h2>
-    <div style="margin-top:12px">
-      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">¶Ô¾ÖÊ±¼ä</label>
-      <input type="datetime-local" id="supplement-time" class="filter-input" style="width:100%;box-sizing:border-box">
-    </div>
-    <div style="margin-top:10px">
-      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">Íæ¼ÒÈËÊý</label>
-      <select id="supplement-pc" class="filter-select" style="width:100%;box-sizing:border-box" onchange="onSuppPcChange()">
-        <option value="5">5ÈË</option>
-        <option value="6">6ÈË</option>
-        <option value="7" selected>7ÈË</option>
-        <option value="8">8ÈË</option>
-        <option value="9">9ÈË</option>
-        <option value="10">10ÈË</option>
-      </select>
-    </div>
-    <div style="margin-top:10px">
-      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">½ÇÉ«·ÖÅä£¨Ñ¡ÔñºóÌîÈëÍæ¼ÒÐÕÃû£©</label>
-      <div id="supplement-roles" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
-    </div>
-    <div style="margin-top:10px">
-      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">Éí·ÝÅäÖÃ£¨¿ÉÑ¡£¬²»Ñ¡Ä¬ÈÏÓëÈËÊýÆ¥Åä£©</label>
-      <div id="supplement-active-roles" style="display:flex;flex-wrap:wrap;gap:4px"></div>
-    </div>
-    <div style="margin-top:10px">
-      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">Ê¤¸º½á¹û</label>
-      <select id="supplement-winner" class="filter-select" style="width:100%;box-sizing:border-box">
-        <option value="good">ºÃÈË·½Ê¤</option>
-        <option value="evil">·´·½Ê¤</option>
-      </select>
-    </div>
-    <div style="margin-top:10px">
-      <label style="display:block;font-size:13px;color:var(--text-dim);margin-bottom:4px">±¸×¢£¨¿ÉÑ¡£©</label>
-      <input type="text" id="supplement-note" class="filter-input" style="width:100%;box-sizing:border-box" placeholder="ÀýÈç£ºÏßÏÂ¾Ö¡¢ÍøÉ±²¹Â¼">
-    </div>
-    <div class="modal-actions" style="margin-top:16px">
-      <button class="btn small" onclick="closeSupplementModal()">È¡Ïû</button>
-      <button class="btn small" onclick="submitSupplement()" style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none">È·ÈÏ²¹Â¼</button>
-    </div>
-  </div>
-</div>
+
 
 <script>
-// Ç¿ÖÆ×¢ÏúËùÓÐ¾É Service Worker£¬´òÆÆÎÞÏÞË¢ÐÂÑ­»·
+
+// å¼ºåˆ¶æ³¨é”€æ‰€æœ‰æ—§ Service Workerï¼Œæ‰“ç ´æ— é™åˆ·æ–°å¾ªçŽ¯
+
 if('serviceWorker' in navigator){
+
   navigator.serviceWorker.getRegistrations().then(function(regs){
+
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
+
   }).then(function(){
-    var SW_VERSION = 'v159';
+
+    var SW_VERSION = 'v160';
+
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
+
   }).then(function(reg){
-    console.log('[SW] ' + ('v159') + ' registered:', reg.scope);
+
+    console.log('[SW] ' + ('v160') + ' registered:', reg.scope);
+
     reg.addEventListener('updatefound', function(){
+
       var newWorker = reg.installing;
+
       if (!newWorker) return;
+
       console.log('[SW] update found');
+
       newWorker.addEventListener('statechange', function(){
+
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+
           console.log('[SW] new version installed');
+
           var banner = document.createElement('div');
+
           banner.id = 'sw-update-banner';
+
           banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#4CAF50;color:#fff;text-align:center;padding:10px;font-size:14px;cursor:pointer;';
-          banner.textContent = 'ÐÂ°æ±¾¿ÉÓÃ£¬µã»÷Ë¢ÐÂ';
+
+          banner.textContent = 'æ–°ç‰ˆæœ¬å¯ç”¨ï¼Œç‚¹å‡»åˆ·æ–°';
+
           banner.onclick = function(){
+
             newWorker.postMessage('skipWaiting');
+
             window.location.reload();
+
           };
+
           document.body.appendChild(banner);
+
         }
+
       });
+
     });
+
   }).catch(function(e){
+
     console.warn('[SW] operation failed:', e);
+
   });
+
 }
+
 </script>
+
 </body>
+
 </html>
+
+
+
+
+
 
 
 

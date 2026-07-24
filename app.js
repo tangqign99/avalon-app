@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v159';
+var SW_VERSION = 'v160';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -303,6 +303,16 @@ function playerLabel(idx) {
   return (idx + 1) + '号 ' + state.playerNames[idx];
 }
 
+// 从 "N号 Name" 或数字格式解析出索引（0-based），兜底返回 0
+function parseLeaderIndex(leader) {
+  if (typeof leader === 'number') return leader;
+  if (typeof leader === 'string' && leader) {
+    var m = leader.match(/^(\d+)/);
+    if (m) { var idx = parseInt(m[1]) - 1; if (idx >= 0) return idx; }
+  }
+  return 0;
+}
+
 /* ==================== STORAGE ==================== */
 function loadNamePool() {
   try { var d = localStorage.getItem('avalon_name_pool'); if (d) namePool = JSON.parse(d); } catch(e) {}
@@ -443,6 +453,27 @@ function loadHistory() {
         if (tzMigrated && merged.length > 0) console.log('[Time] cloud+local after migrate:', merged[0].st);
         // 写回 localStorage 作为缓存
         saveHistory(merged);
+        // 时区迁移后，将 _tzMigrated 标记异步写回 Supabase 防止下次加载仍触发迁移
+        if (tzMigrated) {
+          (function() {
+            var sb2 = getSupabase();
+            if (!sb2) return;
+            for (var tii = 0; tii < merged.length; tii++) {
+              var mr = merged[tii];
+              if (!mr._sid || !mr._tm) continue;
+              try {
+                var token2 = SUPABASE_KEY;
+                var xhr2 = new XMLHttpRequest();
+                xhr2.open('PATCH', SUPABASE_URL + '/rest/v1/game_records?id=eq.' + mr._sid, false);
+                xhr2.setRequestHeader('apikey', token2);
+                xhr2.setRequestHeader('Authorization', 'Bearer ' + token2);
+                xhr2.setRequestHeader('Content-Type', 'application/json');
+                xhr2.setRequestHeader('Prefer', 'return=minimal');
+                xhr2.send(JSON.stringify({ game_data_v2: mr }));
+              } catch(e2) { console.warn('[loadHistory] failed to write _tzMigrated to Supabase:', e2); }
+            }
+          })();
+        }
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
         if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u4ee5\u5e94\u7528\u4fee\u6539', 'info');
         return merged.slice();
@@ -673,6 +704,7 @@ function toRecordV2(record) {
   if (record.forceEndReason) v2.fer = record.forceEndReason;
   if (record.forceEndTime) v2.fet = record.forceEndTime;
   if (record._supabaseId) v2._sid = record._supabaseId;
+  if (record._tzMigrated) v2._tm = true;
   return v2;
 }
 
@@ -723,6 +755,7 @@ function fromRecordV2(v2) {
   rec.forceEndReason = v2.fer || '';
   rec.forceEndTime = v2.fet || '';
   rec._supabaseId = v2._sid || '';
+  rec._tzMigrated = v2._tm || false;
   return rec;
 }
 
@@ -1717,7 +1750,7 @@ function generateLiveScreenshot() {
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
-        var leader = (typeof att.leader === 'number') ? att.leader : 0;
+        var leader = parseLeaderIndex(att.leader);
         var teamIndices = att.team || [];
         if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
         var hSegs = [
@@ -5184,11 +5217,9 @@ function togglePlayerStat(name) {
       var rec = history[d.recIndex];
       finalFaction = resolveHuntFaction(rec, d.huntFollow);
     }
-    // 菜头调试：输出每局胜负和阵营归属
-    if (name === '菜头') {
-      var recDebug = history[d.recIndex];
-      console.log('[菜头调试] 局#' + d.recIndex + ' 日期=' + (recDebug ? recDebug.date : '?') + ' 身份=' + role + ' 翻转=' + flipped + ' 最终阵营=' + finalFaction + ' 胜方=' + d.winner + ' 是否胜利=' + (d.winner === finalFaction ? 'YES' : 'NO'));
-    }
+    // 调试日志：所有玩家的每局胜负和阵营归属
+    var recDebug = history[d.recIndex];
+    console.log('[胜负调试] 玩家=' + name + ' 局#' + d.recIndex + ' 日期=' + (recDebug ? recDebug.date : '?') + ' 身份=' + role + ' 翻转=' + flipped + ' 最终阵营=' + finalFaction + ' 胜方=' + d.winner + ' 计为' + (d.winner === finalFaction ? '胜' : '负'));
 
     if (finalFaction === 'good') {
       gamesGood++;
@@ -8736,7 +8767,7 @@ function generateGameScreenshot(idx) {
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
-        var leader = (typeof att.leader === 'number') ? att.leader : 0;
+        var leader = parseLeaderIndex(att.leader);
         var teamIndices = att.team || [];
         if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
         // Draw attempt header: "第N次组队 ★X号NAME提议：A、B、C"
@@ -9094,8 +9125,12 @@ function openSupplementModal() {
   var now = new Date();
   var dtLocal = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
   document.getElementById('supplement-time').value = dtLocal;
-  renderSuppRoles();
-  renderSuppActiveRoles();
+  renderSuppIdentities();
+  renderSuppMissions();
+  renderSuppLancelot();
+  renderSuppLady();
+  renderSuppExcalibur();
+  renderSuppAssassin();
 }
 
 function closeSupplementModal(e) {
@@ -9104,68 +9139,430 @@ function closeSupplementModal(e) {
 }
 
 function onSuppPcChange() {
-  renderSuppRoles();
-  renderSuppActiveRoles();
+  renderSuppIdentities();
+  renderSuppMissions();
+  renderSuppLancelot();
+  renderSuppLady();
+  renderSuppExcalibur();
+  renderSuppAssassin();
 }
 
-function renderSuppRoles() {
-  var pc = parseInt(document.getElementById('supplement-pc').value) || 7;
-  var container = document.getElementById('supplement-roles');
+function getSuppPc() { return parseInt(document.getElementById('supplement-pc').value) || 7; }
+function getSuppNames() {
+  var pc = getSuppPc();
+  var names = [];
+  for (var i = 0; i < pc; i++) {
+    var inp = document.getElementById('supp-name-' + i);
+    names.push(inp ? (inp.value.trim() || ('玩家' + (i + 1))) : ('玩家' + (i + 1)));
+  }
+  return names;
+}
+function getSuppRoles() {
+  var pc = getSuppPc();
+  var roles = [];
+  for (var i = 0; i < pc; i++) {
+    var sel = document.getElementById('supp-role-' + i);
+    roles.push(sel ? sel.value : '');
+  }
+  return roles;
+}
+
+function renderSuppIdentities() {
+  var pc = getSuppPc();
+  var container = document.getElementById('supplement-identities');
   if (!container) return;
   var h = '';
   for (var i = 0; i < pc; i++) {
     h += '<div style="display:flex;align-items:center;gap:4px">';
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">' + (i + 1) + '号</span>';
-    h += '<input type="text" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名">';
-    h += '<select id="supp-role-' + i + '" class="filter-select" style="width:110px;flex-shrink:0;box-sizing:border-box"></select>';
+    h += '<input type="text" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名" oninput="onSuppNameInput()">';
+    h += '<select id="supp-role-' + i + '" class="filter-select" style="width:110px;flex-shrink:0;box-sizing:border-box" onchange="onSuppRoleChange()"></select>';
     h += '</div>';
   }
   container.innerHTML = h;
   fillSuppRoleOptions(pc);
+  // Restore prev values
+  for (var j = 0; j < pc; j++) {
+    var prevSel = document.getElementById('supp-role-' + j);
+    if (prevSel && state._suppPrevRoles && state._suppPrevRoles[j]) prevSel.value = state._suppPrevRoles[j];
+  }
 }
 
 function fillSuppRoleOptions(pc) {
-  var defaultAssign = [];
-  if (pc === 5) defaultAssign = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
-  else if (pc === 6) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客'];
-  else if (pc === 7) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客','奥伯伦'];
-  else if (pc === 8) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','忠臣','莫甘娜','刺客','爪牙'];
-  else if (pc === 9) defaultAssign = ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德'];
-  else defaultAssign = ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦'];
-
+  var defaultAssign = getDefaultRoleAssign(pc);
   for (var i = 0; i < pc; i++) {
     var sel = document.getElementById('supp-role-' + i);
     if (!sel) continue;
     var prevVal = sel.value;
-    sel.innerHTML = '';
+    sel.innerHTML = '<option value="">-- 选身份 --</option>';
     for (var r = 0; r < ALL_ROLES.length; r++) {
       var role = ALL_ROLES[r];
-      sel.innerHTML += '<option value="' + escAttr(role) + '"' + (role === defaultAssign[i] ? ' selected' : '') + '>' + role + '</option>';
+      var selAttr = '';
+      if (prevVal && prevVal === role) selAttr = ' selected';
+      else if (!prevVal && role === defaultAssign[i]) selAttr = ' selected';
+      sel.innerHTML += '<option value="' + escAttr(role) + '"' + selAttr + '>' + role + '</option>';
     }
-    if (prevVal) sel.value = prevVal;
   }
 }
 
-function renderSuppActiveRoles() {
-  var container = document.getElementById('supplement-active-roles');
-  if (!container) return;
-  var pc = parseInt(document.getElementById('supplement-pc').value) || 7;
-  var defaultSet = {};
-  if (pc === 5) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true};
-  else if (pc === 6) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true};
-  else if (pc === 7) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'奥伯伦':true};
-  else if (pc === 8) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'爪牙':true};
-  else if (pc === 9) defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'莫德雷德':true};
-  else defaultSet = {'梅林':true,'派西维尔':true,'忠臣':true,'莫甘娜':true,'刺客':true,'莫德雷德':true,'奥伯伦':true};
+function getDefaultRoleAssign(pc) {
+  if (pc === 5) return ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
+  if (pc === 6) return ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客'];
+  if (pc === 7) return ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客','奥伯伦'];
+  if (pc === 8) return ['梅林','派西维尔','忠臣','忠臣','忠臣','莫甘娜','刺客','爪牙'];
+  if (pc === 9) return ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德'];
+  return ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦'];
+}
 
+function onSuppNameInput() {
+  // Re-render missions/lancelot/lady/excalibur/assassin with updated names
+  renderSuppMissions();
+  renderSuppLancelot();
+  renderSuppLady();
+  renderSuppExcalibur();
+  renderSuppAssassin();
+}
+
+function onSuppRoleChange() {
+  // Save current role selections
+  var pc = getSuppPc();
+  state._suppPrevRoles = [];
+  for (var i = 0; i < pc; i++) {
+    var sel = document.getElementById('supp-role-' + i);
+    state._suppPrevRoles[i] = sel ? sel.value : '';
+  }
+}
+
+function getSuppMissionCount() {
+  var pc = getSuppPc();
+  return (pc === 7) ? 4 : 5;
+}
+
+function getSuppMissionSizes() {
+  var pc = getSuppPc();
+  if (pc === 5) return [2,3,2,3,3];
+  if (pc === 6) return [2,3,4,3,4];
+  if (pc === 7) return [2,3,3,4];
+  if (pc === 8) return [3,4,4,5,5];
+  return [3,4,4,5,5]; // 9-10人
+}
+
+function getSuppShieldRound() {
+  var pc = getSuppPc();
+  return (pc >= 7) ? 4 : -1; // 7+人第4轮需要2票失败
+}
+
+function onSuppWinnerChange() {
+  renderSuppAssassin();
+}
+
+function renderSuppMissions() {
+  var container = document.getElementById('supplement-missions');
+  if (!container) return;
+  var pc = getSuppPc();
+  var names = getSuppNames();
+  var missionCount = getSuppMissionCount();
+  var sizes = getSuppMissionSizes();
+  var shieldRound = getSuppShieldRound();
   var h = '';
-  for (var r = 0; r < ALL_ROLES.length; r++) {
-    var role = ALL_ROLES[r];
-    var checked = defaultSet[role] ? ' checked' : '';
-    h += '<label style="font-size:12px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;user-select:none">';
-    h += '<input type="checkbox" id="supp-ar-' + r + '" value="' + escAttr(role) + '"' + checked + '> ' + role;
+  for (var r = 0; r < missionCount; r++) {
+    var size = sizes[r];
+    var shielded = (r + 1 === shieldRound);
+    var prevData = state._suppMissionData && state._suppMissionData[r];
+    var prevRes = prevData ? prevData.result : '';
+    var prevFail = prevData ? prevData.failCount : 0;
+    var prevLeader = prevData ? prevData.leader : '';
+    var prevTeam = prevData ? prevData.team : [];
+    h += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">';
+    h += '<div style="font-size:13px;font-weight:600;margin-bottom:6px">任务' + (r + 1) + ' · ' + size + '人出战' + (shielded ? ' · 需2票失败' : '') + '</div>';
+    // Leader
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+    h += '<span style="font-size:12px;color:var(--text-dim);min-width:32px">队长</span>';
+    h += '<select id="supp-m-leader-' + r + '" class="filter-select" style="flex:1;min-width:0">';
+    h += '<option value="">-- 选队长 --</option>';
+    for (var pi = 0; pi < pc; pi++) {
+      h += '<option value="' + (pi + 1) + '号 ' + escAttr(names[pi]) + '"' + (prevLeader === (pi + 1) + '号 ' + names[pi] ? ' selected' : '') + '>' + names[pi] + '</option>';
+    }
+    h += '</select></div>';
+    // Team
+    h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">';
+    h += '<span style="font-size:12px;color:var(--text-dim);min-width:32px;line-height:28px">队伍</span>';
+    for (var pi = 0; pi < pc; pi++) {
+      var selKey = (pi + 1) + '号 ' + names[pi];
+      var checked = prevTeam.indexOf(selKey) !== -1 ? ' checked' : '';
+      h += '<label style="font-size:12px;padding:2px 6px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:3px">';
+      h += '<input type="checkbox" id="supp-m-team-' + r + '-' + pi + '" value="' + escAttr(selKey) + '"' + checked + '> ' + names[pi];
+      h += '</label>';
+    }
+    h += '</div>';
+    // Result + fail count
+    h += '<div style="display:flex;align-items:center;gap:8px">';
+    h += '<span style="font-size:12px;color:var(--text-dim)">结果</span>';
+    h += '<select id="supp-m-result-' + r + '" class="filter-select" style="width:90px" onchange="onSuppMissionResultChange()">';
+    h += '<option value=""' + (prevRes === '' ? ' selected' : '') + '>--</option>';
+    h += '<option value="success"' + (prevRes === 'success' ? ' selected' : '') + '>成功</option>';
+    h += '<option value="fail"' + (prevRes === 'fail' ? ' selected' : '') + '>失败</option>';
+    h += '</select>';
+    h += '<span style="font-size:12px;color:var(--text-dim)">失败票</span>';
+    h += '<select id="supp-m-failcount-' + r + '" class="filter-select" style="width:50px">';
+    for (var fc = 0; fc <= size; fc++) {
+      h += '<option value="' + fc + '"' + (fc === prevFail ? ' selected' : '') + '>' + fc + '</option>';
+    }
+    h += '</select>';
+    h += '</div>';
+    h += '</div>';
+  }
+  container.innerHTML = h;
+}
+
+function onSuppMissionResultChange() {
+  // Save current mission data so it survives re-renders
+  saveSuppMissionData();
+}
+
+function saveSuppMissionData() {
+  var pc = getSuppPc();
+  var names = getSuppNames();
+  var missionCount = getSuppMissionCount();
+  state._suppMissionData = [];
+  for (var r = 0; r < missionCount; r++) {
+    var team = [];
+    for (var pi = 0; pi < pc; pi++) {
+      var cb = document.getElementById('supp-m-team-' + r + '-' + pi);
+      if (cb && cb.checked) team.push(cb.value);
+    }
+    var resultEl = document.getElementById('supp-m-result-' + r);
+    var failEl = document.getElementById('supp-m-failcount-' + r);
+    var leaderEl = document.getElementById('supp-m-leader-' + r);
+    state._suppMissionData.push({
+      result: resultEl ? resultEl.value : '',
+      failCount: failEl ? parseInt(failEl.value) || 0 : 0,
+      leader: leaderEl ? leaderEl.value : '',
+      team: team
+    });
+  }
+}
+
+function onSuppLancelotToggle() {
+  var cb = document.getElementById('supp-has-lancelot');
+  var div = document.getElementById('supplement-lancelot');
+  if (div) div.style.display = cb && cb.checked ? 'block' : 'none';
+  if (cb && cb.checked) renderSuppLancelot();
+}
+
+function renderSuppLancelot() {
+  var container = document.getElementById('supplement-lancelot');
+  if (!container || container.style.display === 'none') return;
+  var pc = getSuppPc();
+  var names = getSuppNames();
+  var prevFlipped = state._suppLancelotFlipped;
+  var prevTarget = state._suppLancelotTarget;
+  var h = '';
+  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">第4轮开始后是否翻转？</div>';
+  h += '<select id="supp-lancelot-flipped" class="filter-select" style="width:120px;margin-bottom:6px" onchange="onSuppLancelotFlippedChange()">';
+  h += '<option value="no"' + (!prevFlipped ? ' selected' : '') + '>否</option>';
+  h += '<option value="yes"' + (prevFlipped ? ' selected' : '') + '>是</option>';
+  h += '</select>';
+  h += '<div id="supp-lancelot-target-area" style="' + (prevFlipped ? '' : 'display:none') + '">';
+  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">翻转了谁？（可多选）</div>';
+  for (var pi = 0; pi < pc; pi++) {
+    var checked = prevTarget && prevTarget.indexOf(pi) !== -1 ? ' checked' : '';
+    h += '<label style="font-size:12px;padding:2px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;margin-right:4px">';
+    h += '<input type="checkbox" id="supp-lancelot-' + pi + '" value="' + pi + '"' + checked + '> ' + names[pi];
     h += '</label>';
   }
+  h += '</div>';
+  container.innerHTML = h;
+}
+
+function onSuppLancelotFlippedChange() {
+  var sel = document.getElementById('supp-lancelot-flipped');
+  var area = document.getElementById('supp-lancelot-target-area');
+  if (area) area.style.display = (sel && sel.value === 'yes') ? 'block' : 'none';
+}
+
+function onSuppLadyToggle() {
+  var cb = document.getElementById('supp-has-lady');
+  var div = document.getElementById('supplement-lady');
+  if (div) div.style.display = cb && cb.checked ? 'block' : 'none';
+  if (cb && cb.checked) renderSuppLady();
+}
+
+function renderSuppLady() {
+  var container = document.getElementById('supplement-lady');
+  if (!container || container.style.display === 'none') return;
+  var pc = getSuppPc();
+  var names = getSuppNames();
+  var missionCount = getSuppMissionCount();
+  var prevEntries = state._suppLadyEntries || [];
+  var h = '<div style="margin-bottom:6px">';
+  h += '<button class="btn small" onclick="addSuppLadyEntry()" style="font-size:11px">+ 添加湖中仙女</button>';
+  h += '</div>';
+  for (var ei = 0; ei < prevEntries.length; ei++) {
+    var ent = prevEntries[ei];
+    h += renderSuppLadyEntry(ei, ent, pc, names, missionCount);
+  }
+  container.innerHTML = h;
+}
+
+function renderSuppLadyEntry(ei, ent, pc, names, missionCount) {
+  var h = '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:4px">';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim)">第</span>';
+  h += '<select id="supp-lady-round-' + ei + '" class="filter-select" style="width:60px">';
+  for (var r = 0; r < missionCount; r++) {
+    h += '<option value="' + r + '"' + (ent.round === r ? ' selected' : '') + '>' + (r + 1) + '轮</option>';
+  }
+  h += '</select>';
+  h += '<span style="font-size:12px;color:var(--text-dim)">后</span>';
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">持有</span>';
+  h += '<select id="supp-lady-holder-' + ei + '" class="filter-select" style="flex:1">';
+  for (var pi = 0; pi < pc; pi++) {
+    h += '<option value="' + pi + '"' + (ent.holder === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+  }
+  h += '</select></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">查验</span>';
+  h += '<select id="supp-lady-target-' + ei + '" class="filter-select" style="flex:1">';
+  for (var pi = 0; pi < pc; pi++) {
+    h += '<option value="' + pi + '"' + (ent.target === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+  }
+  h += '</select></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px">';
+  h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">结果</span>';
+  h += '<select id="supp-lady-result-' + ei + '" class="filter-select" style="flex:1">';
+  h += '<option value="正义"' + (ent.result === '正义' ? ' selected' : '') + '>正义</option>';
+  h += '<option value="邪恶"' + (ent.result === '邪恶' ? ' selected' : '') + '>邪恶</option>';
+  h += '</select>';
+  h += '<button class="btn small" onclick="removeSuppLadyEntry(' + ei + ')" style="font-size:11px;color:#ff6666">删除</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function addSuppLadyEntry() {
+  if (!state._suppLadyEntries) state._suppLadyEntries = [];
+  state._suppLadyEntries.push({ round: 0, holder: 0, target: 1, result: '正义' });
+  renderSuppLady();
+}
+
+function removeSuppLadyEntry(idx) {
+  if (!state._suppLadyEntries) return;
+  state._suppLadyEntries.splice(idx, 1);
+  renderSuppLady();
+}
+
+function onSuppExcaliburToggle() {
+  var cb = document.getElementById('supp-has-excalibur');
+  var div = document.getElementById('supplement-excalibur');
+  if (div) div.style.display = cb && cb.checked ? 'block' : 'none';
+  if (cb && cb.checked) renderSuppExcalibur();
+}
+
+function renderSuppExcalibur() {
+  var container = document.getElementById('supplement-excalibur');
+  if (!container || container.style.display === 'none') return;
+  var pc = getSuppPc();
+  var names = getSuppNames();
+  var missionCount = getSuppMissionCount();
+  var prevEntries = state._suppExcaliburEntries || [];
+  var h = '<div style="margin-bottom:6px">';
+  h += '<button class="btn small" onclick="addSuppExcaliburEntry()" style="font-size:11px">+ 添加王者之剑</button>';
+  h += '</div>';
+  for (var ei = 0; ei < prevEntries.length; ei++) {
+    var ent = prevEntries[ei];
+    h += renderSuppExcaliburEntry(ei, ent, pc, names, missionCount);
+  }
+  container.innerHTML = h;
+}
+
+function renderSuppExcaliburEntry(ei, ent, pc, names, missionCount) {
+  var h = '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:4px">';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim)">第</span>';
+  h += '<select id="supp-ex-round-' + ei + '" class="filter-select" style="width:60px">';
+  for (var r = 0; r < missionCount; r++) {
+    h += '<option value="' + r + '"' + (ent.round === r ? ' selected' : '') + '>' + (r + 1) + '轮</option>';
+  }
+  h += '</select></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">使用者</span>';
+  h += '<select id="supp-ex-user-' + ei + '" class="filter-select" style="flex:1">';
+  for (var pi = 0; pi < pc; pi++) {
+    h += '<option value="' + pi + '"' + (ent.user === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+  }
+  h += '</select></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">对象</span>';
+  h += '<select id="supp-ex-target-' + ei + '" class="filter-select" style="flex:1">';
+  for (var pi = 0; pi < pc; pi++) {
+    h += '<option value="' + pi + '"' + (ent.target === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+  }
+  h += '</select></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px">';
+  h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">结果</span>';
+  h += '<select id="supp-ex-result-' + ei + '" class="filter-select" style="flex:1">';
+  h += '<option value="success"' + (ent.result !== 'fail' ? ' selected' : '') + '>成功（抵消失败票）</option>';
+  h += '<option value="fail"' + (ent.result === 'fail' ? ' selected' : '') + '>失败</option>';
+  h += '</select>';
+  h += '<button class="btn small" onclick="removeSuppExcaliburEntry(' + ei + ')" style="font-size:11px;color:#ff6666">删除</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function addSuppExcaliburEntry() {
+  if (!state._suppExcaliburEntries) state._suppExcaliburEntries = [];
+  state._suppExcaliburEntries.push({ round: 0, user: 0, target: 1, result: 'success' });
+  renderSuppExcalibur();
+}
+
+function removeSuppExcaliburEntry(idx) {
+  if (!state._suppExcaliburEntries) return;
+  state._suppExcaliburEntries.splice(idx, 1);
+  renderSuppExcalibur();
+}
+
+function onSuppAssassinToggle() {
+  renderSuppAssassin();
+}
+
+function renderSuppAssassin() {
+  var container = document.getElementById('supplement-assassin');
+  if (!container) return;
+  var cb = document.getElementById('supp-has-assassin');
+  if (!cb || !cb.checked) { container.innerHTML = ''; return; }
+  var pc = getSuppPc();
+  var names = getSuppNames();
+  var roles = getSuppRoles();
+  var winner = document.getElementById('supplement-winner').value;
+  // 反方胜+有刺杀 → 刺杀成功；好人胜+有刺杀 → 可选命中
+  var prevData = state._suppAssassinData || {};
+  var h = '';
+  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+  h += '<span style="font-size:12px;color:var(--text-dim)">刺客</span>';
+  h += '<select id="supp-assassin-who" class="filter-select" style="width:100px">';
+  for (var pi = 0; pi < pc; pi++) {
+    h += '<option value="' + pi + '"' + (prevData.who === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+  }
+  h += '</select>';
+  h += '<span style="font-size:12px;color:var(--text-dim)">刺杀目标</span>';
+  h += '<select id="supp-assassin-target" class="filter-select" style="width:100px">';
+  for (var pi = 0; pi < pc; pi++) {
+    h += '<option value="' + (pi + 1) + '号 ' + escAttr(names[pi]) + '"' + (prevData.targetIdx === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+  }
+  h += '</select>';
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">';
+  h += '<span style="font-size:12px;color:var(--text-dim)">是否命中梅林</span>';
+  h += '<select id="supp-assassin-success" class="filter-select" style="width:80px">';
+  var defaultSuccess = (winner === 'evil');
+  h += '<option value="yes"' + (prevData.success === true ? ' selected' : (!prevData.hasOwnProperty('success') && defaultSuccess ? ' selected' : '')) + '>是</option>';
+  h += '<option value="no"' + (prevData.success === false ? ' selected' : (!prevData.hasOwnProperty('success') && !defaultSuccess ? ' selected' : '')) + '>否</option>';
+  h += '</select>';
+  h += '</div>';
   container.innerHTML = h;
 }
 
@@ -9173,31 +9570,28 @@ function submitSupplement() {
   var dt = document.getElementById('supplement-time').value;
   if (!dt) { toast('请选择对局时间', 'warn'); return; }
 
-  var pc = parseInt(document.getElementById('supplement-pc').value) || 7;
+  var pc = getSuppPc();
   var winner = document.getElementById('supplement-winner').value;
   var note = document.getElementById('supplement-note').value.trim();
+  var names = getSuppNames();
+  var roles = getSuppRoles();
 
-  var identities = [];
-  var playerNames = [];
+  // Verify all identities have roles
   for (var i = 0; i < pc; i++) {
-    var nameInput = document.getElementById('supp-name-' + i);
-    var roleSel = document.getElementById('supp-role-' + i);
-    var name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : ('玩家' + (i + 1));
-    var role = roleSel ? roleSel.value : '';
-    playerNames.push(name);
-    identities.push({ index: i, name: name, role: role });
+    if (!roles[i]) { toast(names[i] + '未选择身份', 'warn'); return; }
   }
 
-  var activeRoles = [];
-  for (var r = 0; r < ALL_ROLES.length; r++) {
-    var cb = document.getElementById('supp-ar-' + r);
-    if (cb && cb.checked) activeRoles.push(ALL_ROLES[r]);
+  // Build identities
+  var identities = [];
+  for (var i = 0; i < pc; i++) {
+    identities.push({ index: i, name: names[i], role: roles[i] });
   }
-  if (activeRoles.length === 0) {
-    for (var i2 = 0; i2 < identities.length; i2++) {
-      if (identities[i2].role && activeRoles.indexOf(identities[i2].role) === -1) {
-        activeRoles.push(identities[i2].role);
-      }
+
+  // Build activeRoles from identities
+  var activeRoles = [];
+  for (var i = 0; i < identities.length; i++) {
+    if (activeRoles.indexOf(identities[i].role) === -1) {
+      activeRoles.push(identities[i].role);
     }
   }
 
@@ -9207,26 +9601,136 @@ function submitSupplement() {
   var startTime = dateStr + ' ' + timeStr;
   var endTime = startTime;
 
+  // Build missions
+  saveSuppMissionData();
+  var missionData = state._suppMissionData || [];
+  var missionCount = getSuppMissionCount();
+  var sizes = getSuppMissionSizes();
+  var votedMissions = 0;
+  var failMissions = 0;
+  var missions = [];
+  for (var r = 0; r < missionCount; r++) {
+    var md = (r < missionData.length) ? missionData[r] : { result: '', failCount: 0, leader: '', team: [] };
+    if (!md.result) continue;
+    missions.push({
+      round: r + 1,
+      size: sizes[r],
+      leader: md.leader || '',
+      team: md.team || [],
+      result: md.result,
+      failCount: md.failCount || 0,
+      shieldedFails: 0,
+      launchFailures: 0,
+      launchAttempts: [{
+        team: md.team || [],
+        votes: buildAllApproveVotes(names),
+        leader: md.leader || ''
+      }],
+      votes: buildAllApproveVotes(names)
+    });
+    votedMissions++;
+    if (md.result === 'fail') failMissions++;
+  }
+
+  // Lancelot flips
+  var lancelotFlips = {};
+  var hasLancelot = document.getElementById('supp-has-lancelot');
+  if (hasLancelot && hasLancelot.checked) {
+    for (var pi = 0; pi < pc; pi++) {
+      var cb = document.getElementById('supp-lancelot-' + pi);
+      if (cb && cb.checked) lancelotFlips[pi] = true;
+    }
+  }
+
+  // Lady of lake
+  var ladyCheckHistory = [];
+  var hasLady = document.getElementById('supp-has-lady');
+  if (hasLady && hasLady.checked && state._suppLadyEntries) {
+    for (var ei = 0; ei < state._suppLadyEntries.length; ei++) {
+      var ent = state._suppLadyEntries[ei];
+      ladyCheckHistory.push({
+        round: ent.round,
+        holder: ent.holder,
+        holderName: names[ent.holder],
+        target: ent.target,
+        targetName: names[ent.target],
+        result: ent.result,
+        note: '',
+        recordedAtRound: ent.round,
+        recordedAtSpeaker: 0
+      });
+    }
+  }
+
+  // Excalibur
+  var excaliburHistory = [];
+  var hasExcalibur = document.getElementById('supp-has-excalibur');
+  if (hasExcalibur && hasExcalibur.checked && state._suppExcaliburEntries) {
+    for (var ei = 0; ei < state._suppExcaliburEntries.length; ei++) {
+      var ent = state._suppExcaliburEntries[ei];
+      excaliburHistory.push({
+        round: ent.round,
+        user: ent.user,
+        userName: names[ent.user],
+        target: ent.target,
+        targetName: names[ent.target],
+        result: ent.result,
+        recordedAtRound: ent.round
+      });
+      // Apply excalibur effect to mission
+      if (ent.result === 'success' && ent.round < missions.length) {
+        var mission = missions[ent.round];
+        if (mission && mission.failCount > 0) {
+          mission.failCount = Math.max(0, mission.failCount - 1);
+          mission.shieldedFails = (mission.shieldedFails || 0) + 1;
+        }
+      }
+    }
+  }
+
+  // Assassination
+  var assassinTarget = '';
+  var assassinSuccess = false;
+  var hasAssassin = document.getElementById('supp-has-assassin');
+  if (hasAssassin && hasAssassin.checked) {
+    var targetEl = document.getElementById('supp-assassin-target');
+    var successEl = document.getElementById('supp-assassin-success');
+    assassinTarget = targetEl ? targetEl.value : '';
+    assassinSuccess = successEl ? successEl.value === 'yes' : false;
+  }
+
+  // If assassin killed Merlin, evil wins regardless of missions
+  if (assassinSuccess) winner = 'evil';
+
+  // Save names to pool
   var dirty = false;
   for (var i3 = 0; i3 < Math.min(pc, 10); i3++) {
-    if (playerNames[i3] && playerNames[i3] !== ('玩家' + (i3 + 1))) {
-      namePool[i3] = playerNames[i3];
+    if (names[i3] && names[i3] !== ('玩家' + (i3 + 1))) {
+      namePool[i3] = names[i3];
       dirty = true;
     }
   }
   if (dirty) saveNamePool();
 
   var record = {
-    playerCount: pc,
-    playerNames: playerNames,
-    identities: identities,
-    activeRoles: activeRoles,
-    winner: winner,
+    _uuid: generateUUID(),
     date: dateStr,
     startTime: startTime,
     endTime: endTime,
-    missions: [],
+    playerCount: pc,
+    winner: winner,
+    identities: identities,
+    activeRoles: activeRoles,
+    missions: missions,
+    lancelotFlips: lancelotFlips,
+    ladyCheckHistory: ladyCheckHistory,
+    excaliburEnabled: (excaliburHistory.length > 0),
+    excaliburHistory: excaliburHistory,
+    assassinTarget: assassinTarget,
+    assassinSuccess: assassinSuccess,
     roundTendencies: [],
+    currentRound: missionCount,
+    identityMarks: [],
     _isSupplement: true,
     _note: note || ''
   };
@@ -9239,7 +9743,7 @@ function submitSupplement() {
   var sb = getSupabase();
   if (sb) {
     var v2 = toRecordV2(record);
-    if (!v2._uuid) v2._uuid = generateUUID();
+    if (!v2._uuid) v2._uuid = record._uuid;
     v2._note = note || '';
     v2._isSupplement = true;
     try {
@@ -9258,6 +9762,14 @@ function submitSupplement() {
   toast('补录成功！');
   closeSupplementModal();
   renderStats();
+}
+
+function buildAllApproveVotes(names) {
+  var votes = {};
+  for (var i = 0; i < names.length; i++) {
+    votes[(i + 1) + '号 ' + names[i]] = 'approve';
+  }
+  return votes;
 }
 
 function loadRawHistoryForSupplement() {
