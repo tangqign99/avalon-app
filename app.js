@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v163';
+var SW_VERSION = 'v164';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -5209,6 +5209,7 @@ function togglePlayerStat(name) {
   var gamesEvil = 0, winsEvil = 0;
   var roleStats = {};
   var history = loadNormalizedHistory();
+  var gameDetails = [];
 
   for (var i = 0; i < data.length; i++) {
     var d = data[i];
@@ -5230,11 +5231,15 @@ function togglePlayerStat(name) {
 
     if (d.winner === finalFaction) totalWins++;
 
-    // 阿弟专项调试日志：逐局打印阵营归属与累计计数
-    if (name === '阿弟') {
-      var recDebug = history[d.recIndex];
-      console.log('[阿弟调试] 局#' + d.recIndex + ' 日期=' + (recDebug ? recDebug.date : '?') + ' 角色=' + role + ' flipped=' + flipped + ' getFinalFaction(原生)=' + getFinalFaction(role, flipped) + ' finalFaction(解析后)=' + finalFaction + ' 胜方=' + d.winner + ' 计为' + (d.winner === finalFaction ? '胜' : '负') + ' | gamesGood=' + gamesGood + ' winsGood=' + winsGood + ' gamesEvil=' + gamesEvil + ' winsEvil=' + winsEvil + ' totalWins=' + totalWins);
-    }
+    // 逐局明细数据收集
+    gameDetails.push({
+      recIndex: d.recIndex,
+      date: (history[d.recIndex] ? history[d.recIndex].date : '--'),
+      role: role,
+      flipped: flipped,
+      finalFaction: finalFaction,
+      winner: d.winner
+    });
 
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
     roleStats[role].total++;
@@ -5308,6 +5313,40 @@ function togglePlayerStat(name) {
   h += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
   h += '</div>';
 
+  // 逐局明细表格
+  h += '<div style="font-size:15px;font-weight:600;margin-top:12px;margin-bottom:6px">逐局明细</div>';
+  h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">';
+  h += '<table style="width:100%;font-size:12px;border-collapse:collapse;white-space:nowrap">';
+  h += '<thead><tr>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">日期</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">角色</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">翻转</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">最终阵营</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">胜方</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人局</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方局</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人胜</th>';
+  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方胜</th>';
+  h += '</tr></thead><tbody>';
+  for (var gi = 0; gi < gameDetails.length; gi++) {
+    var gd = gameDetails[gi];
+    var isGood = gd.finalFaction === 'good';
+    var isEvil = gd.finalFaction === 'evil';
+    h += '<tr>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd.date + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd.role + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (gd.flipped ? '\u2713' : '\u2717') + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;color:' + (isGood ? 'var(--green-bright)' : isEvil ? 'var(--red-bright)' : 'var(--text-dim)') + '">' + gd.finalFaction + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + gd.winner + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood ? '\u2713' : '\u2717') + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil ? '\u2713' : '\u2717') + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood && gd.winner === 'good' ? '\u2713' : '\u2717') + '</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil && gd.winner === 'evil' ? '\u2713' : '\u2717') + '</td>';
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  h += '</div>';
+
   var div = document.createElement('div');
   div.id = safeId;
   div.className = 'player-stat-expand';
@@ -5350,6 +5389,7 @@ function renderPlayerProfile() {
   var totalWins = 0, winsGood = 0, winsEvil = 0;
   var gamesGood = 0, gamesEvil = 0;
   var roleStats = {}; // role -> { good: {total,wins}, evil: {total,wins} }
+  var gameDetails = [];
   var streak = 0, maxStreak = 0, streakType = '';
   var recentResults = []; // for streak calc: ordered by recIndex desc
 
@@ -5386,6 +5426,16 @@ function renderPlayerProfile() {
       roleStats[rn].evil.total++;
       if (d.winner === 'evil') roleStats[rn].evil.wins++;
     }
+
+    // 逐局明细数据收集
+    gameDetails.push({
+      recIndex: d.recIndex,
+      date: (history[d.recIndex] ? history[d.recIndex].date : '--'),
+      role: d.role,
+      flipped: flipped,
+      finalFaction: finalFaction,
+      winner: d.winner
+    });
 
     // Streak calculation
     var factionTag = finalFaction === 'good' ? 'G' : 'E';
@@ -5574,6 +5624,40 @@ function renderPlayerProfile() {
     ph += '</div></div></div>';
   }
   ph += '</div></div>';
+
+  // 逐局明细表格
+  ph += '<div style="font-size:15px;font-weight:600;margin-top:12px;margin-bottom:6px">逐局明细</div>';
+  ph += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">';
+  ph += '<table style="width:100%;font-size:12px;border-collapse:collapse;white-space:nowrap">';
+  ph += '<thead><tr>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">日期</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">角色</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">翻转</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">最终阵营</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">胜方</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人局</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方局</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人胜</th>';
+  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方胜</th>';
+  ph += '</tr></thead><tbody>';
+  for (var gi2 = 0; gi2 < gameDetails.length; gi2++) {
+    var gd2 = gameDetails[gi2];
+    var isGood2 = gd2.finalFaction === 'good';
+    var isEvil2 = gd2.finalFaction === 'evil';
+    ph += '<tr>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd2.date + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd2.role + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (gd2.flipped ? '\u2713' : '\u2717') + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;color:' + (isGood2 ? 'var(--green-bright)' : isEvil2 ? 'var(--red-bright)' : 'var(--text-dim)') + '">' + gd2.finalFaction + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + gd2.winner + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood2 ? '\u2713' : '\u2717') + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil2 ? '\u2713' : '\u2717') + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood2 && gd2.winner === 'good' ? '\u2713' : '\u2717') + '</td>';
+    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil2 && gd2.winner === 'evil' ? '\u2713' : '\u2717') + '</td>';
+    ph += '</tr>';
+  }
+  ph += '</tbody></table>';
+  ph += '</div>';
 
   var contentEl = document.getElementById('profile-content');
   if (contentEl) contentEl.innerHTML = ph;
