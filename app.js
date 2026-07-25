@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v164';
+var SW_VERSION = 'v167';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -5203,13 +5203,11 @@ function togglePlayerStat(name) {
   var data = state._playerSetCache[name];
   if (!data) return;
 
-  var total = data.length;
   var totalWins = 0;
   var gamesGood = 0, winsGood = 0;
   var gamesEvil = 0, winsEvil = 0;
   var roleStats = {};
   var history = loadNormalizedHistory();
-  var gameDetails = [];
 
   for (var i = 0; i < data.length; i++) {
     var d = data[i];
@@ -5231,22 +5229,13 @@ function togglePlayerStat(name) {
 
     if (d.winner === finalFaction) totalWins++;
 
-    // 逐局明细数据收集
-    gameDetails.push({
-      recIndex: d.recIndex,
-      date: (history[d.recIndex] ? history[d.recIndex].date : '--'),
-      role: role,
-      flipped: flipped,
-      finalFaction: finalFaction,
-      winner: d.winner
-    });
-
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
     roleStats[role].total++;
     // 身份胜率使用最终阵营判定（考虑翻转），确保兰斯洛特变节后按实际阵营计算
     if (d.winner === finalFaction) roleStats[role].wins++;
   }
 
+  var total = gamesGood + gamesEvil;
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
@@ -5313,40 +5302,6 @@ function togglePlayerStat(name) {
   h += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
   h += '</div>';
 
-  // 逐局明细表格
-  h += '<div style="font-size:15px;font-weight:600;margin-top:12px;margin-bottom:6px">逐局明细</div>';
-  h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">';
-  h += '<table style="width:100%;font-size:12px;border-collapse:collapse;white-space:nowrap">';
-  h += '<thead><tr>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">日期</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">角色</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">翻转</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">最终阵营</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">胜方</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人局</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方局</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人胜</th>';
-  h += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方胜</th>';
-  h += '</tr></thead><tbody>';
-  for (var gi = 0; gi < gameDetails.length; gi++) {
-    var gd = gameDetails[gi];
-    var isGood = gd.finalFaction === 'good';
-    var isEvil = gd.finalFaction === 'evil';
-    h += '<tr>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd.date + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd.role + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (gd.flipped ? '\u2713' : '\u2717') + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;color:' + (isGood ? 'var(--green-bright)' : isEvil ? 'var(--red-bright)' : 'var(--text-dim)') + '">' + gd.finalFaction + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + gd.winner + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood ? '\u2713' : '\u2717') + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil ? '\u2713' : '\u2717') + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood && gd.winner === 'good' ? '\u2713' : '\u2717') + '</td>';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil && gd.winner === 'evil' ? '\u2713' : '\u2717') + '</td>';
-    h += '</tr>';
-  }
-  h += '</tbody></table>';
-  h += '</div>';
-
   var div = document.createElement('div');
   div.id = safeId;
   div.className = 'player-stat-expand';
@@ -5385,11 +5340,9 @@ function renderPlayerProfile() {
   var data = playerSet[name];
   if (!data) return;
 
-  var total = data.length;
   var totalWins = 0, winsGood = 0, winsEvil = 0;
   var gamesGood = 0, gamesEvil = 0;
   var roleStats = {}; // role -> { good: {total,wins}, evil: {total,wins} }
-  var gameDetails = [];
   var streak = 0, maxStreak = 0, streakType = '';
   var recentResults = []; // for streak calc: ordered by recIndex desc
 
@@ -5426,16 +5379,6 @@ function renderPlayerProfile() {
       roleStats[rn].evil.total++;
       if (d.winner === 'evil') roleStats[rn].evil.wins++;
     }
-
-    // 逐局明细数据收集
-    gameDetails.push({
-      recIndex: d.recIndex,
-      date: (history[d.recIndex] ? history[d.recIndex].date : '--'),
-      role: d.role,
-      flipped: flipped,
-      finalFaction: finalFaction,
-      winner: d.winner
-    });
 
     // Streak calculation
     var factionTag = finalFaction === 'good' ? 'G' : 'E';
@@ -5500,6 +5443,7 @@ function renderPlayerProfile() {
     }
   }
 
+  var total = gamesGood + gamesEvil;
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
@@ -5624,40 +5568,6 @@ function renderPlayerProfile() {
     ph += '</div></div></div>';
   }
   ph += '</div></div>';
-
-  // 逐局明细表格
-  ph += '<div style="font-size:15px;font-weight:600;margin-top:12px;margin-bottom:6px">逐局明细</div>';
-  ph += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">';
-  ph += '<table style="width:100%;font-size:12px;border-collapse:collapse;white-space:nowrap">';
-  ph += '<thead><tr>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">日期</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">角色</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">翻转</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">最终阵营</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">胜方</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人局</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方局</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">好人胜</th>';
-  ph += '<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center">反方胜</th>';
-  ph += '</tr></thead><tbody>';
-  for (var gi2 = 0; gi2 < gameDetails.length; gi2++) {
-    var gd2 = gameDetails[gi2];
-    var isGood2 = gd2.finalFaction === 'good';
-    var isEvil2 = gd2.finalFaction === 'evil';
-    ph += '<tr>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd2.date + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05)">' + gd2.role + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (gd2.flipped ? '\u2713' : '\u2717') + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;color:' + (isGood2 ? 'var(--green-bright)' : isEvil2 ? 'var(--red-bright)' : 'var(--text-dim)') + '">' + gd2.finalFaction + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + gd2.winner + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood2 ? '\u2713' : '\u2717') + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil2 ? '\u2713' : '\u2717') + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isGood2 && gd2.winner === 'good' ? '\u2713' : '\u2717') + '</td>';
-    ph += '<td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center">' + (isEvil2 && gd2.winner === 'evil' ? '\u2713' : '\u2717') + '</td>';
-    ph += '</tr>';
-  }
-  ph += '</tbody></table>';
-  ph += '</div>';
 
   var contentEl = document.getElementById('profile-content');
   if (contentEl) contentEl.innerHTML = ph;
@@ -9362,8 +9272,54 @@ function renderSuppMissions() {
     var prevFail = prevData ? prevData.failCount : 0;
     var prevLeader = prevData ? prevData.leader : '';
     var prevTeam = prevData ? prevData.team : [];
+    var prevLaunchFailures = prevData ? prevData.launchFailures : 0;
+    var prevLaunchAttempts = prevData ? prevData.launchAttempts : [];
     h += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">';
     h += '<div style="font-size:13px;font-weight:600;margin-bottom:6px">任务' + (r + 1) + ' · ' + size + '人出战' + (shielded ? ' · 需2票失败' : '') + '</div>';
+
+    // --- 组队失败（多次组队尝试） ---
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+    h += '<span style="font-size:12px;color:var(--text-dim);min-width:56px">组队失败</span>';
+    h += '<select id="supp-m-launchfail-' + r + '" class="filter-select" style="width:56px" onchange="onSuppLaunchFailChange(' + r + ')">';
+    for (var lf = 0; lf <= 5; lf++) {
+      h += '<option value="' + lf + '"' + (lf === prevLaunchFailures ? ' selected' : '') + '>' + lf + '次</option>';
+    }
+    h += '</select>';
+    h += '<span style="font-size:11px;color:#888">（0次=首轮即组队成功）</span>';
+    h += '</div>';
+
+    // Render failed launch attempts
+    for (var la = 0; la < prevLaunchFailures; la++) {
+      var att = (la < prevLaunchAttempts.length) ? prevLaunchAttempts[la] : { team: [], leader: '' };
+      var attLeader = att.leader || '';
+      var attTeam = att.team || [];
+      h += '<div style="margin-left:8px;padding:4px 6px;margin-bottom:3px;background:rgba(220,53,69,0.08);border-left:3px solid #dc3545;border-radius:0 4px 4px 0;font-size:11px">';
+      h += '<span style="color:#dc3545;font-weight:600">第' + (la + 1) + '次失败</span>';
+      // Leader
+      h += '<div style="display:flex;align-items:center;gap:4px;margin-top:3px">';
+      h += '<span style="font-size:11px;color:var(--text-dim);min-width:24px">队长</span>';
+      h += '<select id="supp-m-' + r + '-failldr-' + la + '" class="filter-select" style="flex:1;min-width:0;font-size:11px;padding:2px 4px">';
+      h += '<option value="">-- 选队长 --</option>';
+      for (var pi = 0; pi < pc; pi++) {
+        var fKeyL = (pi + 1) + '号 ' + names[pi];
+        h += '<option value="' + escAttr(fKeyL) + '"' + (attLeader === fKeyL ? ' selected' : '') + '>' + names[pi] + '</option>';
+      }
+      h += '</select></div>';
+      // Team
+      h += '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;align-items:center">';
+      h += '<span style="font-size:11px;color:var(--text-dim);min-width:24px">队伍</span>';
+      for (var pi = 0; pi < pc; pi++) {
+        var fKeyT = (pi + 1) + '号 ' + names[pi];
+        var fChecked = attTeam.indexOf(fKeyT) !== -1 ? ' checked' : '';
+        h += '<label style="font-size:11px;padding:1px 4px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:3px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:2px">';
+        h += '<input type="checkbox" id="supp-m-' + r + '-failteam-' + la + '-' + pi + '" value="' + escAttr(fKeyT) + '"' + fChecked + '> ' + names[pi];
+        h += '</label>';
+      }
+      h += '</div></div>';
+    }
+
+    // --- 成功组队 ---
+    h += '<div style="font-size:11px;color:#28a745;font-weight:600;margin-bottom:4px;margin-top:2px">最终组队成功</div>';
     // Leader
     h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:32px">队长</span>';
@@ -9409,6 +9365,13 @@ function onSuppMissionResultChange() {
   saveSuppMissionData();
 }
 
+function onSuppLaunchFailChange(round) {
+  // Save current state before re-render
+  saveSuppMissionData();
+  // Re-render missions to show/hide failed attempt rows
+  renderSuppMissions();
+}
+
 function saveSuppMissionData() {
   var pc = getSuppPc();
   var names = getSuppNames();
@@ -9423,11 +9386,32 @@ function saveSuppMissionData() {
     var resultEl = document.getElementById('supp-m-result-' + r);
     var failEl = document.getElementById('supp-m-failcount-' + r);
     var leaderEl = document.getElementById('supp-m-leader-' + r);
+    var lfEl = document.getElementById('supp-m-launchfail-' + r);
+    var launchFailures = lfEl ? parseInt(lfEl.value) || 0 : 0;
+
+    // Collect failed launch attempts
+    var launchAttempts = [];
+    for (var la = 0; la < launchFailures; la++) {
+      var fTeam = [];
+      for (var pi = 0; pi < pc; pi++) {
+        var fCb = document.getElementById('supp-m-' + r + '-failteam-' + la + '-' + pi);
+        if (fCb && fCb.checked) fTeam.push(fCb.value);
+      }
+      var fLdrEl = document.getElementById('supp-m-' + r + '-failldr-' + la);
+      launchAttempts.push({
+        team: fTeam,
+        leader: fLdrEl ? fLdrEl.value : '',
+        votes: buildAllApproveVotes(names)
+      });
+    }
+
     state._suppMissionData.push({
       result: resultEl ? resultEl.value : '',
       failCount: failEl ? parseInt(failEl.value) || 0 : 0,
       leader: leaderEl ? leaderEl.value : '',
-      team: team
+      team: team,
+      launchFailures: launchFailures,
+      launchAttempts: launchAttempts
     });
   }
 }
@@ -9699,8 +9683,24 @@ function submitSupplement() {
   var failMissions = 0;
   var missions = [];
   for (var r = 0; r < missionCount; r++) {
-    var md = (r < missionData.length) ? missionData[r] : { result: '', failCount: 0, leader: '', team: [] };
+    var md = (r < missionData.length) ? missionData[r] : { result: '', failCount: 0, leader: '', team: [], launchFailures: 0, launchAttempts: [] };
     if (!md.result) continue;
+    // Build launchAttempts: failed attempts + final successful one
+    var launchAttempts = [];
+    var failedAttempts = md.launchAttempts || [];
+    for (var la = 0; la < failedAttempts.length; la++) {
+      launchAttempts.push({
+        team: failedAttempts[la].team || [],
+        votes: failedAttempts[la].votes || buildAllApproveVotes(names),
+        leader: failedAttempts[la].leader || ''
+      });
+    }
+    // Final successful attempt
+    launchAttempts.push({
+      team: md.team || [],
+      votes: buildAllApproveVotes(names),
+      leader: md.leader || ''
+    });
     missions.push({
       round: r + 1,
       size: sizes[r],
@@ -9709,12 +9709,8 @@ function submitSupplement() {
       result: md.result,
       failCount: md.failCount || 0,
       shieldedFails: 0,
-      launchFailures: 0,
-      launchAttempts: [{
-        team: md.team || [],
-        votes: buildAllApproveVotes(names),
-        leader: md.leader || ''
-      }],
+      launchFailures: md.launchFailures || 0,
+      launchAttempts: launchAttempts,
       votes: buildAllApproveVotes(names)
     });
     votedMissions++;
