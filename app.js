@@ -1,9795 +1,19590 @@
 /* ==================== DATA ==================== */
+
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
+
 var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
+
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
+
 var UNIQUE_ROLES = ['梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
+
 var GOOD_ROLES = ['梅林','派西维尔','忠臣','兰斯洛特(蓝)'];
+
 var EVIL_ROLES = ['莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(红)'];
+
 var NEUTRAL_ROLES = ['混子'];
+
 var DEFAULT_ACTIVE_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
 
+
+
 /* ============ BEIJING TIME HELPERS (UTC+8) ============ */
+
 function _bjNow() {
+
   var d = new Date();
+
   return new Date(d.getTime() + d.getTimezoneOffset() * 60 * 1000 + 8 * 60 * 60 * 1000);
+
 }
+
 function _bjTimestamp() {
+
   var b = _bjNow();
+
   return b.getUTCFullYear() + '-' + String(b.getUTCMonth() + 1).padStart(2, '0') + '-' + String(b.getUTCDate()).padStart(2, '0') + ' ' + String(b.getUTCHours()).padStart(2, '0') + ':' + String(b.getUTCMinutes()).padStart(2, '0') + ':' + String(b.getUTCSeconds()).padStart(2, '0');
+
 }
+
 function _bjDate() {
+
   var b = _bjNow();
+
   return b.getUTCFullYear() + '-' + String(b.getUTCMonth() + 1).padStart(2, '0') + '-' + String(b.getUTCDate()).padStart(2, '0');
+
 }
+
 function _bjFileStamp() {
+
   var b = _bjNow();
+
   return b.getUTCFullYear() + '-' + String(b.getUTCMonth() + 1).padStart(2, '0') + '-' + String(b.getUTCDate()).padStart(2, '0') + '-' + String(b.getUTCHours()).padStart(2, '0') + '-' + String(b.getUTCMinutes()).padStart(2, '0') + '-' + String(b.getUTCSeconds()).padStart(2, '0');
+
 }
+
+
 
 /* ==================== SUPABASE ==================== */
+
 var SUPABASE_URL = 'https://nzbpopxrxniixnhnqktw.supabase.co';
+
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56YnBvcHhyeG5paXhuaG5xa3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODQ2MzQsImV4cCI6MjA5NzQ2MDYzNH0.wLk-FdQlKha8YObTvgINW2M_9QVSpJk8c91bKJeQO7Q';
+
 var _supabase = null;
+
 var _supabaseConnected = false;
+
 var _supabaseChannel = null;
+
 function getSupabase() {
+
   if (_supabase) return _supabase;
 
+
+
   var sdkGlobal = typeof supabase !== 'undefined' ? supabase : (typeof window.supabase !== 'undefined' ? window.supabase : null);
+
   if (sdkGlobal) {
+
     try {
+
       _supabase = sdkGlobal.createClient(SUPABASE_URL, SUPABASE_KEY);
+
       if (_supabase) {
+
         _supabaseConnected = true;
+
         console.log('[Supabase] client created successfully, URL:', SUPABASE_URL, ', keys:', Object.keys(_supabase).length);
+
         return _supabase;
+
       }
+
     } catch(e) {
+
       console.error('[Supabase] createClient failed:', e.message, '| sdkGlobal keys:', Object.keys(sdkGlobal).slice(0, 5));
+
     }
+
   }
+
+
 
   // Supabase SDK 不可用 → 使用 REST API 降级方案（直接 XHR/fetch 调用）
+
   console.warn('[Supabase] SDK not loaded (typeof supabase=' + typeof supabase + '), using REST API fallback');
+
   _supabase = createRestFallbackClient();
+
   _supabaseConnected = true;
+
   return _supabase;
+
 }
+
+
 
 /* ---- REST API Fallback (Supabase SDK 不可用时直接用 fetch 调用 REST API) ---- */
+
 function createRestFallbackClient() {
+
   function restFetch(method, table, opts) {
+
     var url = SUPABASE_URL + '/rest/v1/' + table;
+
     var headers = {
+
       'apikey': SUPABASE_KEY,
+
       'Authorization': 'Bearer ' + SUPABASE_KEY,
+
       'Content-Type': 'application/json',
+
       'Prefer': ''
+
     };
+
     if (opts.single) headers['Prefer'] = 'return=representation';
+
     if (opts.upsert) {
+
       headers['Prefer'] = (headers['Prefer'] ? headers['Prefer'] + ',' : '') + 'resolution=merge-duplicates';
+
     }
+
     if (opts.onConflict) {
+
       url += (url.indexOf('?') === -1 ? '?' : '&') + 'onConflict=' + encodeURIComponent(opts.onConflict);
+
     }
+
     if (opts.select) {
+
       url += (url.indexOf('?') === -1 ? '?' : '&') + 'select=' + encodeURIComponent(opts.select);
+
     }
+
     if (opts.filter) {
+
       url += (url.indexOf('?') === -1 ? '?' : '&') + encodeURIComponent(opts.filter.col) + '=eq.' + encodeURIComponent(String(opts.filter.val));
+
     }
+
     if (opts.order && opts.order.col) {
+
       url += (url.indexOf('?') === -1 ? '?' : '&') + 'order=' + encodeURIComponent(opts.order.col + (opts.order.asc === false ? '.desc' : '.asc'));
+
     }
+
+
 
     return {
+
       then: function(fn) {
+
         fetch(url, {
+
           method: method,
+
           headers: headers,
+
           body: opts.body ? JSON.stringify(opts.body) : undefined
+
         }).then(function(resp) {
+
           if (method === 'DELETE') {
+
             if (!resp.ok) return resp.text().then(function(t) { fn({ data: null, error: { message: resp.status + ': ' + t } }); });
+
             return resp.json().then(function(d) { fn({ data: d, error: null }); }).catch(function() { fn({ data: null, error: null }); });
+
           }
+
           if (!resp.ok) return resp.text().then(function(t) { fn({ data: null, error: { message: resp.status + ': ' + t } }); });
+
           return resp.json().then(function(d) {
+
             if (opts.single && Array.isArray(d)) {
+
               fn({ data: d.length > 0 ? d[0] : null, error: null });
+
             } else {
+
               fn({ data: d, error: null });
+
             }
+
           });
+
         }).catch(function(err) {
+
           fn({ data: null, error: { message: err.message || 'Network error' } });
+
         });
+
       }
+
     };
+
   }
+
+
 
   function queryBuilder(table) {
+
     var _select = null, _single = false, _filter = null, _order = null, _body = null, _onConflict = null, _upsert = false, _method = 'GET';
+
     var q = {
+
       insert: function(body) { _body = body; _method = 'POST'; return q; },
+
       delete: function() { _method = 'DELETE'; return q; },
+
       upsert: function(body, opts) {
+
         _body = body; _method = 'POST'; _upsert = true;
+
         if (opts && opts.onConflict) _onConflict = opts.onConflict;
+
         return q;
+
       },
+
       select: function(cols) { _select = cols || '*'; return q; },
+
       eq: function(col, val) { _filter = { col: col, val: val }; return q; },
+
       single: function() { _single = true; return q; },
+
       order: function(col, dir) { _order = { col: col, asc: !dir || !dir.ascending !== false }; return q; },
+
       then: function(fn) {
+
         return restFetch(_method, table, { select: _select, single: _single, body: _body, filter: _filter, order: _order, upsert: _upsert, onConflict: _onConflict }).then(fn);
+
       }
+
     };
+
     return q;
+
   }
+
+
 
   return {
+
     from: function(table) { return queryBuilder(table); },
+
     channel: function() { return { on: function() { return this; }, subscribe: function() {} }; },
+
     removeChannel: function() {}
+
   };
+
 }
-var SW_VERSION = 'v161';
+
+var SW_VERSION = 'v162';
+
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
+
+
 /* ---- UUID utility ---- */
+
 function generateUUID() {
+
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+
     return crypto.randomUUID();
+
   }
+
   // Fallback: crypto.getRandomValues + hex
+
   var arr = new Uint8Array(16);
+
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+
     crypto.getRandomValues(arr);
+
   } else {
+
     for (var i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
+
   }
+
   arr[6] = (arr[6] & 0x0f) | 0x40;
+
   arr[8] = (arr[8] & 0x3f) | 0x80;
+
   function hex(v) { return (v < 16 ? '0' : '') + v.toString(16); }
+
   return hex(arr[0]) + hex(arr[1]) + hex(arr[2]) + hex(arr[3]) + '-' +
+
     hex(arr[4]) + hex(arr[5]) + '-' + hex(arr[6]) + hex(arr[7]) + '-' +
+
     hex(arr[8]) + hex(arr[9]) + '-' + hex(arr[10]) + hex(arr[11]) + hex(arr[12]) + hex(arr[13]) + hex(arr[14]) + hex(arr[15]);
+
 }
+
+
 
 // ====== Pending Queue (离线重推) ======
+
 function getPendingQueue() {
+
   try { return JSON.parse(localStorage.getItem('avalon_pending_queue') || '[]'); } catch(e) { return []; }
+
 }
+
 function savePendingQueue(queue) {
+
   localStorage.setItem('avalon_pending_queue', JSON.stringify(queue));
+
 }
+
 function processOfflineQueues() {
+
   var sb = getSupabase();
+
   if (!sb) return;
+
   var queue = getPendingQueue();
+
   if (queue.length === 0) return;
+
   var remaining = [];
+
   var processed = 0;
+
   for (var i = 0; i < queue.length; i++) {
+
     (function(item) {
+
       sb.from('game_records').insert({ game_data: item.record, game_data_v2: item.recordV2 }).select('id').single().then(function(res) {
+
         if (res.error) {
+
           console.warn('[PendingQueue] push failed:', res.error);
+
           remaining.push(item);
+
         } else {
+
           processed++;
+
         }
+
         if (i === queue.length - 1) {
+
           savePendingQueue(remaining);
+
           if (processed > 0) console.log('[PendingQueue] pushed ' + processed + ' items');
+
         }
+
       });
+
     })(queue[i]);
+
   }
+
 }
+
 // ====== End Pending Queue ======
 
+
+
 var namePool = DEFAULT_NAME_POOL.slice();
+
 var _historyRawCache = null;
+
 var _historyCache = null;
+
 var _normalizedHistoryRawCache = null;
+
 var _normalizedHistoryCache = null;
+
 var _tendScoreCacheKey = '';
+
 var _tendScoreCacheValue = null;
+
 var _statsRenderScheduled = false;
 
+
+
 var state = {
+
   playerCount: 7,
+
   playerNames: [],
+
   selfIndex: -1,
+
   myRole: null,
+
   activeRoles: DEFAULT_ACTIVE_ROLES.slice(),
+
   missions: [],
+
   currentRound: 0,
+
   tendencies: {},
+
   winner: null,
+
   consecutiveRejects: {},
+
   _firstLeaderPicked: false,
+
   _lastLeaderIdx: -1,
+
   assassinTarget: null,
+
   assassinFromMission: false,
+
   assassinMode: false,
+
   _assassinPickTarget: null,
+
   _historyPage: 0,
+
   _historyPageSize: 5,
+
   _assassinTimerRemaining: 0,
+
   _assassinTimerEnd: 0,
+
   _assassinTimerInterval: null,
+
   _huntFollowTarget: undefined,
+
   ladyOfLakeEnabled: true,
+
   excaliburEnabled: false,
+
   excaliburHistory: [],
+
   ladyLakeHolder: -1,
+
   ladyLakeChecks: [],
+
   timerMode: 'all',
+
   timerSeconds: 300,
+
   timerInterval: null,
+
   timerRemaining: 0,
+
   _timerEnd: 0,
+
   _undoStack: [],
+
   lancelotFlipped: false,
+
   lancelotDeck: null,
+
   lancelotDrawResults: [],
+
   roundTendencies: [],
+
   identityMarks: [],
+
   ladyCheckHistory: [],
+
   knownIdentities: {}
+
 };
 
+
+
 function initState(n) {
+
   n = n || 7;
+
   state.playerCount = n;
+
   state.playerNames = [];
+
   for (var i = 0; i < n; i++) state.playerNames[i] = '玩家' + (i + 1);
+
   state.selfIndex = -1;
+
   state.myRole = null;
+
   state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客'] : DEFAULT_ACTIVE_ROLES.slice();
+
   state.missions = [];
+
   state.currentRound = 0;
+
   state.tendencies = {};
+
   state.winner = null;
+
   state.consecutiveRejects = {};
+
   state._firstLeaderPicked = false;
+
   state._lastLeaderIdx = -1;
+
   state.assassinTarget = null;
+
   state.assassinFromMission = false;
+
   state.assassinMode = false;
+
   state.gameStartTime = _bjTimestamp();
+
   state._assassinPickTarget = null;
+
   state._assassinAfterRound = null;
+
   state.lancelotFlipped = false;
+
   state.lancelotDeck = null;
+
   state.lancelotDrawResults = [];
+
   state._historyPage = 0;
+
   state._assassinTimerRemaining = 0;
+
   state._assassinTimerEnd = 0;
+
   state._assassinTimerInterval = null;
+
   state._huntFollowTarget = undefined;
+
   state.ladyOfLakeEnabled = true;
+
   state.excaliburEnabled = false;
+
   state.excaliburHistory = [];
+
   state.playerRoles = [];
+
   state.ladyLakeHolder = -1;
+
   state.ladyLakeChecks = [];
+
   state.ladyCheckHistory = [];
+
   state.knownIdentities = {};
+
   state.timerMode = 'all';
+
   state.timerSeconds = 300;
+
   state.timerInterval = null;
+
   state.timerRemaining = 0;
+
   state.roundTendencies = [];
+
   state.identityMarks = [];
+
   state.playerPredictions = {};
+
   state.speakerOrder = [];
+
   state.currentSpeakerIdx = -1;
+
   state.speakTimes = {};
+
   state._teamConfirmedPending = false;
+
   for (var i = 0; i < n; i++) {
+
     state.tendencies[i] = 50;
+
     state.consecutiveRejects[i] = 0;
+
   }
+
 }
+
+
 
 /* ==================== PLAYER LABEL ==================== */
+
 function playerLabel(idx) {
+
   return (idx + 1) + '号 ' + state.playerNames[idx];
+
 }
+
+
 
 // 从 "N号 Name" 或数字格式解析出索引（0-based），兜底返回 0
+
 function parseLeaderIndex(leader) {
+
   if (typeof leader === 'number') return leader;
+
   if (typeof leader === 'string' && leader) {
+
     var m = leader.match(/^(\d+)/);
+
     if (m) { var idx = parseInt(m[1]) - 1; if (idx >= 0) return idx; }
+
   }
+
   return 0;
+
 }
+
+
 
 /* ==================== STORAGE ==================== */
+
 function loadNamePool() {
+
   try { var d = localStorage.getItem('avalon_name_pool'); if (d) namePool = JSON.parse(d); } catch(e) {}
+
 }
+
 function saveNamePool() {
+
   localStorage.setItem('avalon_name_pool', JSON.stringify(namePool));
+
 }
+
 function invalidateHistoryCache() {
+
   _historyRawCache = null;
+
   _historyCache = null;
+
   _normalizedHistoryRawCache = null;
+
   _normalizedHistoryCache = null;
+
 }
+
 // 将旧格式 roundTendencies（纯数值对象数组）迁移为新格式（带 r/a 元数据）
+
 function migrateRoundTendenciesV2(v2) {
+
   var rt = v2.rt;
+
   if (!rt || !rt.length) return false;
+
   // 已经是新格式：{ v: snap, r: round, a: attempt }
+
   if (rt[0] && typeof rt[0].v === 'object') return false;
 
+
+
   var missions = v2.ms || [];
+
   var newRT = [];
+
   var entryIdx = 0;
 
+
+
   for (var ri = 0; ri < missions.length; ri++) {
+
     var m = missions[ri];
+
     var failedCount = 0;
+
     if (m.la && m.la.length > 0) {
+
       // 有 launchAttempts：最后一组投票通过则为 failedCount = attempts-1
+
       if (m.res) {
+
         failedCount = m.la.length - 1;
+
       } else {
+
         failedCount = m.la.length;
+
       }
+
     } else {
+
       // 传统格式：直接取 launchFailures 计数
+
       failedCount = m.lf2 || 0;
+
     }
+
+
 
     // 失败的组队投票快照（a 从 1 开始）
+
     for (var a = 1; a <= failedCount; a++) {
+
       if (entryIdx < rt.length) {
+
         newRT.push({ v: rt[entryIdx], r: ri, a: a });
+
         entryIdx++;
+
       }
+
     }
+
+
 
     // 任务执行完成快照（a=0）
+
     if (m.res) {
+
       if (entryIdx < rt.length) {
+
         newRT.push({ v: rt[entryIdx], r: ri, a: 0 });
+
         entryIdx++;
+
       }
+
     }
+
   }
+
+
 
   // 兜底：剩余未匹配的条目按最后一轮处理
+
   while (entryIdx < rt.length) {
+
     newRT.push({ v: rt[entryIdx], r: missions.length, a: 0 });
+
     entryIdx++;
+
   }
+
+
 
   v2.rt = newRT;
+
   return true;
+
 }
+
+
 
 function loadHistory() {
+
   // 先尝试从 Supabase 全量拉取，不可用时回退到 localStorage
+
   var sb = getSupabase();
+
   if (sb) {
+
     try {
+
       var result = null;
+
       var xhr = new XMLHttpRequest();
+
       var token = SUPABASE_KEY;
+
       xhr.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc&limit=1000', false);
+
       xhr.setRequestHeader('apikey', token);
+
       xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+
       xhr.send();
+
       if (xhr.status >= 200 && xhr.status < 300) {
+
         result = JSON.parse(xhr.responseText);
+
       }
+
       if (result && result.length > 0) {
+
         var cloudHistory = [];
+
         var deletedKeys = loadDeletedKeys();
+
         for (var i = 0; i < result.length; i++) {
+
           var row = result[i];
+
           var recordV2 = row.game_data_v2 ? row.game_data_v2 : (row.game_data ? toRecordV2(row.game_data) : null);
+
           if (!recordV2) continue;
+
           recordV2._sid = row.id;
+
           // 从 game_data_v2 内读取 _uuid（已由 saveGameRecord 存入 JSONB）
+
           // 检查删除黑名单
+
           var dk = makeRecordKey(recordV2);
+
           if (deletedKeys.indexOf(dk) !== -1) continue;
+
           // 向后兼容：旧记录没有 _uuid 的，赋予一个
+
           if (!recordV2._uuid) {
+
             recordV2._uuid = generateUUID();
+
           }
+
           cloudHistory.push(recordV2);
+
         }
+
         // 合并本地未同步的记录（按 _sid 去重，避免 refresh 时 UUID 漂移导致无限增长）
+
         var localRaw = [];
+
         try { localRaw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]'); } catch(e) {}
+
         var cloudBySid = {};
+
         for (var i = 0; i < cloudHistory.length; i++) {
+
           cloudBySid[cloudHistory[i]._sid] = true;
+
         }
+
         var merged = cloudHistory.slice();
+
         for (var i = 0; i < localRaw.length; i++) {
+
           var lr = localRaw[i];
+
           // v2 格式标准化
+
           if (!isRecordV2(lr)) { lr = toRecordV2(lr); }
+
           // 有 _sid 的记录跟随云端状态：云端存在则已含在 cloudHistory 中，
+
           // 云端不存在该 _sid 说明被其他设备删了，同步从本地移除
+
           if (lr._sid) continue;
+
           // 无 _sid 的纯本地记录保留
+
           merged.push(lr);
+
         }
+
         // 按内容指纹去重，只保留一份
+
         merged = deduplicateHistory(merged);
+
         // 从本地记录复制 _tzMigrated 标记到云端记录，避免每次加载都重复触发时区迁移
+
         var localTzMigratedSids = {};
+
         for (var li = 0; li < localRaw.length; li++) {
+
           var lr2 = localRaw[li];
+
           if (!isRecordV2(lr2)) lr2 = toRecordV2(lr2);
+
           if (lr2._sid && lr2._tzMigrated) localTzMigratedSids[lr2._sid] = true;
+
         }
+
         for (var mi = 0; mi < merged.length; mi++) {
+
           if (merged[mi]._sid && localTzMigratedSids[merged[mi]._sid]) {
+
             merged[mi]._tzMigrated = true;
+
           }
+
         }
+
         // 迁移旧记录的 UTC 时间到北京时间
+
         if (merged.length > 0) console.log('[Time] cloud+local before migrate:', merged[0].st);
+
         var tzMigrated = false;
+
         for (var ti = 0; ti < merged.length; ti++) {
+
           if (migrateUtcToBeijingV2(merged[ti])) { tzMigrated = true; _migratedCount++; }
+
         }
+
         if (tzMigrated && merged.length > 0) console.log('[Time] cloud+local after migrate:', merged[0].st);
+
         // 写回 localStorage 作为缓存
+
         saveHistory(merged);
+
         // 时区迁移后，将 _tzMigrated 标记异步写回 Supabase 防止下次加载仍触发迁移
+
         if (tzMigrated) {
+
           (function() {
+
             var sb2 = getSupabase();
+
             if (!sb2) return;
+
             for (var tii = 0; tii < merged.length; tii++) {
+
               var mr = merged[tii];
+
               if (!mr._sid || !mr._tm) continue;
+
               try {
+
                 var token2 = SUPABASE_KEY;
+
                 var xhr2 = new XMLHttpRequest();
+
                 xhr2.open('PATCH', SUPABASE_URL + '/rest/v1/game_records?id=eq.' + mr._sid, false);
+
                 xhr2.setRequestHeader('apikey', token2);
+
                 xhr2.setRequestHeader('Authorization', 'Bearer ' + token2);
+
                 xhr2.setRequestHeader('Content-Type', 'application/json');
+
                 xhr2.setRequestHeader('Prefer', 'return=minimal');
+
                 xhr2.send(JSON.stringify({ game_data_v2: mr }));
+
               } catch(e2) { console.warn('[loadHistory] failed to write _tzMigrated to Supabase:', e2); }
+
             }
+
           })();
+
         }
+
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
+
         if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u4ee5\u5e94\u7528\u4fee\u6539', 'info');
+
         return merged.slice();
+
       }
+
     } catch(e) {
+
       console.warn('[loadHistory] Supabase sync failed, falling back to localStorage:', e);
+
     }
+
   }
+
+
 
   // 回退到 localStorage
+
   return loadHistoryLocal();
+
 }
+
+
 
 function loadHistoryLocal() {
+
   try {
+
     var rawText = localStorage.getItem('avalon_history_v2') || '[]';
+
     if (_historyRawCache === rawText && _historyCache) return _historyCache.slice();
+
     var raw = JSON.parse(rawText);
+
     var migrated = false;
+
     var rtMigrated = false;
+
     for (var i = 0; i < raw.length; i++) {
+
       if (!isRecordV2(raw[i])) {
+
         raw[i] = toRecordV2(raw[i]);
+
         migrated = true;
+
       }
+
       if (!raw[i]._uuid) {
+
         raw[i]._uuid = generateUUID();
+
         migrated = true;
+
       }
+
       if (migrateRoundTendenciesV2(raw[i])) rtMigrated = true;
+
     }
+
     if (migrated || rtMigrated) {
+
       rawText = JSON.stringify(raw);
+
       localStorage.setItem('avalon_history_v2', rawText);
+
     }
+
     // 迁移旧记录的 UTC 时间到北京时间
+
     if (raw.length > 0) console.log('[Time] local-only before migrate:', raw[0].st);
+
     var tzMigratedLocal = false;
+
     for (var ti = 0; ti < raw.length; ti++) {
+
       if (migrateUtcToBeijingV2(raw[ti])) { tzMigratedLocal = true; _migratedCount++; }
+
     }
+
     if (tzMigratedLocal) migrated = true;
+
     if (tzMigratedLocal && raw.length > 0) console.log('[Time] local-only after migrate:', raw[0].st);
+
     if (migrated) {
+
       rawText = JSON.stringify(raw);
+
       localStorage.setItem('avalon_history_v2', rawText);
+
     }
+
     _historyRawCache = rawText;
+
     _historyCache = raw;
+
     _normalizedHistoryRawCache = null;
+
     _normalizedHistoryCache = null;
+
     if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u4ee5\u5e94\u7528\u4fee\u6539', 'info');
+
     return raw.slice();
+
   } catch(e) { return []; }
+
 }
+
 function loadNormalizedHistory() {
+
   var rawText = localStorage.getItem('avalon_history_v2') || '[]';
+
   if (_normalizedHistoryRawCache === rawText && _normalizedHistoryCache) return _normalizedHistoryCache.slice();
+
   var raw = loadHistory();
+
   var history = raw.map(function(r) { return normalizeRecord(r); });
+
   _normalizedHistoryRawCache = localStorage.getItem('avalon_history_v2') || '[]';
+
   _normalizedHistoryCache = history;
+
   return history.slice();
+
 }
+
 // 迁移旧记录的 UTC 时间到北京时间（UTC+8），仅对 v2 格式生效
+
 function migrateUtcToBeijingV2(rec) {
+
   if (!rec || !rec.st) {
+
     if (rec) console.log('[migrateUtcToBeijing] SKIP: no st field, keys=' + Object.keys(rec).join(','));
+
     return false;
+
   }
+
+
 
   // 检测 st 是否为 ISO UTC 格式（如 "2026-07-20T14:30:00.000Z"）
+
   var isUtc = typeof rec.st === 'string' && rec.st.indexOf('T') !== -1 && rec.st.indexOf('Z') !== -1;
 
+
+
   // 检测空间分隔格式（如 "2026-07-20 13:00:00"），可能来自旧版 UTC 时间存储
+
   var isSpaceFmt = !isUtc && typeof rec.st === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rec.st);
 
+
+
   console.log('[migrateUtcToBeijing] st=' + rec.st + ' isUtc=' + isUtc + ' isSpaceFmt=' + isSpaceFmt + ' d=' + rec.d + ' _tzMigrated=' + !!rec._tzMigrated);
+
   if (!isUtc && !isSpaceFmt) return false;
 
+
+
   // 已迁移标记：做交叉验证，检测是否曾被错误标记（旧版代码可能标记了但未实际转换）
+
   if (rec._tzMigrated) {
+
     if (isSpaceFmt) {
+
       var origSt = rec.st;
+
       var origD = rec.d;
+
       var testDate = new Date(origSt.replace(' ', 'T') + '.000Z');
+
       if (!isNaN(testDate.getTime())) {
+
         var bjMs = testDate.getTime() + 8 * 3600000;
+
         var bjDate = new Date(bjMs);
+
         var bjY = bjDate.getUTCFullYear();
+
         var bjMo = String(bjDate.getUTCMonth() + 1).padStart(2, '0');
+
         var bjD = String(bjDate.getUTCDate()).padStart(2, '0');
+
         var bjH = String(bjDate.getUTCHours()).padStart(2, '0');
+
         var bjMi = String(bjDate.getUTCMinutes()).padStart(2, '0');
+
         var bjS = String(bjDate.getUTCSeconds()).padStart(2, '0');
+
         var newSt = bjY + '-' + bjMo + '-' + bjD + ' ' + bjH + ':' + bjMi + ':' + bjS;
+
         // 如果转换后时间不同且日期与现有 d 一致，说明是 UTC 记录被错误标记
+
         if (newSt !== origSt && (bjY + '-' + bjMo + '-' + bjD) === origD) {
+
           console.log('[migrateUtcToBeijing] _tzMigrated but time=' + origSt.slice(11,16) + ' looks like UTC, forcing re-convert');
+
           delete rec._tzMigrated;
+
         } else {
+
           return false;
+
         }
+
       } else {
+
         return false;
+
       }
+
     } else {
+
       return false;
+
     }
+
   }
 
+
+
   try {
+
     // 空间分隔格式构造为 ISO 再解析
+
     var dateStr = isUtc ? rec.st : rec.st.replace(' ', 'T') + '.000Z';
+
     var utcDate = new Date(dateStr);
+
     if (isNaN(utcDate.getTime())) return false;
+
     var bjMs = utcDate.getTime() + 8 * 3600000;
+
     var bjDate = new Date(bjMs);
+
     var y = bjDate.getUTCFullYear();
+
     var mo = String(bjDate.getUTCMonth() + 1).padStart(2, '0');
+
     var d = String(bjDate.getUTCDate()).padStart(2, '0');
+
     var h = String(bjDate.getUTCHours()).padStart(2, '0');
+
     var mi = String(bjDate.getUTCMinutes()).padStart(2, '0');
+
     var s = String(bjDate.getUTCSeconds()).padStart(2, '0');
+
     var newSt = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
+
     var newD = y + '-' + mo + '-' + d;
 
+
+
     // 如果转换后与原始一致，说明已是北京时间，仅标记跳过
+
     if (newSt === rec.st && newD === rec.d) {
+
       rec._tzMigrated = true;
+
       rec._tm = true;
+
       return false;
+
     }
+
+
 
     // 对于空间格式：检查转换有效性
+
     // 如果转换后日期与原始日期相同（说明是北京时间当天游戏，UTC时间未跨越日期边界）→ 是旧UTC记录，转换有效
+
     // 如果转换后日期不同（北京21:00→UTC+8h=次日05:00）→ 原始已是北京时间，需回滚
+
     if (isSpaceFmt && !isUtc) {
+
       if (newD !== rec.d) {
+
         // 转换导致日期变化 → 原已是北京时间，不要转换
+
         rec._tzMigrated = true;
+
         rec._tm = true;
+
         return false;
+
       }
+
       // newD === rec.d 且时间不同 → 旧UTC记录，需要转换
+
     }
+
+
 
     rec.st = newSt;
+
     rec.d = newD;
+
     // 转换 endTime
+
     var parseTimeParam = function(t) {
+
       if (t && typeof t === 'string') {
+
         if (t.indexOf('T') !== -1 && t.indexOf('Z') !== -1) return t;
+
         if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(t)) return t.replace(' ', 'T') + '.000Z';
+
       }
+
       return null;
+
     };
+
     if (rec.et) {
+
       var etStr = parseTimeParam(rec.et);
+
       if (etStr) {
+
         var utcEt = new Date(etStr);
+
         if (!isNaN(utcEt.getTime())) {
+
           var bjEtMs = utcEt.getTime() + 8 * 3600000;
+
           var bjEt = new Date(bjEtMs);
+
           var ety = bjEt.getUTCFullYear();
+
           var etmo = String(bjEt.getUTCMonth() + 1).padStart(2, '0');
+
           var etd = String(bjEt.getUTCDate()).padStart(2, '0');
+
           var eth = String(bjEt.getUTCHours()).padStart(2, '0');
+
           var etmi = String(bjEt.getUTCMinutes()).padStart(2, '0');
+
           var ets = String(bjEt.getUTCSeconds()).padStart(2, '0');
+
           rec.et = ety + '-' + etmo + '-' + etd + ' ' + eth + ':' + etmi + ':' + ets;
+
         }
+
       }
+
     }
+
     rec._tzMigrated = true;
+
     rec._tm = true;
+
     console.log('[migrateUtcToBeijing] converted record, st=' + rec.st);
+
     return true;
+
   } catch(e) {
+
     console.warn('[migrateUtcToBeijing] error:', e);
+
     return false;
+
   }
+
 }
+
+
 
 function saveHistory(data) {
+
   var rawText = JSON.stringify(data);
+
   localStorage.setItem('avalon_history_v2', rawText);
+
   _historyRawCache = rawText;
+
   _historyCache = data.slice();
+
   _normalizedHistoryRawCache = null;
+
   _normalizedHistoryCache = null;
+
 }
+
+
 
 // 将旧格式记录转为 v2 短字段格式
+
 function toRecordV2(record) {
+
   var v2 = {};
+
   if (record.date !== undefined) v2.d = record.date;
+
   if (record.startTime !== undefined) v2.st = record.startTime;
+
   if (record.endTime !== undefined) v2.et = record.endTime;
+
   if (record.playerCount !== undefined) v2.pc = record.playerCount;
+
   if (record.winner !== undefined) v2.w = record.winner;
+
   if (record.identities) v2.ids = record.identities.map(function(id) { return { n: id.name, r: id.role, i: id.index }; });
+
   if (record.lancelotFlips) v2.lf = record.lancelotFlips;
+
   if (record.activeRoles) v2.ar = record.activeRoles;
+
   if (record.roundTendencies) v2.rt = record.roundTendencies;
+
   if (record.v7Scores) v2.v7s = record.v7Scores;
+
   if (record.assassinTarget !== undefined) v2.at = record.assassinTarget;
+
   if (record.assassinSuccess !== undefined) v2.as = record.assassinSuccess;
+
   if (record.assassinAfterRound != null) v2.aar = record.assassinAfterRound;
+
   if (record.assassinFromMission) v2.afm = record.assassinFromMission;
+
   if (record.huntFollow != null) v2.hf = record.huntFollow;
+
   if (record.currentRound !== undefined) v2.cr = record.currentRound;
+
   if (record.identityMarks) v2.im = record.identityMarks.map(function(m) { return { t: m.target, tn: m.targetName, l: m.level, ts: m.timestamp }; });
+
   if (record.missions) v2.ms = record.missions.map(function(m) {
+
     var vm = { r: m.round, s: m.size, ld: m.leader, t: m.team, res: m.result, fc: m.failCount, sf: m.shieldedFails };
+
     if (m.launchFailures !== undefined) vm.lf2 = m.launchFailures;
+
     if (m.launchAttempts) vm.la = m.launchAttempts.map(function(att) {
+
       return { t: att.team, v: att.votes, ld: att.leader };
+
     });
+
     if (m.votes) vm.v = m.votes;
+
     return vm;
+
   });
+
   if (record.ladyCheckHistory) v2.lch = record.ladyCheckHistory.map(function(h) {
+
     return { r: h.round, h: h.holder, hn: h.holderName, t: h.target, tn: h.targetName, res: h.result, n: h.note, rr: h.recordedAtRound, sp: h.recordedAtSpeaker };
+
   });
+
   if (record.excaliburEnabled !== undefined) v2.ee = record.excaliburEnabled;
+
   if (record.excaliburHistory) v2.ex = record.excaliburHistory.map(function(e) {
+
     return { r: e.round, ld: e.leader, ldn: e.leaderName, tm: e.team, h: e.holder, hn: e.holderName, u: e.used, t: e.target, tn: e.targetName, fr: e.feedbackRecorded, fbr: e.feedbackRound, fs: e.feedbackSpeaker, cd: e.claimedDirection, n: e.note };
+
   });
+
   if (record.forceEnded) v2.fe = record.forceEnded;
+
   if (record.forceEndReason) v2.fer = record.forceEndReason;
+
   if (record.forceEndTime) v2.fet = record.forceEndTime;
+
   if (record._supabaseId) v2._sid = record._supabaseId;
+
   if (record._tzMigrated) v2._tm = true;
+
   return v2;
+
 }
+
+
 
 // 统一标准化函数：输入任意格式（v2短键名 或 长格式），返回统一长格式
+
 function normalizeGameData(gd) {
+
   if (!gd) return null;
+
   // JSON 字符串则解析
+
   if (typeof gd === 'string') { try { gd = JSON.parse(gd); } catch(e) { return null; } }
+
   // v2 短键名格式
+
   if (gd.d !== undefined && gd.w !== undefined) return fromRecordV2(gd);
+
   // 已经是长格式
+
   if (gd.date !== undefined || gd.playerCount !== undefined) return gd;
+
   // 兜底：尝试正常化
+
   return normalizeRecord(gd);
+
 }
+
+
 
 // 将 v2 短字段格式转回旧格式（供渲染等消费端使用）
+
 function fromRecordV2(v2) {
+
   var rec = {};
+
   rec.date = v2.d || '';
+
   rec.startTime = v2.st || '';
+
   rec.endTime = v2.et || '';
+
   rec.playerCount = v2.pc || 0;
+
   rec.winner = v2.w || '';
+
   rec.identities = (v2.ids || []).map(function(id) { return { name: id.n, role: id.r, index: id.i }; });
+
   rec.lancelotFlips = v2.lf || {};
+
   rec.activeRoles = v2.ar || [];
+
   rec.roundTendencies = v2.rt || [];
+
   rec.v7Scores = v2.v7s || null;
+
   rec.assassinTarget = v2.at || null;
+
   rec.assassinSuccess = v2.as || false;
+
   rec.assassinAfterRound = v2.aar != null ? v2.aar : null;
+
   rec.assassinFromMission = v2.afm || false;
+
   rec.huntFollow = v2.hf != null ? v2.hf : null;
+
   rec.currentRound = v2.cr != null ? v2.cr : 0;
+
   rec.identityMarks = (v2.im || []).map(function(m) { return { target: m.t, targetName: m.tn, level: m.l, timestamp: m.ts }; });
+
   rec.missions = (v2.ms || []).map(function(m) {
+
     var rm = { round: m.r, size: m.s, leader: m.ld, team: m.t || [], result: m.res, failCount: m.fc || 0, shieldedFails: m.sf || 0 };
+
     if (m.lf2 !== undefined) rm.launchFailures = m.lf2;
+
     if (m.la) rm.launchAttempts = m.la.map(function(att) { return { team: att.t || [], votes: att.v || {}, leader: att.ld }; });
+
     if (m.v) rm.votes = m.v;
+
     return rm;
+
   });
+
   rec.ladyCheckHistory = (v2.lch || []).map(function(h) { return { round: h.r, holder: h.h, holderName: h.hn, target: h.t, targetName: h.tn, result: h.res, note: h.n || '', recordedAtRound: h.rr, recordedAtSpeaker: h.sp }; });
+
   rec.excaliburEnabled = !!v2.ee;
+
   rec.excaliburHistory = (v2.ex || []).map(function(e) { return { round: e.r, leader: e.ld, leaderName: e.ldn, team: e.tm || [], holder: e.h, holderName: e.hn, used: e.u, target: e.t, targetName: e.tn, feedbackRecorded: e.fr, feedbackRound: e.fbr, feedbackSpeaker: e.fs, claimedDirection: e.cd || '', note: e.n || '' }; });
+
   rec.forceEnded = v2.fe || false;
+
   rec.forceEndReason = v2.fer || '';
+
   rec.forceEndTime = v2.fet || '';
+
   rec._supabaseId = v2._sid || '';
+
   rec._tzMigrated = v2._tm || false;
+
   return rec;
+
 }
+
+
 
 // 判断记录是否为 v2 格式
+
 function isRecordV2(record) {
+
   return record && record.d !== undefined && record.w !== undefined;
+
 }
+
+
 
 // 将 v2 记录标准化为消费端可用格式（带旧字段名）
+
 function normalizeRecord(record) {
+
   if (!record) return null;
+
   if (isRecordV2(record)) return fromRecordV2(record);
+
   return record; // 兼容未迁移的旧格式
+
 }
+
 function getSortedNamePool() {
+
   var history = loadNormalizedHistory();
+
   var counts = {};
+
   for (var i = 0; i < history.length; i++) {
+
     var rec = history[i];
+
     if (!rec.identities) continue;
+
     for (var j = 0; j < rec.identities.length; j++) {
+
       var name = rec.identities[j].name;
+
       if (name) counts[name] = (counts[name] || 0) + 1;
+
     }
+
   }
+
   var sorted = namePool.slice().sort(function(a, b) {
+
     var ca = counts[a] || 0;
+
     var cb = counts[b] || 0;
+
     if (cb !== ca) return cb - ca;
+
     return a.localeCompare(b);
+
   });
+
   return sorted;
+
 }
+
 function loadDeletedKeys() {
+
   try { return JSON.parse(localStorage.getItem('avalon_deleted_keys') || '[]'); } catch(e) { return []; }
+
 }
+
 function saveDeletedKeys(data) {
+
   localStorage.setItem('avalon_deleted_keys', JSON.stringify(data));
+
 }
+
 function clearDeletedKeys() {
+
   localStorage.removeItem('avalon_deleted_keys');
+
   invalidateHistoryCache();
+
   if (state._currentPage === 'stats') renderStats();
+
   toast('已清理删除标记，历史记录已恢复');
+
 }
+
 function saveLastGame() {
+
   var cfg = {
+
     date: _bjDate(),
+
     playerCount: state.playerCount,
+
     playerNames: state.playerNames.slice(),
+
     selfIndex: state.selfIndex
+
   };
+
   localStorage.setItem('avalon_last_game', JSON.stringify(cfg));
+
 }
+
 function loadLastGame() {
+
   try {
+
     var d = localStorage.getItem('avalon_last_game');
+
     if (!d) return null;
+
     var cfg = JSON.parse(d);
+
     var today = _bjDate();
+
     if (cfg.date !== today) return null;
+
     return cfg;
+
   } catch(e) { return null; }
+
 }
+
 loadNamePool();
 
+
+
 /* ==================== ASSASSIN COUNTDOWN ==================== */
+
 function startAssassinTimer() {
+
   stopAssassinTimer();
+
   ensureAudioContext();
+
   state._assassinTimerEnd = Date.now() + 3 * 60 * 1000; // wall-clock end time
+
   state._assassinTimerRemaining = 3 * 60;
+
   renderAssassinTimer();
+
   state._assassinTimerInterval = setInterval(function() {
+
     var remaining = Math.max(0, Math.ceil((state._assassinTimerEnd - Date.now()) / 1000));
+
     state._assassinTimerRemaining = remaining;
+
     renderAssassinTimer();
+
     if (remaining <= 0) {
+
       stopAssassinTimer();
+
       playBeepSound();
+
     }
+
   }, 250); // more frequent refresh for wall-clock accuracy
+
 }
+
+
 
 function stopAssassinTimer() {
+
   if (state._assassinTimerInterval) {
+
     clearInterval(state._assassinTimerInterval);
+
     state._assassinTimerInterval = null;
+
   }
+
   state._assassinTimerEnd = 0;
+
   var el = document.getElementById('assassin-countdown-display');
+
   if (el) el.innerHTML = '';
+
 }
+
+
 
 function renderAssassinTimer() {
+
   var el = document.getElementById('assassin-countdown-display');
+
   if (!el) return;
+
   var min = Math.floor(state._assassinTimerRemaining / 60);
+
   var sec = state._assassinTimerRemaining % 60;
+
   var timeStr = (min < 10 ? '0' : '') + min + ':' + (sec < 10 ? '0' : '') + sec;
+
   var warning = state._assassinTimerRemaining <= 30 && state._assassinTimerRemaining > 0;
+
   el.innerHTML = '<div class="assassin-countdown' + (warning ? ' warning' : '') + '">'
+
     + '<div class="ac-value">' + timeStr + '</div>'
+
     + '<div class="ac-label">刺杀倒计时</div></div>';
+
   if (state._assassinTimerRemaining <= 0) {
+
     el.innerHTML = '<div class="assassin-countdown warning">'
+
       + '<div class="ac-value">00:00</div>'
+
       + '<div class="ac-label">倒计时结束</div></div>';
+
   }
+
 }
+
+
 
 /* ==================== UTILS ==================== */
+
 function $(id) { return document.getElementById(id); }
+
 function toast(msg, type) {
+
   type = type || 'info';
+
   var t = $('toast'); t.textContent = msg; t.className = 'toast ' + type + ' show';
+
   setTimeout(function() { t.classList.remove('show'); }, 2200);
-}
-function setActiveNav(page) {
-  document.querySelectorAll('.nav-btns button').forEach(function(b) { b.classList.remove('active'); });
-  var btn = document.getElementById('nav-' + page);
-  if (btn) btn.classList.add('active');
-}
-function showPage(page) {
-  var prevPage = state._currentPage;
-  state._currentPage = page;
-  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-  var pg = document.getElementById('page-' + page);
-  if (pg) pg.classList.add('active');
-  setActiveNav(page);
-  if (page === 'game') {
-    renderGame();
-  }
-  if (page === 'setup') { renderSetup(); }
-  if (page === 'tend') {
-    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
-  }
-  if (page === 'tools') {
-    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
-    processOfflineQueues();
-  }
-  if (page === 'end') renderEnd();
-  if (page === 'stats') {
-    if (prevPage !== 'stats') state._historyPage = 0;
-    renderStats();
-    processOfflineQueues();
-  }
-  // 更新底部版本号
-  var fv = document.getElementById('page-footer-version');
-  if (fv) fv.textContent = '版本: ' + SW_VERSION;
+
 }
 
-// 游戏导航入口：未开始游戏则提示先去 setup 配置
-function goToGame() {
-  if (!state.missions || state.missions.length === 0) {
-    toast('请先在设置页面配置游戏参数', 'warn');
-    showPage('setup');
-    return;
-  }
-  showPage('game');
+function setActiveNav(page) {
+
+  document.querySelectorAll('.nav-btns button').forEach(function(b) { b.classList.remove('active'); });
+
+  var btn = document.getElementById('nav-' + page);
+
+  if (btn) btn.classList.add('active');
+
 }
+
+function showPage(page) {
+
+  var prevPage = state._currentPage;
+
+  state._currentPage = page;
+
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+
+  var pg = document.getElementById('page-' + page);
+
+  if (pg) pg.classList.add('active');
+
+  setActiveNav(page);
+
+  if (page === 'game') {
+
+    renderGame();
+
+  }
+
+  if (page === 'setup') { renderSetup(); }
+
+  if (page === 'tend') {
+
+    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
+
+  }
+
+  if (page === 'tools') {
+
+    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
+
+    processOfflineQueues();
+
+  }
+
+  if (page === 'end') renderEnd();
+
+  if (page === 'stats') {
+
+    if (prevPage !== 'stats') state._historyPage = 0;
+
+    renderStats();
+
+    processOfflineQueues();
+
+  }
+
+  // 更新底部版本号
+
+  var fv = document.getElementById('page-footer-version');
+
+  if (fv) fv.textContent = '版本: ' + SW_VERSION;
+
+}
+
+
+
+// 游戏导航入口：未开始游戏则提示先去 setup 配置
+
+function goToGame() {
+
+  if (!state.missions || state.missions.length === 0) {
+
+    toast('请先在设置页面配置游戏参数', 'warn');
+
+    showPage('setup');
+
+    return;
+
+  }
+
+  showPage('game');
+
+}
+
+
 
 /* ==================== SETUP RENDER ==================== */
 
+
+
 function renderSetup() {
+
   var h = '';
+
   for (var i = 6; i <= 10; i++) {
+
     h += '<div class="count-btn' + (state.playerCount === i ? ' selected' : '') + '" onclick="setPlayerCount(' + i + ')">' + i + '</div>';
+
   }
+
   $('count-grid').innerHTML = h;
 
+
+
   h = '';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var curName = state.playerNames[i];
 
+
+
     // Collect names already taken by other players
+
     var takenNames = {};
+
     for (var k = 0; k < state.playerCount; k++) {
+
       if (k === i) continue;
+
       takenNames[state.playerNames[k]] = true;
+
     }
+
+
 
     h += '<div class="player-setup-row">';
+
     h += '<span class="idx">' + (i + 1) + '号</span>';
+
     h += '<select onchange="setPlayerName(' + i + ',this.value)">';
+
     var sortedPool = getSortedNamePool();
+
     for (var j = 0; j < sortedPool.length; j++) {
+
       var nm = sortedPool[j];
+
       if (takenNames[nm] && nm !== curName) continue;
+
       h += '<option value="' + nm + '"' + (nm === curName ? ' selected' : '') + '>' + nm + '</option>';
+
     }
+
     if (namePool.indexOf(curName) === -1) {
+
       h += '<option value="' + curName + '" selected>' + curName + '</option>';
+
     }
+
     h += '</select>';
+
     h += '<button class="btn small swap-seat-btn" id="swap-seat-' + i + '" onclick="toggleSwapSeat(' + i + ')" title="换座">⇄</button>';
+
     h += '</div>';
+
   }
+
   $('player-names').innerHTML = h;
 
+
+
   h = '<div class="role-horizontal">';
+
   h += '<div class="good-section">';
+
   h += '<span class="faction-label good">好人方</span>';
+
   h += '<div class="role-group">';
+
   for (var i = 0; i < GOOD_ROLES.length; i++) {
+
     var r = GOOD_ROLES[i];
+
     var checked = state.activeRoles.indexOf(r) !== -1;
+
     h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
+
   }
+
   h += '</div></div>';
+
   h += '<div class="evil-section">';
+
   h += '<span class="faction-label evil">反方</span>';
+
   h += '<div class="role-group">';
+
   for (var i = 0; i < EVIL_ROLES.length; i++) {
+
     var r = EVIL_ROLES[i];
+
     var checked = state.activeRoles.indexOf(r) !== -1;
+
     h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
+
   }
+
   h += '</div></div>';
+
   h += '<div class="neutral-section">';
+
   h += '<span class="faction-label neutral">中立方</span>';
+
   h += '<div class="role-group">';
+
   for (var i = 0; i < NEUTRAL_ROLES.length; i++) {
+
     var r = NEUTRAL_ROLES[i];
+
     var checked = state.activeRoles.indexOf(r) !== -1;
+
     h += '<label class="' + (checked ? 'checked' : '') + '" onclick="toggleRole(\'' + r + '\')">' + r + '</label>';
+
   }
+
   h += '</div></div></div>';
+
   $('role-checkbox-grid').innerHTML = h;
 
+
+
   var mc = MISSION_COUNTS[state.playerCount];
+
   $('mission-info').textContent = mc ? mc.join('-') : '请先选择人数';
+
   // Sync lady toggle button UI
+
   var ladyRow = document.getElementById('lady-check-row');
+
   if (ladyRow) {
+
     if (state.ladyOfLakeEnabled) { ladyRow.classList.add('checked'); }
+
     else { ladyRow.classList.remove('checked'); }
+
   }
+
   var excaliburRow = document.getElementById('excalibur-row');
+
   if (excaliburRow) {
+
     if (state.excaliburEnabled) { excaliburRow.classList.add('checked'); }
+
     else { excaliburRow.classList.remove('checked'); }
+
   }
+
   // 设置版本号
+
   var vi = document.getElementById('version-info');
+
   if (vi) vi.textContent = '版本: ' + SW_VERSION;
+
 }
+
+
 
 function setPlayerCount(n) {
+
   var oldNames = state.playerNames;
+
   var oldSelf = state.selfIndex;
+
   state.playerCount = n;
+
   state.activeRoles = (n === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客'] : DEFAULT_ACTIVE_ROLES.slice();
+
   state.playerNames = [];
+
   for (var i = 0; i < n; i++) {
+
     state.playerNames[i] = (oldNames[i] && oldNames[i].indexOf('玩家') !== 0) ? oldNames[i] : ('玩家' + (i + 1));
+
   }
+
   state.selfIndex = oldSelf < n ? oldSelf : -1;
+
   _swapSeatFirst = null;
+
   state.tendencies = {};
+
   state.consecutiveRejects = {};
+
   state.roundTendencies = [];
+
   for (var i = 0; i < n; i++) {
+
     if (!(i in state.tendencies)) state.tendencies[i] = 50;
+
     state.consecutiveRejects[i] = 0;
+
   }
+
   state.missions = [];
+
   state.currentRound = 0;
+
   state.winner = null;
+
   renderSetup();
+
 }
+
+
 
 function setPlayerName(idx, name) {
+
   state.playerNames[idx] = name;
+
   renderSetup();
+
 }
+
+
 
 function toggleRole(role) {
+
   var pos = state.activeRoles.indexOf(role);
+
   if (pos !== -1) {
+
     state.activeRoles.splice(pos, 1);
 
+
+
   } else {
+
     state.activeRoles.push(role);
+
   }
+
   renderSetup();
+
 }
+
+
 
 function _addNameCore(name) {
+
   if (!name) { toast('请输入名字', 'warn'); return false; }
+
   if (namePool.indexOf(name) !== -1) { toast('名字已存在', 'warn'); return false; }
+
   namePool.push(name);
+
   saveNamePool();
+
   // Sync to Supabase
+
   var sb = getSupabase();
+
   if (sb) {
+
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+
       if (res.error) console.warn('[Supabase] add name_pool failed:', res.error);
+
     });
+
   }
+
   renderSetup();
+
   renderNamePoolList();
+
   toast('已添加「' + name + '」');
+
   return true;
+
 }
+
+
 
 var _swapSeatFirst = null;
+
 var _endSwapRoleFirst = null;
 
+
+
 function toggleSwapSeat(idx) {
+
   if (_swapSeatFirst === null) {
+
     _swapSeatFirst = idx;
+
     var btn = document.getElementById('swap-seat-' + idx);
+
     if (btn) { btn.classList.add('swapping'); btn.textContent = '⇄'; }
+
     toast('已选中 ' + (idx + 1) + ' 号，再点另一位的换座按钮完成互换');
+
   } else if (_swapSeatFirst === idx) {
+
     _swapSeatFirst = null;
+
     var btn = document.getElementById('swap-seat-' + idx);
+
     if (btn) { btn.classList.remove('swapping'); btn.textContent = '⇄'; }
+
     toast('已取消');
+
   } else {
+
     var a = _swapSeatFirst;
+
     var b = idx;
+
     // Swap names
+
     var tmp = state.playerNames[a];
+
     state.playerNames[a] = state.playerNames[b];
+
     state.playerNames[b] = tmp;
+
     _swapSeatFirst = null;
+
     renderSetup();
+
     toast((a + 1) + ' 号与 ' + (b + 1) + ' 号已互换');
+
   }
+
 }
+
+
 
 function statsAddName() {
+
   var input = document.getElementById('stats-add-name-input');
+
   if (!input) return;
+
   var name = input.value.trim();
+
   if (_addNameCore(name)) input.value = '';
+
 }
+
+
 
 function deleteNameFromPool(name) {
+
   var idx = namePool.indexOf(name);
+
   if (idx === -1) return;
+
   namePool.splice(idx, 1);
+
   saveNamePool();
+
   // Sync to Supabase
+
   var sb = getSupabase();
+
   if (sb) {
+
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+
       if (res.error) console.warn('[Supabase] delete name_pool failed:', res.error);
+
     });
+
   }
+
   // Update player names that reference the deleted name
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (state.playerNames[i] === name) {
+
       state.playerNames[i] = '玩家' + (i + 1);
+
     }
+
   }
+
   renderSetup();
+
   renderNamePoolList();
+
   toast('已删除「' + name + '」');
+
 }
+
+
 
 function editNameInPool(oldName) {
+
   var newName = prompt('修改玩家姓名「' + oldName + '」：', oldName);
+
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
   newName = newName.trim();
+
   if (newName.length > 10) { toast('名字不能超过10个字符', 'warn'); return; }
+
   if (namePool.indexOf(newName) !== -1) { toast('名字已存在', 'warn'); return; }
+
   var idx = namePool.indexOf(oldName);
+
   if (idx !== -1) {
+
     namePool[idx] = newName;
+
   } else {
+
     namePool.push(newName);
+
   }
+
   saveNamePool();
+
   // Sync to Supabase
+
   var sb = getSupabase();
+
   if (sb) {
+
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }).then(function(res) {
+
       if (res.error) console.warn('[Supabase] edit name_pool failed:', res.error);
+
     });
+
   }
+
   // Update player names that reference the old name
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (state.playerNames[i] === oldName) {
+
       state.playerNames[i] = newName;
+
     }
+
   }
+
   renderSetup();
+
   renderNamePoolList();
+
   toast('已修改「' + oldName + '」→「' + newName + '」');
+
 }
+
+
 
 function renderNamePoolList() {
+
   var el = $('name-pool-list');
+
   if (!el) return;
+
   if (namePool.length === 0) {
+
     el.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:10px;font-size:13px">暂无玩家姓名</p>';
+
     return;
+
   }
+
   var h = '';
+
   for (var i = 0; i < namePool.length; i++) {
+
     var nm = namePool[i];
+
     h += '<div class="name-pool-item">';
+
     h += '<span class="np-name">' + nm + '</span>';
+
     h += '<button class="btn small np-edit-btn" onclick="editNameInPool(\'' + nm.replace(/'/g, "\\'") + '\')" title="修改">&#9998; 编辑</button>';
+
     h += '<button class="btn small danger np-del-btn" onclick="deleteNameFromPool(\'' + nm.replace(/'/g, "\\'") + '\')" title="删除">&times; 删除</button>';
+
     h += '</div>';
+
   }
+
   el.innerHTML = h;
+
 }
+
+
 
 function showNamePoolModal() {
+
   renderNamePoolList();
+
   var overlay = document.getElementById('name-pool-modal-overlay');
+
   if (overlay) overlay.classList.add('active');
-}
-function closeNamePoolModal(event) {
-  if (event && event.target !== document.getElementById('name-pool-modal-overlay')) return;
-  var overlay = document.getElementById('name-pool-modal-overlay');
-  if (overlay) overlay.classList.remove('active');
+
 }
 
-function toggleLadyOfLake() {
-  state.ladyOfLakeEnabled = !state.ladyOfLakeEnabled;
-  var row = document.getElementById('lady-check-row');
-  if (state.ladyOfLakeEnabled) { row.classList.add('checked'); }
-  else { row.classList.remove('checked'); }
+function closeNamePoolModal(event) {
+
+  if (event && event.target !== document.getElementById('name-pool-modal-overlay')) return;
+
+  var overlay = document.getElementById('name-pool-modal-overlay');
+
+  if (overlay) overlay.classList.remove('active');
+
 }
+
+
+
+function toggleLadyOfLake() {
+
+  state.ladyOfLakeEnabled = !state.ladyOfLakeEnabled;
+
+  var row = document.getElementById('lady-check-row');
+
+  if (state.ladyOfLakeEnabled) { row.classList.add('checked'); }
+
+  else { row.classList.remove('checked'); }
+
+}
+
+
+
 
 
 function toggleExcalibur() {
+
   state.excaliburEnabled = !state.excaliburEnabled;
+
   if (!state.excaliburHistory) state.excaliburHistory = [];
+
   renderSetup();
+
 }
+
+
 
 function setTimerMode(mode) {
+
   state.timerMode = mode;
+
   var allOptRow = document.getElementById('timer-all-options');
+
   var perOptRow = document.getElementById('timer-per-options');
+
   if (allOptRow) allOptRow.style.display = (mode === 'all') ? 'flex' : 'none';
+
   if (perOptRow) perOptRow.style.display = (mode === 'per') ? 'flex' : 'none';
+
   ['off','all','per'].forEach(function(m) {
+
     var btn = document.getElementById('timer-mode-' + m);
+
     if (btn) btn.className = 'timer-mode-btn' + (m === mode ? ' selected' : '');
+
   });
+
   if (mode === 'all') setAllTimerSeconds(300);
+
   if (mode === 'per') setTimerSeconds(60);
+
 }
+
+
 
 function setTimerSecondsInput() {
+
   var input = document.getElementById('timer-seconds-input');
+
   if (!input) return;
+
   var val = parseInt(input.value);
+
   if (isNaN(val) || val < 10) { val = 10; input.value = 10; }
+
   if (val > 300) { val = 300; input.value = 300; }
+
   state.timerSeconds = val;
+
   [45,60,75,90].forEach(function(s) {
+
     var btn = document.getElementById('timer-per-opt-' + s);
+
     if (btn) btn.className = 'timer-opt-btn';
+
   });
+
 }
+
+
 
 function setTimerSeconds(sec) {
+
   state.timerSeconds = sec;
+
   var input = document.getElementById('timer-seconds-input');
+
   if (input) input.value = sec;
+
   [45,60,75,90].forEach(function(s) {
+
     var btn = document.getElementById('timer-per-opt-' + s);
+
     if (btn) btn.className = 'timer-opt-btn' + (s === sec ? ' selected' : '');
+
   });
+
 }
 
+
+
 function setAllTimerSeconds(sec) {
+
   state.timerSeconds = sec;
+
   [180,240,300].forEach(function(s) {
+
     var btn = document.getElementById('timer-all-opt-' + s);
+
     if (btn) btn.className = 'timer-opt-btn' + (s === sec ? ' selected' : '');
+
   });
+
 }
+
 /* ==================== GAME START ==================== */
+
 function startGame() {
+
   ensureAudioContext();
+
   if (!MISSION_COUNTS[state.playerCount]) { toast('请选择玩家人数', 'warn'); return; }
+
   if (state.activeRoles.length === 0) { toast('请至少选择一个本局角色', 'warn'); return; }
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (state.playerNames[i] === '阿弟') { state.selfIndex = i; break; }
+
   }
+
   // 防御：保证玩家名数组长度=人数
+
   state.playerNames = (state.playerNames || []).slice(0, state.playerCount);
+
   for (var pn = 0; pn < state.playerCount; pn++) {
+
     if (!state.playerNames[pn]) state.playerNames[pn] = '玩家' + (pn + 1);
+
   }
+
   doStartGame();
+
 }
+
+
+
 
 
 function doStartGame() {
+
   // 防御性修复：确保玩家数组长度与选择人数一致
+
   state.playerNames = (state.playerNames || []).slice(0, state.playerCount);
+
   for (var pn = 0; pn < state.playerCount; pn++) {
+
     if (!state.playerNames[pn]) state.playerNames[pn] = '玩家' + (pn + 1);
+
   }
+
   state.missions = MISSION_COUNTS[state.playerCount].map(function(size, i) {
+
     return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, shieldedFails: 0, launchFailures: 0, launchAttempts: [] };
+
   });
+
   state.currentRound = 0;
+
   state.winner = null;
+
   state._firstLeaderPicked = false;
+
   state._lastLeaderIdx = -1;
+
   state.assassinTarget = null;
+
   state.assassinFromMission = false;
+
   state.assassinMode = false;
+
   state.gameStartTime = _bjTimestamp();
+
   state._assassinPickTarget = null;
+
   state._assassinAfterRound = null;
+
   state.lancelotFlipped = false;
+
   state.lancelotFlipCount = 0;
+
   state.lancelotRoundFlips = [false, false, false, false, false];
+
   state.lancelotDrawResults = [false]; // index 0 = round 0, no draw before game starts
+
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+
   state.lancelotDeck = hasLancelot ? shuffleLancelotDeck() : null;
+
   state.autoRoles = null;
+
   state.ladyLakeChecks = [];
+
   state.ladyCheckHistory = [];
+
   state.ladyLakeHolder = -1;
+
   state._undoStack = [];
+
   state._ladyCheckTriggeredThisRound = false;
+
   _swapSeatFirst = null;
+
   state.roundTendencies = [];
+
   state.identityMarks = [];
+
   state.playerPredictions = {};
+
   state.speakerOrder = [];
+
   state.currentSpeakerIdx = -1;
+
   state.speakTimes = {};
+
   state._teamConfirmedPending = false;
+
   state._excaliburPreConfirm = false;
+
   state.playerRoles = state.playerRoles || [];
+
   stopTimer();
+
   for (var i = 0; i < state.playerCount; i++) {
+
     state.tendencies[i] = 50;
+
     state.consecutiveRejects[i] = 0;
+
   }
+
   state.roundTendencies = [];
+
   saveLastGame();
+
   showPage('game');
+
   var msg = '游戏开始！共 ' + state.playerCount + ' 名玩家，5 轮任务';
+
   if (state.myRole) msg += '（你的身份：' + state.myRole + '）';
+
   toast(msg);
+
 }
+
+
 
 /* ==================== GAME RENDER ==================== */
 
+
+
 function renderLancelotFlipTracker() {
+
   var el = $('lancelot-flip-tracker');
+
   if (!el) return;
+
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+
   if (!hasLancelot) { el.style.display = 'none'; return; }
+
   el.style.display = 'flex';
+
   var flipSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18A7 7 0 0 1 17 6"/><polyline points="16 2 18 6 14 6"/><path d="M17 6A7 7 0 0 1 7 18"/><polyline points="8 22 6 18 10 18"/></svg>';
+
   var flipImg = '<img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+
   var remaining = state.lancelotDeck ? state.lancelotDeck.length : 0;
 
+
+
   var h = '<div class="lancelot-flip-row">';
+
   for (var i = 0; i < 5; i++) {
+
     var cls = 'lancelot-flip-dot';
+
     var inner = flipSVG;
+
     var drawInfo = '';
 
+
+
     // Draw result sub-label
+
     if (i === 0) {
+
       cls += ' blank';
+
       drawInfo = '<div class="lancelot-draw-label" style="color:var(--text-dim);font-size:10px">第1轮</div>';
+
     } else if (i < state.lancelotDrawResults.length && state.lancelotDrawResults[i] !== null && state.lancelotDrawResults[i] !== undefined) {
+
       var drew = state.lancelotDrawResults[i];
+
       if (drew) {
+
         drawInfo = '<div class="lancelot-draw-label flip-label"><img src="images/兰斯洛特转移.png?v=3" style="width:16px;height:16px;border-radius:50%;vertical-align:middle"> 反转</div>';
+
       } else {
+
         drawInfo = '<div class="lancelot-draw-label blank-label">&#9711; 未反转</div>';
+
       }
+
     } else if (i > state.currentRound) {
+
       cls += ' future';
+
       drawInfo = '<div class="lancelot-draw-label" style="color:var(--text-dim);font-size:10px">待抽</div>';
+
     } else {
+
       // Round happened but draw result not recorded (unlikely)
+
       drawInfo = '<div class="lancelot-draw-label" style="color:var(--orange);font-size:10px">?</div>';
+
     }
+
+
 
     // Flip dot styling
+
     if (i > 0 && i <= state.currentRound && state.lancelotRoundFlips[i]) {
+
       cls += ' flipped'; inner = flipImg;
+
     } else if (i > 0 && i <= state.currentRound && !(state.lancelotDrawResults[i] !== undefined && state.lancelotDrawResults[i] !== null)) {
+
       cls += ' future';
+
     } else if (i > state.currentRound) {
+
       cls += ' future';
+
     } else if (i > 0 && i <= state.currentRound) {
+
       cls += ' no-flip';
+
     }
 
+
+
     h += '<div class="lancelot-flip-col"><div class="' + cls + '">' + inner + '</div>' + drawInfo + '</div>';
+
   }
+
   h += '</div>';
 
+
+
   // Remaining deck counter
+
   if (state.lancelotDeck && state.lancelotDeck.length > 0) {
+
     h += '<div class="lancelot-deck-counter" title="剩余牌堆"><span class="deck-icon">&#127136;</span><span class="deck-num">' + remaining + '</span></div>';
+
   } else if (state.lancelotDeck) {
+
     h += '<div class="lancelot-deck-counter empty" title="牌堆已耗尽"><span class="deck-icon">&#127136;</span><span class="deck-num">0</span></div>';
+
   }
+
+
 
   el.innerHTML = h;
+
 }
+
+
 
 function renderGame() {
+
   renderRoundTracker();
+
   renderLancelotFlipTracker();
+
   renderStepPanel();
+
   renderLadyLakeResults();
+
   renderLadyLakeHolderInfo();
+
   renderLadyLakeEntry();
+
   renderTimerDisplay();
+
   renderReviewEntry();
+
   renderAssassinButton();
+
   renderUndoButton();
+
   renderScreenshotButton();
+
   $('launch-fail-area').innerHTML = '';
+
  ;
+
 }
 
+
+
 /* ==================== ASSASSIN MODE (in-game) ==================== */
+
 function renderAssassinButton() {
+
   var existing = document.getElementById('assassin-float-btn');
+
   if (state.winner) {
+
     if (existing) existing.remove();
+
     return;
+
   }
+
   if (!existing) {
+
     var btn = document.createElement('button');
+
     btn.id = 'assassin-float-btn';
+
     btn.className = 'assassin-float-btn';
+
     btn.textContent = '拍刀';
+
     btn.title = '反方拍刀：选择一名玩家作为梅林';
+
     btn.addEventListener('click', function(e) {
+
       e.stopPropagation();
+
       enterAssassinMode();
+
     });
+
     var gamePage = document.getElementById('page-game');
+
     if (gamePage) gamePage.appendChild(btn);
+
   }
+
 }
+
+
 
 /* ==================== UNDO SYSTEM ==================== */
 
+
+
 // Replacer for JSON serialization: exclude timer interval references (non-serializable)
+
 function _undoReplacer(key, val) {
+
   if (key === '_assassinTimerInterval' || key === 'timerInterval' ||
+
       key === '_assassinTimerRemaining' || key === '_assassinTimerEnd' ||
+
       key === '_undoStack' || key === '_timerEnd') return undefined;
+
   return val;
+
 }
+
+
 
 function saveUndo() {
+
   var snap = JSON.parse(JSON.stringify(state, _undoReplacer));
+
   state._undoStack.push(snap);
+
   if (state._undoStack.length > 60) state._undoStack.shift();
+
   renderUndoButton();
+
 }
+
+
 
 function performUndo() {
+
   if (state._undoStack.length === 0) { toast('没有可撤销的操作', 'warn'); return; }
+
   if (state.winner) { toast('游戏已结束，无法撤销', 'warn'); return; }
+
   var snap = state._undoStack.pop();
+
   // Deep restore: copy each key from snapshot
+
   var keys = Object.keys(snap);
+
   for (var i = 0; i < keys.length; i++) {
+
     state[keys[i]] = snap[keys[i]];
+
   }
+
   // 必须在清除 state.timerInterval 之前停止正在运行的计时器，否则 stopTimer 看到 null 会跳过 clearInterval
+
   stopTimer();
+
   // Fix non-serializable fields
+
   state._assassinTimerInterval = null;
+
   state._assassinTimerEnd = 0;
+
   state._timerEnd = 0;
+
   state.timerInterval = null;
+
   state.timerRemaining = 0;
+
   state.assassinMode = false;
+
   state._assassinPickTarget = null;
+
   // Exit any assassin overlay
+
   var ao = document.getElementById('assassin-overlay');
+
   if (ao) ao.remove();
+
   // 取消 AudioContext 中已调度的所有音频（撤销计时时播放的提示音等）
+
   if (window._audioCtx) {
+
     try { window._audioCtx.close(); } catch(_) {}
+
     window._audioCtx = null;
+
   }
+
   // 清除计时结束后调度的 speakEnd / transitionToVotes 回调，防止撤销后重启计时
+
   clearTimeout(window._undoSpeakEndTimeout);
+
   clearTimeout(window._undoTransitionTimeout);
+
   renderGame();
+
   renderUndoButton();
+
   renderTimerDisplay();
+
   toast('已撤销', 'info');
+
 }
+
+
 
 function renderUndoButton() {
+
   var existing = document.getElementById('undo-float-btn');
+
   if (state.winner) {
+
     if (existing) existing.style.display = 'none';
+
     return;
+
   }
+
   if (!existing) {
+
     var btn = document.createElement('button');
+
     btn.id = 'undo-float-btn';
+
     btn.className = 'undo-float-btn';
+
     btn.textContent = '撤销';
+
     btn.title = '撤销上一步操作';
+
     btn.addEventListener('click', function(e) {
+
       e.stopPropagation();
+
       performUndo();
+
     });
+
     var gamePage = document.getElementById('page-game');
+
     if (gamePage) gamePage.appendChild(btn);
+
   }
+
   var btn2 = document.getElementById('undo-float-btn');
+
   if (btn2) btn2.style.display = state._undoStack.length > 0 ? '' : 'none';
+
 }
+
+
 
 /* ==================== SCREENSHOT BUTTON (LIVE) ==================== */
+
 function renderScreenshotButton() {
+
   var existing = document.getElementById('screenshot-float-btn');
+
   if (state.winner) {
+
     if (existing) existing.remove();
+
     return;
+
   }
+
   if (!state.missions || !state.missions.length) return;
+
   if (!existing) {
+
     var btn = document.createElement('button');
+
     btn.id = 'screenshot-float-btn';
+
     btn.className = 'screenshot-float-btn';
+
     btn.textContent = '截图';
+
     btn.title = '生成当前进度截图';
+
     btn.addEventListener('click', function(e) {
+
       e.stopPropagation();
+
       generateLiveScreenshot();
+
     });
+
     var undoBtn = document.getElementById('undo-float-btn');
+
     if (undoBtn && undoBtn.parentNode) {
+
       undoBtn.parentNode.insertBefore(btn, undoBtn.nextSibling);
+
     } else {
+
       var gamePage = document.getElementById('page-game');
+
       if (gamePage) gamePage.appendChild(btn);
+
     }
+
   }
+
 }
+
+
 
 function generateLiveScreenshot() {
+
   try {
+
   var W = 750;
+
   var SCALE = 6;
+
   var PAD = 28;
+
   var contentW = W - PAD * 2;
 
+
+
   var canvas = document.createElement('canvas');
+
   canvas.width = W * SCALE;
+
   var ctx = canvas.getContext('2d');
 
+
+
   var pc = state.playerCount;
+
   var ids = [];
+
   for (var i = 0; i < pc; i++) {
+
     ids.push({ name: state.playerNames[i] || ('玩家' + (i + 1)), role: '' });
+
   }
+
   function pn(idx) { var p = ids[idx]; return (idx + 1) + '\u53f7 ' + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+
   function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+
   function tw(text, size) {
+
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     return ctx.measureText(text).width;
+
   }
+
   function dt(text, x, y, size, color, align) {
+
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     ctx.fillStyle = color || TXT;
+
     ctx.textAlign = align || 'left';
+
     ctx.textBaseline = 'top';
+
     ctx.fillText(text, x, y);
+
   }
+
   function rr(x, y, w, h, r) {
+
     ctx.beginPath();
+
     ctx.moveTo(x + r, y);
+
     ctx.lineTo(x + w - r, y);
+
     ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+
     ctx.lineTo(x + w, y + h - r);
+
     ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+
     ctx.lineTo(x + r, y + h);
+
     ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+
     ctx.lineTo(x, y + r);
+
     ctx.quadraticCurveTo(x, y, x + r, y);
+
     ctx.closePath();
+
   }
+
   function dtSegments(x, y, segs, sz) {
+
     ctx.font = sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     ctx.textBaseline = 'top';
+
     var cx = x;
+
     for (var si = 0; si < segs.length; si++) {
+
       ctx.fillStyle = segs[si].color || TXT;
+
       ctx.textAlign = 'left';
+
       ctx.fillText(segs[si].text, cx, y);
+
       cx += tw(segs[si].text, sz);
+
     }
+
     return cx;
+
   }
+
+
 
   var GOLD = '#f4d03f';
+
   var GREEN = '#27ae60';
+
   var GREEN_BRIGHT = '#2ecc71';
+
   var RED = '#e74c3c';
+
   var BLUE = '#5dade2';
+
   var TXT = '#e8dcc8';
+
   var TXT_SEC = '#a89070';
+
   var TXT_DIM = '#7a6e5e';
 
+
+
   // Compute stats
+
   var doneMissions = 0, failMissions = 0;
+
   for (var mi = 0; mi < state.missions.length; mi++) {
+
     if (state.missions[mi].result === 'success') doneMissions++;
+
     else if (state.missions[mi].result === 'fail') failMissions++;
+
   }
+
+
 
   function calcMissionCardH(m) {
+
     var attempts = m.launchAttempts || [];
+
     if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
+
     var h = 10 + 18 + 6;
+
     for (var a = 0; a < attempts.length; a++) {
+
       var att = attempts[a];
+
       h += 18;
+
       var voteLine = '投票：';
+
       for (var vi = 0; vi < pc; vi++) {
+
         var vv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : (att.votes[pn(vi)] !== undefined) ? att.votes[pn(vi)] : null;
+
         voteLine += pnShort(vi) + (vv === 'approve' ? '✓' : vv === 'reject' ? '✗' : '?') + ' ';
+
       }
+
       var approves = 0, rejects = 0;
+
       for (var vi2 = 0; vi2 < pc; vi2++) {
+
         var vv2 = (att.votes[vi2] !== undefined) ? att.votes[vi2] : (att.votes[String(vi2)] !== undefined) ? att.votes[String(vi2)] : (att.votes[pn(vi2)] !== undefined) ? att.votes[pn(vi2)] : null;
+
         if (vv2 === 'approve') approves++; else if (vv2 === 'reject') rejects++;
+
       }
+
       voteLine += ' — ' + approves + ':' + rejects;
+
       h += (tw(voteLine, 10) > contentW - 28) ? 34 : 16;
+
       h += 2;
+
     }
+
     if (m.result) {
+
       h += 18 + 10;
+
       if (m.result === 'success' && m.shieldedFails) h += 18;
+
     }
+
     return h;
+
   }
+
+
 
   // Layout sections: header, divider, players, divider, missions, optional rules, bottom divider, footer
+
   var secH = [];
+
   secH.push(28 + 8 + 26 + 4 + 16 + 16); // header
+
   secH.push(16); // divider 1
+
   secH.push(20 + Math.ceil(pc / 2) * 28 + 4); // player list
+
   secH.push(16); // divider 2
+
   var questH = 20 + 12;
+
   for (var qi = 0; qi < state.missions.length; qi++) {
+
     var m = state.missions[qi];
+
     if (!m.result && qi > state.currentRound) continue;
+
     questH += calcMissionCardH(m) + 8;
+
   }
+
   questH -= 8;
+
   secH.push(questH + 8);
+
   var rulesH = 0;
+
   var hasLady = state.ladyCheckHistory && state.ladyCheckHistory.length > 0;
+
   var hasExcalibur = state.excaliburHistory && state.excaliburHistory.length > 0;
+
   var hasAnyRule = hasLady || hasExcalibur;
+
   if (hasAnyRule) {
+
     rulesH += 20 + 8;
+
     if (hasLady) rulesH += 18 * state.ladyCheckHistory.length + 4;
+
     if (hasExcalibur) rulesH += 18 * state.excaliburHistory.length + 4;
+
     secH.push(rulesH + 8);
+
   }
+
   secH.push(12); // bottom divider
+
   secH.push(18 + 6 + 18 + 16 + 20); // footer
 
+
+
   var totalH = PAD * 2;
+
   for (var si = 0; si < secH.length; si++) totalH += secH[si];
+
   canvas.height = Math.ceil(totalH * SCALE);
+
   ctx.scale(SCALE, SCALE);
 
+
+
   var grad = ctx.createLinearGradient(0, 0, 0, totalH);
+
   grad.addColorStop(0, '#1a0e30');
+
   grad.addColorStop(0.4, '#120926');
+
   grad.addColorStop(1, '#0d0617');
+
   ctx.fillStyle = grad;
+
   ctx.fillRect(0, 0, W, totalH);
 
+
+
   var y = PAD;
+
   var si = 0;
 
+
+
   // === Header ===
+
   (function() {
+
     // In-progress badge
+
     var badgeText = '游戏进行中';
+
     var badgeW = tw(badgeText, 15) + 36;
+
     var bx = (W - badgeW) / 2;
+
     rr(bx, y, badgeW, 28, 14);
+
     var g = ctx.createLinearGradient(bx, 0, bx + badgeW, 0);
+
     g.addColorStop(0, '#5b3d8e'); g.addColorStop(1, '#7c5bbf');
+
     ctx.fillStyle = g;
+
     ctx.fill();
+
     dt(badgeText, W/2, y + 6, 15, '#fff', 'center');
+
     var ty = y + 28 + 8;
+
     dt('阿瓦隆（进行中）', W/2, ty, 20, GOLD, 'center');
+
     var iy = ty + 26 + 4;
+
     dt((state.gameStartTime || _bjTimestamp()) + ' · ' + state.playerCount + '人局', W/2, iy, 11, TXT_DIM, 'center');
+
   })();
+
   y += secH[si++];
 
+
+
   // === Divider ===
+
   (function() {
+
     var dy = y + 8;
+
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+
     g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
+
   })();
+
   y += secH[si++];
+
+
 
   // === Player List (no roles) ===
+
   (function() {
+
     ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+
     dt('玩家列表', PAD + 12, y + 1, 13, TXT_SEC, 'left');
+
     var gridY = y + 20;
+
     var colW = (contentW - 12) / 2;
+
     for (var pi = 0; pi < pc; pi++) {
+
       var col = pi % 2, row = Math.floor(pi / 2);
+
       var px = PAD + col * (colW + 12), py = gridY + row * 28;
+
       ctx.fillStyle = 'rgba(255,255,255,0.04)';
+
       rr(px, py, colW, 24, 6); ctx.fill();
+
       dt('⬢', px + 8, py + 5, 10, TXT_DIM, 'left');
+
       dt(pn(pi), px + 22, py + 4, 13, TXT, 'left');
+
     }
+
   })();
+
   y += secH[si++];
+
+
 
   // === Divider ===
+
   (function() {
+
     var dy = y + 8;
+
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+
     g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
+
   })();
+
   y += secH[si++];
+
+
 
   // === Missions ===
+
   (function() {
+
     ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+
     dt('任务历程', PAD + 12, y + 1, 13, TXT_SEC, 'left');
+
     var qy = y + 20 + 12;
+
     for (var qi = 0; qi < state.missions.length; qi++) {
+
       var m = state.missions[qi];
+
       // Skip future rounds (no data yet)
+
       if (!m.result && qi > state.currentRound) continue;
+
       var isSuc = m.result === 'success';
+
       var isShielded = m.result === 'success' && m.shieldedFails;
+
       var isPureSuc = m.result === 'success' && !m.failCount && !m.shieldedFails;
+
       var attempts = m.launchAttempts || [];
+
       if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
+
       var cardH = calcMissionCardH(m);
+
       var cx = PAD + 16;
+
       ctx.fillStyle = 'rgba(255,255,255,0.04)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
+
       var leftColor = isSuc ? GREEN : (m.result === 'fail' ? RED : '#7c5bbf');
+
       ctx.fillStyle = leftColor; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
+
       var roundLabel = '任务 ' + (qi + 1) + ' · ' + m.size + '人出战';
+
       if (!m.result) roundLabel += ' · 进行中';
+
       dt(roundLabel, cx, qy + 10, 13, TXT_SEC, 'left');
+
       if (m.result) {
+
         var tagText = isShielded ? ('✓ 成功（含' + m.shieldedFails + '张失败票）') : isPureSuc ? '✓ 成功（全票通过）' : isSuc ? '✓ 成功' : '✗ 失败';
+
         var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
+
         ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
+
         dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
+
       } else {
+
         var tagText2 = '⏳ 进行中';
+
         var tagW2 = tw(tagText2, 11) + 16, tagX2 = PAD + contentW - 16 - tagW2;
+
         ctx.fillStyle = 'rgba(124,91,191,0.2)'; rr(tagX2, qy + 9, tagW2, 18, 9); ctx.fill();
+
         dt(tagText2, PAD + contentW - 16 - tagW2 / 2, qy + 11, 11, '#b39ddb', 'center');
+
       }
+
       var ay = qy + 10 + 18 + 8;
+
       for (var a = 0; a < attempts.length; a++) {
+
         var att = attempts[a], isLast = (a === attempts.length - 1);
+
         var approves = 0, rejects = 0;
+
         for (var vk = 0; vk < pc; vk++) {
+
           var vv = (att.votes[vk] !== undefined) ? att.votes[vk] : (att.votes[String(vk)] !== undefined) ? att.votes[String(vk)] : (att.votes[pn(vk)] !== undefined) ? att.votes[pn(vk)] : null;
+
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
+
         }
+
         var passed = approves > pc / 2;
+
         var leader = parseLeaderIndex(att.leader);
+
         var teamIndices = att.team || [];
+
         if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
+
         var hSegs = [
+
           { text: '第' + (a + 1) + '次组队 ', color: TXT_DIM },
+
           { text: '★' + pnShort(leader), color: GOLD },
+
           { text: '提议：', color: TXT_DIM }
+
         ];
+
         for (var ti = 0; ti < teamIndices.length; ti++) {
+
           if (ti > 0) hSegs.push({ text: '、', color: TXT_DIM });
+
           hSegs.push({ text: pnShort(teamIndices[ti]), color: TXT });
+
         }
+
         dtSegments(cx, ay, hSegs, 11);
+
         ay += 18;
+
         var vSegs = [{ text: '投票：', color: TXT_DIM }];
+
         for (var vi = 0; vi < pc; vi++) {
+
           var vvv = (att.votes[vi] !== undefined) ? att.votes[vi] : (att.votes[String(vi)] !== undefined) ? att.votes[String(vi)] : null;
+
           vSegs.push({ text: pnShort(vi), color: TXT });
+
           vSegs.push({ text: (vvv === 'approve' ? '✓' : vvv === 'reject' ? '✗' : '?') + ' ', color: vvv === 'approve' ? GREEN_BRIGHT : vvv === 'reject' ? RED : TXT_DIM });
+
         }
+
         vSegs.push({ text: ' — ' + approves + ':' + rejects + ' ' + (passed ? '通过' : '否决') + ' ' + (passed ? '✓' : '✗'), color: passed ? GREEN_BRIGHT : RED });
+
         var voteFull = '';
+
         for (var vsi = 0; vsi < vSegs.length; vsi++) voteFull += vSegs[vsi].text;
+
         if (tw(voteFull, 10) > contentW - 28) {
+
           var v1Segs = [vSegs[0]];
+
           for (var vi = 0; vi < pc; vi++) { v1Segs.push(vSegs[vi * 2 + 1]); v1Segs.push(vSegs[vi * 2 + 2]); }
+
           dtSegments(cx, ay, v1Segs, 10); ay += 16;
+
           dtSegments(cx, ay, [vSegs[vSegs.length - 1]], 10); ay += 18 + 2;
+
         } else { dtSegments(cx, ay, vSegs, 10); ay += 16 + 2; }
+
       }
+
       if (m.result) {
+
         if (m.result === 'fail') {
+
           var fs = '任务结果：✗ 失败'; if (m.failCount) fs += '（' + m.failCount + '张失败卡）';
+
           dt(fs, cx, ay, 12, RED, 'left');
+
         } else if (isShielded) {
+
           dt('任务结果：✓ 成功（含' + m.shieldedFails + '张失败票，保护轮抵消）', cx, ay, 12, '#e65100', 'left');
+
           ay += 18;
+
           // fail card details
+
           var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
+
           var evilNames = [];
+
           if (lastAtt && lastAtt.team && state.identities) {
+
             var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+
             for (var ei = 0; ei < tArr.length; ei++) {
+
               if (getPlayerFaction(state.identities[tArr[ei]].role) === 'evil') evilNames.push(pnShort(tArr[ei]));
+
             }
+
           }
+
           if (evilNames.length > 0) {
+
             dt('失败卡：' + m.shieldedFails + '张（' + evilNames.join('、') + '）', cx, ay, 12, RED, 'left');
+
           }
+
         }
+
         else if (isPureSuc) { dt('任务结果：✓ 成功（全票通过）', cx, ay, 12, GREEN_BRIGHT, 'left'); }
+
         else { dt('任务结果：✓ 成功', cx, ay, 12, GREEN_BRIGHT, 'left'); }
+
       }
+
       qy += cardH + 8;
+
     }
+
   })();
+
   y += secH[si++];
+
+
 
   // === Optional Rules ===
+
   if (hasAnyRule) {
+
     (function() {
+
       ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+
       dt('可选规则', PAD + 12, y + 1, 13, TXT_SEC, 'left');
+
       var ry = y + 20 + 8;
+
       if (hasLady) {
+
         for (var li = 0; li < state.ladyCheckHistory.length; li++) {
+
           var lc = state.ladyCheckHistory[li];
+
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
+
           var rl = lc.round ? '第' + lc.round + '轮后：' : '';
+
           dt(rl + pn(hldr) + ' 查验 ' + pn(tgt) + ' → ' + (lc.result || '?'), PAD + 12, ry, 12, TXT_SEC, 'left');
+
           ry += 18;
+
         }
+
         ry += 4;
+
       }
+
       if (hasExcalibur) {
+
         for (var exi = 0; exi < state.excaliburHistory.length; exi++) {
+
           var ex = state.excaliburHistory[exi];
+
           var desc = '王者之剑：' + (ex.holderName || '') + ' 授予 ' + (ex.targetName || '') + (ex.used ? '（已使用）' : '（未使用）');
+
           dt(desc, PAD + 12, ry, 12, TXT_SEC, 'left'); ry += 18;
+
         }
+
         ry += 4;
+
       }
+
     })();
+
     y += secH[si++];
+
   }
+
+
 
   // === Bottom Divider ===
+
   (function() {
+
     var dy = y + 6;
+
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+
     g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
+
   })();
+
   y += secH[si++];
 
+
+
   // === Footer ===
+
   (function() {
+
     dt('任务：' + doneMissions + '✓ ' + failMissions + '✗  当前第' + (state.currentRound + 1) + '轮', PAD, y, 12, TXT_DIM, 'left');
+
     var namesStr = '';
+
     for (var pi = 0; pi < pc; pi++) { namesStr += pnShort(pi); if (pi < pc - 1) namesStr += '、'; }
+
     dt('玩家：' + namesStr, PAD, y + 18, 12, TXT_DIM, 'left');
+
     ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     ctx.fillText('阿瓦隆 · The Resistance Avalon', W / 2, totalH - PAD);
+
   })();
 
+
+
   canvas.toBlob(function(blob) {
+
     if (!blob) {
+
       console.error('[Screenshot] canvas.toBlob returned null (canvas too large or tainted)');
+
       toast('截图失败：画布生成异常，请重试', 'error');
+
       return;
+
     }
+
     var dateStr = _bjFileStamp();
+
     var fileName = '阿瓦隆进行中_' + dateStr + '.png';
+
     var link = document.createElement('a');
+
     link.href = URL.createObjectURL(blob);
+
     link.download = fileName;
+
     document.body.appendChild(link);
+
     link.click();
+
     document.body.removeChild(link);
+
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
+
   }, 'image/png');
+
   console.log('[Screenshot] Live screenshot generated, canvas=' + canvas.width + 'x' + canvas.height);
+
 } catch(e) {
+
   console.error('[Screenshot] generateLiveScreenshot error:', e);
+
   toast('截图失败：' + e.message, 'error');
+
 }
+
 }
+
+
 
 function enterAssassinMode() {
+
   state.assassinMode = true;
+
   state._assassinPickTarget = null;
+
   var overlay = document.createElement('div');
+
   overlay.id = 'assassin-overlay';
+
   overlay.className = 'assassin-overlay active';
+
   var h = '<div class="assassin-modal">';
+
   h += '<h2 style="text-align:center;margin:0 0 4px">反方拍刀</h2>';
+
   h += '<div id="assassin-countdown-display"></div>';
+
   h += '<p style="text-align:center;color:var(--text-dim);font-size:13px;margin:0 0 16px">选择一名玩家作为梅林</p>';
+
   h += '<div class="assassin-player-grid">';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     h += '<button class="assassin-player-btn" onclick="pickAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div class="assassin-actions">';
+
   h += '<button class="btn primary" id="assassin-confirm-btn" disabled onclick="confirmAssassinAction()">确认拍刀</button>';
+
   h += '<button class="btn" onclick="exitAssassinMode()">取消</button>';
+
   h += '</div></div>';
+
   overlay.innerHTML = h;
+
   overlay.addEventListener('click', function(e) {
+
     if (e.target === overlay) exitAssassinMode();
+
   });
+
   document.body.appendChild(overlay);
+
   startAssassinTimer();
+
 }
+
+
 
 function exitAssassinMode() {
+
   stopAssassinTimer();
+
   state.assassinMode = false;
+
   state._assassinPickTarget = null;
+
   var overlay = document.getElementById('assassin-overlay');
+
   if (overlay) overlay.remove();
+
 }
+
+
 
 function pickAssassinTarget(idx) {
+
   state._assassinPickTarget = idx;
+
   var btns = document.querySelectorAll('#assassin-overlay .assassin-player-btn');
+
   btns.forEach(function(b, i) {
+
     b.className = 'assassin-player-btn' + (i === idx ? ' selected' : '');
+
   });
+
   var confirmBtn = document.getElementById('assassin-confirm-btn');
+
   if (confirmBtn) confirmBtn.disabled = false;
+
 }
+
+
 
 function confirmAssassinAction() {
+
   saveUndo();
+
   stopAssassinTimer();
+
   if (state._assassinPickTarget === null) return;
+
   var targetIdx = state._assassinPickTarget;
+
   var targetName = playerLabel(targetIdx);
+
   exitAssassinMode();
 
+
+
   var h = '<h2>拍刀结果</h2>';
+
   h += '<p style="text-align:center;font-size:15px;margin:12px 0">拍刀目标：<strong style="color:var(--red-bright)">' + targetName + '</strong></p>';
+
   h += '<p style="text-align:center;font-size:14px;margin-bottom:16px">目标是否为梅林？</p>';
+
   h += '<div class="modal-actions" style="justify-content:center;gap:16px">';
+
   h += '<button class="winner-btn evil" onclick="resolveInGameAssassin(true, ' + targetIdx + ')">是梅林 → 反方胜</button>';
+
   h += '<button class="winner-btn good" onclick="resolveInGameAssassin(false, ' + targetIdx + ')">不是梅林 → 好人方胜</button>';
+
   h += '</div>';
+
   showModal(h);
+
 }
+
+
 
 function resolveInGameAssassin(isMerlin, targetIdx) {
+
   closeModal();
+
   state._assassinAfterRound = state.currentRound;
+
   state.assassinTarget = targetIdx;
+
   state.assassinFromMission = true;
+
   state.winner = isMerlin ? 'evil' : 'good';
+
   if (isMerlin) {
+
     state.autoRoles = state.autoRoles || {};
+
     state.autoRoles[targetIdx] = '梅林';
+
   }
+
   stopTimer();
+
   var btn = document.getElementById('assassin-float-btn');
+
   if (btn) btn.remove();
+
   toast(isMerlin ? '拍刀成功！反方获胜' : '拍刀失败！好人方获胜');
+
   renderGame();
+
 }
+
+
 
 function renderRoundTracker() {
+
   var mc = MISSION_COUNTS[state.playerCount];
+
   var h = '';
+
   for (var i = 0; i < 5; i++) {
+
     var m = state.missions[i];
+
     var cls = '';
+
     var extra = '';
+
     if (i === state.currentRound && !m.result) cls = 'current';
+
     else if (m && m.result === 'success') { cls = 'success'; extra = '<span class="badge win">&#10003;</span>'; }
+
     else if (m && m.result === 'fail') { cls = 'fail'; extra = '<span class="badge lose">&#10007;</span>'; }
+
     h += '<div class="round-dot ' + cls + '" onclick="switchRound(' + i + ')">' + mc[i] + extra + '</div>';
+
   }
+
   $('round-tracker').innerHTML = h;
+
 }
+
+
 
 function switchRound(i) {
+
   state.currentRound = i;
+
   renderGame();
+
 }
 
+
+
 function renderStepPanel() {
+
   var m = state.missions[state.currentRound];
+
   console.log('[debug-renderStep] round=' + state.currentRound + ' leader=' + (m ? m.leader : 'MISSING') + ' teamLen=' + (m && m.team ? m.team.length : '?') + ' teamPending=' + state._teamConfirmedPending + ' hasResult=' + (m && m.result ? 'yes' : 'no'));
+
   if (!m) return;
+
   // 防御：若 _teamConfirmedPending 为 true 但队伍为空且非投票确认态，说明 flag 是脏数据，强制重置
+
   if (state._teamConfirmedPending && m.team && m.team.length === 0 && Object.keys(m.votes || {}).length === 0) {
+
     console.warn('[fix] _teamConfirmedPending stale, resetting');
+
     state._teamConfirmedPending = false;
+
   }
+
   var c = $('step-container');
+
   var reqSize = m.size;
+
   var pc = state.playerCount;
+
   var h = '';
 
+
+
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+
   h += '<span class="step-label">第' + (state.currentRound + 1) + '轮 · 需要 ' + reqSize + ' 人出任务</span>';
+
   h += '<span style="font-size:13px;color:var(--text-dim)">' + (m.result ? (m.result === 'success' ? '已完成 ✓' : '已失败 ✕') : '进行中');
+
   if (m.launchFailures > 0) h += ' · 组队未通过 ' + m.launchFailures + ' 次';
+
   h += '</span></div>';
 
+
+
   if (m.result) {
+
     h += '<div style="text-align:center;padding:16px">';
+
     h += '<div style="font-size:52px;margin-bottom:6px">' + (m.result === 'success' ? '&#128737;' : '&#128481;') + '</div>';
+
     h += '<div style="font-size:17px;color:' + (m.result === 'success' ? '#99ff99' : '#ff9999') + '">';
+
     if (m.result === 'success' && m.shieldedFails) {
+
       h += '任务成功（含' + m.shieldedFails + '张失败票）';
+
     } else if (m.result === 'success' && !m.failCount) {
+
       h += '任务成功（全票通过）';
+
     } else if (m.result === 'success') {
+
       h += '任务成功';
+
     } else {
+
       h += '任务失败';
+
       if (m.failCount) h += '（' + m.failCount + '张失败票）';
+
     }
+
     h += '</div>';
+
     if (state.winner) {
+
       h += '<div style="margin-top:10px;font-size:16px;font-weight:700;color:var(--gold-light)">';
+
       h += '游戏结束：' + (state.winner === 'good' ? '好人方获胜' : '反方获胜');
+
       if (state.winner === 'evil' && state.assassinTarget !== null) {
+
         h += '（刺杀' + playerLabel(state.assassinTarget) + '）';
+
       }
+
       h += '</div>';
+
       h += '<div style="margin-top:8px"><button class="btn primary" onclick="showPage(\'end\')">进入结束面板</button></div>';
+
     }
+
     h += '</div>';
+
     c.innerHTML = h;
+
     return;
+
   }
+
+
 
   var votesConfirmed = Object.keys(m.votes).length > 0;
 
+
+
   if (m.leader === null) {
+
     if (state._firstLeaderPicked) {
+
       var nextLeader = (state._lastLeaderIdx + 1) % pc;
+
       selectLeader(nextLeader);
+
       return;
+
     }
+
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤A：选择队长</div><div class="btn-row captain-row">';
+
     for (var i = 0; i < pc; i++) {
+
       h += '<button class="btn" onclick="selectLeader(' + i + ')">' + playerLabel(i) + '</button>';
+
     }
+
     h += '<button class="btn random-leader-btn" onclick="randomFirstLeader()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-weight:700">&#127922; 随机</button>';
+
     h += '</div></div>';
+
     c.innerHTML = h;
+
     return;
+
   }
+
+
 
   var leaderName = playerLabel(m.leader);
 
+
+
   if (state._teamConfirmedPending) {
+
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
+
     var pendingTeamHTML = m.team.map(function(i) {
+
       return '<span style="display:inline-block;padding:3px 10px;margin:2px 3px;border:2px solid var(--gold);border-radius:20px;background:rgba(201,168,76,0.1);color:var(--gold-light);font-size:13px;font-weight:600;box-shadow:0 0 6px rgba(201,168,76,0.2)">' + playerLabel(i) + '</span>';
+
     }).join('');
+
     h += '<div style="margin-top:6px">' + pendingTeamHTML + '</div></div>';
+
     h += '<div style="text-align:center;padding:20px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+
     h += '<div style="font-size:18px;color:var(--gold-light);margin-bottom:8px">发言进行中</div>';
+
     h += '<div style="font-size:13px;color:var(--text-dim)">队长已确认队伍，请按顺序发言。计时结束后将进入投票阶段。</div>';
+
     h += '</div>';
+
     h += buildSpeechPhaseInfoPanel();
+
     if (state.timerMode !== 'off') {
+
       h += '<div style="text-align:center;margin-top:8px"><button class="btn" onclick="reopenCombinedModal()" style="color:var(--gold-light);border-color:var(--gold);font-size:13px">&#9998; 填写反馈</button></div>';
+
     }
+
+
 
     c.innerHTML = h;
+
     return;
+
   }
 
+
+
   if (votesConfirmed) {
+
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
+
     var teamMembersHTML = m.team.map(function(i) {
+
       return '<span style="display:inline-block;padding:3px 10px;margin:2px 3px;border:2px solid var(--gold);border-radius:20px;background:rgba(201,168,76,0.1);color:var(--gold-light);font-size:13px;font-weight:600;box-shadow:0 0 6px rgba(201,168,76,0.2)">' + playerLabel(i) + '</span>';
+
     }).join('');
+
     h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px"><span style="color:var(--text-dim);font-size:13px">队伍：</span>' + teamMembersHTML + '</div></div>';
+
   } else {
+
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
+
     h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
+
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
 
+
+
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div>';
+
     h += '<div class="btn-row team-member-row" style="gap:8px;flex-wrap:wrap;justify-content:center">';
+
     for (var i = 0; i < pc; i++) {
+
       var inTeam = m.team.indexOf(i) !== -1;
+
       var cls = 'btn team-member-btn';
+
       if (inTeam) cls += ' selected team-member-highlight';
+
       h += '<button class="' + cls + '" onclick="toggleTeamMember(' + i + ')">';
+
       h += playerLabel(i) + (i === m.leader ? ' ♔' : '');
+
       h += '</button>';
+
     }
+
     h += '</div>';
+
     h += '</div>';
+
+
 
     h += '<div style="text-align:center;margin-bottom:12px">';
+
     h += '<button class="btn primary" onclick="confirmTeam()"';
+
     if (m.team.length !== reqSize) h += ' disabled';
+
     h += '>确认队伍 (' + m.team.length + '/' + reqSize + ')</button>';
+
     h += '</div>';
+
   }
+
+
 
   if (votesConfirmed) {
+
     h += '<hr style="border-color:var(--border);margin-bottom:10px">';
+
     h += '<div class="step-label">步骤C：全员投票 <span style="font-size:11px;color:var(--text-dim);font-weight:400">（默认赞成，点击切换反对）</span></div>';
+
     h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+
     for (var i = 0; i < pc; i++) {
+
       var v = m.votes[i];
+
       var onTeam = m.team.indexOf(i) !== -1;
+
       h += '<div class="vote-row" style="width:calc(50% - 4px)">';
+
       h += '<span class="voter-name">' + playerLabel(i) + '</span>';
+
       if (onTeam) h += '<span class="on-team">⚔队伍</span>';
+
       h += '<div class="vote-btns">';
+
       h += '<span class="vote-num">' + (i + 1) + '</span>';
+
       h += '<div class="vote-btn approve' + (v === 'approve' ? ' selected' : '') + '" onclick="castVote(' + i + ',\'approve\')">&#128077;</div>';
+
       h += '<div class="vote-btn reject' + (v !== 'approve' ? ' selected' : '') + '" onclick="castVote(' + i + ',\'reject\')">&#128078;</div>';
+
       h += '</div></div>';
+
     }
+
     h += '</div>';
+
     h += '<div style="display:flex;justify-content:flex-end;padding-right:8px;margin-top:4px;gap:8px"><button class="btn small success" onclick="allApprove()">全员赞成</button><button class="btn small danger" onclick="allReject()">全员反对</button></div>';
+
     h += '<div style="text-align:center;margin-top:8px">';
+
     h += '<button class="btn primary" onclick="confirmVotes()">投票完成</button></div>';
+
   }
+
+
 
   c.innerHTML = h;
+
 }
+
+
 
 /* ===== Tools Page - Toggle Tendency Panel ===== */
+
 function toggleTendPanel() {
+
   var panel = document.getElementById('tend-panel');
+
   var btn = document.getElementById('tend-toggle-btn');
+
   if (!panel || !btn) return;
+
   var open = panel.classList.toggle('open');
+
   btn.innerHTML = open ? '&#9660; 倾向分析' : '&#9654; 倾向分析';
+
 }
+
+
 
 /* ==================== TENDENCY RENDER ==================== */
+
 function renderTendencyItem(idx, score, merlinProb) {
+
   var cls, barCls;
+
   if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
+
   else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
+
   else { cls = 'suspect'; barCls = 'suspect'; }
+
   var selfMark = (idx === state.selfIndex) ? ' <span style="color:var(--gold-light);font-size:10px">&#9733;&#25105;</span>' : '';
+
   var h = '<div class="tendency-item">';
+
   h += '<span class="tend-name">' + playerLabel(idx) + selfMark + '</span>';
+
   h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
+
   h += '<span class="tend-score ' + cls + '">' + score + '</span>';
+
   if (merlinProb !== undefined) {
+
     h += '<span class="merlin-pct-col">' + merlinProb + '%</span>';
+
   }
+
   h += '</div>';
+
   return h;
+
 }
+
+
 
 function renderTendencyMini() {
+
   var el = $('tendency-mini');
+
   if (!el) return;
+
   var probs = computeMerlinProbability();
+
   var h = '';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     h += renderTendencyItem(i, state.tendencies[i] != null ? state.tendencies[i] : 50, probs[i]);
+
   }
+
   el.innerHTML = h;
+
 }
 
+
+
 /* ==================== MERLIN PREDICTION ==================== */
+
 function computeMerlinProbability() {
+
   var pc = state.playerCount;
+
   var probs = {};
+
   for (var i = 0; i < pc; i++) {
+
     probs[i] = 0;
+
   }
+
+
 
   var totalWeight = 0;
 
+
+
   // --- Current game analysis ---
+
   for (var round = 0; round < state.missions.length; round++) {
+
     var m = state.missions[round];
+
     if (!m || !m.team || m.team.length === 0) continue;
+
     if (!m.result) continue;
 
+
+
     var attempts = m.launchAttempts || [];
+
     for (var a = 0; a < attempts.length; a++) {
+
       var att = attempts[a];
+
       var attApproves = 0;
+
       for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+
       if (attApproves <= Math.floor(pc / 2)) continue;
 
+
+
       for (var i = 0; i < pc; i++) {
+
         if (i === state.selfIndex) continue;
+
         var vote = att.votes[i];
+
         if (m.result === 'success' && vote === 'approve') probs[i] += 3;
+
         if (m.result === 'fail' && vote === 'reject') probs[i] += 2;
+
       }
+
       totalWeight += 3;
+
       break;
+
     }
+
   }
+
+
 
   // Tendency scores
+
   for (var i = 0; i < pc; i++) {
+
     if (i === state.selfIndex) continue;
+
     var t = state.tendencies[i] != null ? state.tendencies[i] : 50;
+
     probs[i] += t * 0.5;
+
     totalWeight += 0.5;
+
   }
+
+
 
   // --- Historical analysis: check past games where each player was Merlin ---
+
   var history = loadNormalizedHistory();
+
   if (history.length > 0) {
+
     for (var i = 0; i < pc; i++) {
+
       if (i === state.selfIndex) continue;
+
       var playerName = state.playerNames[i];
+
       var merlinGames = [];
 
+
+
       for (var h = 0; h < history.length; h++) {
+
         var rec = history[h];
+
         if (!rec.identities) continue;
+
         for (var j = 0; j < rec.identities.length; j++) {
+
           if (rec.identities[j].name === playerName && rec.identities[j].role === '梅林') {
+
             merlinGames.push(rec);
+
             break;
+
           }
+
         }
+
       }
+
+
 
       if (merlinGames.length > 0) {
+
         var successApproves = 0, failRejects = 0, totalVotes = 0;
+
         for (var h = 0; h < merlinGames.length; h++) {
+
           var rec = merlinGames[h];
+
           if (!rec.missions) continue;
+
           for (var m = 0; m < rec.missions.length; m++) {
+
             var mission = rec.missions[m];
+
             if (!mission.votes || !mission.result) continue;
+
             var vote = mission.votes[playerName];
+
             if (!vote) continue;
+
             totalVotes++;
+
             if (mission.result === 'success' && vote === 'approve') successApproves++;
+
             if (mission.result === 'fail' && vote === 'reject') failRejects++;
+
           }
+
         }
+
         if (totalVotes > 0) {
+
           var merlinScore = (successApproves + failRejects) / totalVotes;
+
           var historyWeight = Math.min(merlinGames.length * 2, 8);
+
           probs[i] += merlinScore * historyWeight;
+
           totalWeight += historyWeight;
+
         }
+
       }
+
     }
+
   }
+
+
 
   // Normalize
+
   var maxProb = 0;
+
   for (var i = 0; i < pc; i++) {
+
     if (probs[i] > maxProb) maxProb = probs[i];
+
   }
+
+
 
   if (maxProb > 0) {
+
     for (var i = 0; i < pc; i++) {
+
       probs[i] = Math.round((probs[i] / maxProb) * 90 + 5);
+
       if (probs[i] > 95) probs[i] = 95;
+
     }
+
   } else {
+
     for (var i = 0; i < pc; i++) {
+
       probs[i] = Math.round(20 + Math.random() * 30);
+
     }
+
   }
+
+
 
   return probs;
+
 }
+
+
 
 /* ==================== IDENTITY SIMULATION ==================== */
+
 var SIM_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','兰斯洛特(红)','兰斯洛特(蓝)','奥伯伦'];
 
+
+
 /* ==================== LADY OF THE LAKE ==================== */
+
 function renderLadyLakeResults() {
+
   // 湖中验人记录已合并至女神系谱栏，此处仅保留容器清理
+
   var el = $('lady-lake-results');
+
   if (el) el.innerHTML = '';
+
 }
+
+
 
 function renderLadyLakeEntry() {
+
   // 湖中女神改为发言阶段记录，不再保留侧边栏手动入口
+
   var el = $('lady-lake-entry');
+
   if (!el) return;
+
   el.style.display = 'none';
+
 }
+
+
 
 function renderLadyLakeHolderInfo() {
+
   var el = $('lady-lake-holder-info');
+
   if (!el) return;
+
   if (!state.ladyOfLakeEnabled) { el.style.display = 'none'; return; }
+
   el.style.display = 'block';
+
   var h = '';
+
   // 显示验人历史
+
   var history = state.ladyCheckHistory || [];
+
   if (history.length > 0) {
+
     var genNum = 1;
+
     for (var hi = 0; hi < history.length; hi++) {
+
       var rec = history[hi];
+
       h += '<div style="font-size:14px;color:var(--text);margin-bottom:5px;line-height:1.5">';
+
       h += '<strong>第' + genNum + '任女神：</strong>' + (rec.holder + 1) + '号 ' + state.playerNames[rec.holder] + ' <span style="color:var(--gold-light)">→</span> 验 ' + (rec.target + 1) + '号 ' + state.playerNames[rec.target];
+
       h += ' <span style="font-weight:700;font-size:15px;color:' + (rec.result === 'good' ? '#99bbff' : '#ff9999') + '">' + (rec.result === 'good' ? '好人' : '反方') + '</span>';
+
       h += '</div>';
+
       genNum++;
+
     }
+
   }
+
   // 当前持有者
+
   if (state.ladyLakeHolder >= 0) {
+
     h += '<div style="font-size:13px;font-weight:700;color:var(--gold-light);margin-top:4px;border-top:1px solid var(--border);padding-top:4px">';
+
     h += '当前女神：' + (state.ladyLakeHolder + 1) + '号 ' + state.playerNames[state.ladyLakeHolder];
+
     h += '</div>';
+
   }
+
   el.innerHTML = h || '<span style="color:var(--text-dim)">湖中女神未分配</span>';
+
 }
+
+
 
 function showPerSpeakerModals() {
+
   if (state.timerMode !== 'per' || state.currentSpeakerIdx < 0) return;
+
   var speaker = state.speakerOrder[state.currentSpeakerIdx];
+
   var isLadyHolder = (speaker === state.ladyLakeHolder);
+
   var needLady = state.ladyOfLakeEnabled && state.currentRound >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound() && isLadyHolder;
+
   if (needLady) {
+
     stopTimer();
+
     state._modalPausedTimer = true;
+
     showLadyCheck();
+
     return;
+
   }
+
 }
+
+
 
 function resumePerSpeakerTimer() {
+
   if (state._modalPausedTimer && state.timerMode === 'per') {
+
     state._modalPausedTimer = false;
+
     startTimer();
+
   }
+
 }
 
+
+
 function showExcaliburWithLady(round) {
+
   if (!state.excaliburEnabled || !state.ladyOfLakeEnabled) return;
+
   if (state.currentRound < 2) return;
+
   var m = state.missions[round];
+
   if (!m || !m.team || m.team.length === 0) return;
+
   var rec = ensureExcaliburRecord(round);
+
   var h = '';
+
   // 王者之剑（上半部分）
+
   h += '<h2>王者之剑</h2>';
+
   h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。后续若使用，只能对队伍中除持剑者外的玩家使用。</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   for (var i = 0; i < m.team.length; i++) {
+
     var pi = m.team[i];
+
     if (pi === m.leader) continue;
+
     h += '<button class="assassin-target-btn" onclick="onExcaliburInCombinedModal(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+
   }
+
   h += '</div>';
+
   if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()">稍后指定</button></div>';
+
   // 分隔线
+
   h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+
   // 湖中女神（下半部分）
+
   h += '<h2>湖中女神验人</h2>';
+
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   var pc = state.playerCount;
+
   for (var j = 0; j < pc; j++) {
+
     if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+
     h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+
   showModal(h);
+
 }
+
+
+
 
 
 // Combined modal: after Excalibur pick, transition to Lady check
+
 function onExcaliburInCombinedModal(round, pi) {
+
   if (state.currentRound < 2) { closeModal(); return; }
+
   var rec = ensureExcaliburRecord(round);
+
   rec.holder = pi;
+
   rec.used = rec.used === undefined ? null : rec.used;
+
   rec.target = (rec.target === pi) ? null : rec.target;
+
   toast('王者之剑持剑者：' + playerLabel(pi));
+
   renderGame();
+
   // Replace modal content with Lady-only UI
+
   var modal = document.getElementById('temp-modal');
+
   if (!modal) return;
+
   var h = '<h2>湖中女神验人</h2>';
+
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   var pc = state.playerCount;
+
   for (var j = 0; j < pc; j++) {
+
     if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+
     h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeModal()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+
   modal.innerHTML = h;
+
 }
+
+
 
 // Excalibur feedback modal: shows during sword holder's speech
+
 function showExcaliburFeedbackModal(rec) {
+
   if (!rec || rec.round < 0) return;
+
   var h = '<h2>上轮王者之剑使用反馈</h2>';
+
   h += '<p style="font-size:14px;margin-bottom:6px">第' + (rec.round + 1) + '轮持剑者 <b>' + playerLabel(rec.holder) + '</b> 对 <b>' + playerLabel(rec.target) + '</b> 使用了王者之剑。</p>';
+
   var targetRole = (state.playerRoles && state.playerRoles[rec.target]) || null;
+
   if (targetRole === 'merlin' || targetRole === 'percival') {
+
     h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
+
   } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
+
     h += '<p style="color:var(--evil);font-weight:700">该玩家是反方</p>';
+
   }
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn primary" onclick="ackExcaliburFeedback(' + rec.round + ')">知道了</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function ackExcaliburFeedback(round) {
+
   var rec = getExcaliburRecord(round);
+
   if (rec) rec.feedbackRecorded = true;
+
   closeModal();
+
   var btnRow = document.getElementById('timer-btns');
+
   if (btnRow) btnRow.hidden = false;
+
   resumePerSpeakerTimer();
+
 }
+
+
 
 // Combined modal: Excalibur feedback + Lady check
+
 function showExcaliburFeedbackWithLady(rec) {
+
   if (!rec || rec.round < 0) return;
+
   if (state.currentRound < 2) return;
+
   var h = '<h2>上轮王者之剑使用反馈</h2>';
+
   h += '<p style="font-size:14px;margin-bottom:6px">第' + (rec.round + 1) + '轮持剑者 <b>' + playerLabel(rec.holder) + '</b> 对 <b>' + playerLabel(rec.target) + '</b> 使用了王者之剑。</p>';
+
   var targetRole = (state.playerRoles && state.playerRoles[rec.target]) || null;
+
   if (targetRole === 'merlin' || targetRole === 'percival') {
+
     h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
+
   } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
+
     h += '<p style="color:var(--evil);font-weight:700">该玩家是反方</p>';
+
   }
+
   h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+
   h += '<h2>湖中女神验人</h2>';
+
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   var pc = state.playerCount;
+
   for (var j = 0; j < pc; j++) {
+
     if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+
     h += '<button class="assassin-target-btn" onclick="onLadyCheckWithExcalFeedback(' + j + ',' + rec.round + ')">' + playerLabel(j) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="skipLadyWithExcalFeedback(' + rec.round + ')" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function onLadyCheckWithExcalFeedback(idx, excalRound) {
+
   var rec = getExcaliburRecord(excalRound);
+
   if (rec) rec.feedbackRecorded = true;
+
   doLadyCheck(idx);
+
   var btnRow = document.getElementById('timer-btns');
+
   if (btnRow) btnRow.hidden = false;
+
   resumePerSpeakerTimer();
+
 }
 
+
+
 function skipLadyWithExcalFeedback(excalRound) {
+
   var rec = getExcaliburRecord(excalRound);
+
   if (rec) rec.feedbackRecorded = true;
+
   closeModal();
+
   var btnRow = document.getElementById('timer-btns');
+
   if (btnRow) btnRow.hidden = false;
+
   resumePerSpeakerTimer();
+
 }
+
+
 
 // === 合并确认弹窗（持剑者 + 用剑反馈 + 女神验人）===
 
+
+
 function showCombinedConfirmModal() {
+
   var round = state.currentRound;
+
   var m = state.missions[round];
+
   var showHolder = state.excaliburEnabled && m && m.team && m.team.length > 0;
+
   var prevRec = null;
+
   if (state.excaliburEnabled && round > 0 && state.excaliburHistory) {
+
     for (var _k = 0; _k < state.excaliburHistory.length; _k++) {
+
       var _pv = state.excaliburHistory[_k];
+
       if (_pv.used !== false && _pv.target !== null && !_pv.feedbackRecorded && _pv.round < round && _pv.holder >= 0) {
+
         prevRec = _pv;
+
         break;
+
       }
+
     }
+
   }
+
   var showPrevFeedback = prevRec !== null;
+
   var showLady = state.ladyOfLakeEnabled && round >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+
   if (!showHolder && !showPrevFeedback && !showLady) {
+
     startTimer();
+
     renderStepPanel();
+
     return;
+
   }
+
   stopTimer();
+
   if (state.timerMode === 'per') state._modalPausedTimer = true;
+
   var h = '';
+
   try {
+
     // ① 指定持剑者
+
     if (showHolder) {
+
       var rec = ensureExcaliburRecord(round);
+
       h += '<h2>王者之剑 · 指定持剑者</h2>';
+
       h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。</p>';
+
       h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
       for (var i = 0; i < m.team.length; i++) {
+
         var pi = m.team[i];
+
         if (pi === m.leader) continue;
+
         h += '<button class="assassin-target-btn" onclick="onCombinedSetHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+
       }
+
       h += '</div>';
+
       h += '<p id="combined-holder-info" style="font-size:12px;color:var(--text-dim);margin-top:10px">' + (rec.holder >= 0 ? '当前持剑者：' + playerLabel(rec.holder) : '') + '</p>';
+
     }
+
     // ② 上轮用剑反馈
+
     if (showPrevFeedback) {
+
       if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+
       h += '<h2>上轮王者之剑反馈</h2>';
+
       h += '<p style="font-size:14px;margin-bottom:6px">第' + (prevRec.round + 1) + '轮持剑者 <b>' + playerLabel(prevRec.holder) + '</b> 对 <b>' + playerLabel(prevRec.target) + '</b> 使用了王者之剑。</p>';
+
       var targetRole = (state.playerRoles && state.playerRoles[prevRec.target]) || null;
+
       if (targetRole === 'merlin' || targetRole === 'percival') {
+
         h += '<p style="color:var(--good);font-weight:700">该玩家是好人方</p>';
+
       } else if (targetRole === 'morgana' || targetRole === 'assassin' || targetRole === 'mordred' || targetRole === 'oberon' || targetRole === 'bad') {
+
         h += '<p style="color:var(--evil);font-weight:700">该玩家是反方</p>';
+
       }
+
       h += '<label style="display:block;font-size:13px;color:var(--text-dim);margin-top:12px;margin-bottom:4px">持剑者口述改变方向</label>';
+
       h += '<select id="combined-excal-dir-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px">';
+
       h += '<option value="fail_to_success">失败 → 成功</option><option value="success_to_fail">成功 → 失败</option><option value="unknown" selected>未说明</option><option value="refused">拒绝说明</option>';
+
       h += '</select>';
+
       h += '<input id="combined-excal-note-' + prevRec.round + '" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-dim);background:var(--bg-input);color:var(--text);margin-bottom:8px" placeholder="备注：记录原话或简述">';
+
     }
+
     // ③ 湖中女神验人
+
     if (showLady) {
+
       if (h) h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+
       h += '<h2>湖中女神验人</h2>';
+
       h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营</p>';
+
       h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
       var pc = state.playerCount;
+
       for (var j = 0; j < pc; j++) {
+
         if (j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+
         h += '<button class="assassin-target-btn" onclick="onCombinedLadyCheck(' + j + ')">' + playerLabel(j) + '</button>';
+
       }
+
       h += '</div>';
+
     }
+
     // 完成按钮
+
     h += '<div style="text-align:center;margin-top:16px"><button class="btn primary" onclick="onCombinedModalClose()">完成</button></div>';
+
     showModal(h, onCombinedModalCancel);
+
   } catch (e) {
+
     console.error('[showCombinedConfirmModal] crash:', e);
+
     toast('[错误] 合并弹窗生成失败：' + (e.message || e));
+
     if (state.timerMode === 'per') state._modalPausedTimer = false;
+
     startTimer();
+
     renderStepPanel();
+
   }
+
 }
+
+
 
 function onCombinedSetHolder(round, holderIdx) {
+
   var rec = ensureExcaliburRecord(round);
+
   rec.holder = holderIdx;
+
   rec.used = null;
+
   rec.target = null;
+
   toast('王者之剑持剑者：' + playerLabel(holderIdx));
+
   var infoEl = document.getElementById('combined-holder-info');
+
   if (infoEl) infoEl.textContent = '当前持剑者：' + playerLabel(holderIdx);
+
 }
+
+
 
 function _saveCombinedFeedback() {
+
   if (!state.excaliburHistory) return;
+
   var round = state.currentRound;
+
   for (var _k = 0; _k < state.excaliburHistory.length; _k++) {
+
     var _pv = state.excaliburHistory[_k];
+
     if (_pv.used !== false && _pv.target !== null && !_pv.feedbackRecorded && _pv.round < round && _pv.holder >= 0) {
+
       var dirEl = document.getElementById('combined-excal-dir-' + _pv.round);
+
       var noteEl = document.getElementById('combined-excal-note-' + _pv.round);
+
       if (dirEl) { _pv.claimedDirection = dirEl.value; _pv.feedbackRecorded = true; _pv.feedbackRound = state.currentRound; _pv.feedbackAt = Date.now(); }
+
       if (noteEl) _pv.note = noteEl.value;
+
       break;
+
     }
+
   }
+
 }
+
+
 
 function onCombinedModalClose() {
+
   _saveCombinedFeedback();
+
   closeModal();
+
   if (state.timerMode === 'per') state._modalPausedTimer = false;
+
   startTimer();
+
   renderStepPanel();
+
 }
+
+
 
 function onCombinedModalCancel() {
+
   closeModal();
+
   if (state.timerMode === 'per') state._modalPausedTimer = false;
+
   startTimer();
+
   renderStepPanel();
+
 }
+
+
 
 function reopenCombinedModal() {
+
   var round = state.currentRound;
+
   var m = state.missions[round];
+
   var showHolder = state.excaliburEnabled && m && m.team && m.team.length > 0;
+
   var prevRec = null;
+
   if (state.excaliburEnabled && round > 0 && state.excaliburHistory) {
+
     for (var k = 0; k < state.excaliburHistory.length; k++) {
+
       var pv = state.excaliburHistory[k];
+
       if (pv.used !== false && pv.target !== null && !pv.feedbackRecorded && pv.round < round && pv.holder >= 0) {
+
         prevRec = pv;
+
         break;
+
       }
+
     }
+
   }
+
   var showPrevFeedback = prevRec !== null;
+
   var showLady = state.ladyOfLakeEnabled && round >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+
   if (!showHolder && !showPrevFeedback && !showLady) {
+
     toast('当前没有待填写的反馈', 'info');
+
     return;
+
   }
+
   showCombinedConfirmModal();
+
 }
+
+
 
 function onCombinedLadyCheck(targetIdx) {
+
   _saveCombinedFeedback();
+
   closeModal();
+
   var h = '<h2>湖中女神验人结果</h2>';
+
   h += '<p style="font-size:15px;margin-bottom:10px">查验目标：<strong style="color:var(--gold-light)">' + playerLabel(targetIdx) + '</strong></p>';
+
   h += '<p style="font-size:14px;margin-bottom:14px">该玩家的阵营是？</p>';
+
   h += '<div class="winner-toggle">';
+
   h += '<button class="winner-btn good" onclick="onCombinedRecordLady(' + targetIdx + ',\'good\')">好人方</button>';
+
   h += '<button class="winner-btn evil" onclick="onCombinedRecordLady(' + targetIdx + ',\'evil\')">反方</button>';
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:10px"><button class="btn" onclick="onCombinedRecordLady(' + targetIdx + ',\'skip\')" style="color:var(--text-dim);font-size:13px">不报</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function onCombinedRecordLady(targetIdx, result) {
+
   closeModal();
+
   var holderIdx = state.ladyLakeHolder;
+
   state.ladyLakeChecks.push({
+
     round: state.currentRound,
+
     target: targetIdx,
+
     result: result,
+
     holder: holderIdx
+
   });
+
   state.ladyCheckHistory.push({
+
     round: state.currentRound,
+
     holder: holderIdx,
+
     target: targetIdx,
+
     result: result
+
   });
+
   state.ladyLakeHolder = targetIdx;
+
   if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
+
   if (result === 'good') {
+
     state.tendencies[targetIdx] = Math.min(100, state.tendencies[targetIdx] + 15);
+
   } else if (result === 'evil') {
+
     state.tendencies[targetIdx] = Math.max(0, state.tendencies[targetIdx] - 15);
+
   }
+
   var resultLabel = result === 'good' ? '好人' : result === 'evil' ? '坏人' : '不报';
+
   toast(playerLabel(holderIdx) + '验' + playerLabel(targetIdx) + ' → ' + resultLabel + '，头衔已传递');
+
   if (state.timerMode === 'per') state._modalPausedTimer = false;
+
   startTimer();
+
   renderStepPanel();
+
 }
+
+
 
 function showLadyCheck() {
+
   if (!state.ladyOfLakeEnabled) return;
+
   if (state.currentRound < 3) return;
+
   var pc = state.playerCount;
+
   var h = '<h2>湖中女神验人</h2>';
+
   h += '<p class="sub" style="font-size:13px;color:var(--text-dim);margin-bottom:12px">选择一名其他玩家查验阵营（好人方/反方）</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   for (var i = 0; i < pc; i++) {
+
     if (i === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+
     h += '<button class="assassin-target-btn" onclick="doLadyCheck(' + i + ')">' + playerLabel(i) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="skipLadyCheck()" style="color:var(--text-dim)">不报（放弃本次验人）</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function skipLadyCheck() {
+
   closeModal();
+
   resumePerSpeakerTimer();
+
 }
+
+
 
 function doLadyCheck(targetIdx) {
+
   closeModal();
+
   var pc = state.playerCount;
+
   // Determine faction: we need to simulate - in the assistant context we don't know real roles
+
   // Show a modal to let the user input the real result
+
   var h = '<h2>湖中女神验人结果</h2>';
+
   h += '<p style="font-size:15px;margin-bottom:10px">查验目标：<strong style="color:var(--gold-light)">' + playerLabel(targetIdx) + '</strong></p>';
+
   h += '<p style="font-size:14px;margin-bottom:14px">该玩家的阵营是？</p>';
+
   h += '<div class="winner-toggle">';
+
   h += '<button class="winner-btn good" onclick="recordLadyCheck(' + targetIdx + ',\'good\')">&#128737; 好人方</button>';
+
   h += '<button class="winner-btn evil" onclick="recordLadyCheck(' + targetIdx + ',\'evil\')">&#128481; 反方</button>';
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:10px"><button class="btn" onclick="recordLadyCheck(' + targetIdx + ',\'skip\')" style="color:var(--text-dim);font-size:13px">不报</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function recordLadyCheck(targetIdx, result) {
+
   saveUndo();
+
   closeModal();
+
   var holderIdx = state.ladyLakeHolder;
+
   var holderLabel = playerLabel(holderIdx);
+
   state.ladyLakeChecks.push({
+
     round: state.currentRound,
+
     target: targetIdx,
+
     result: result,
+
     holder: holderIdx
+
   });
+
   // 湖中女神头衔传递给被验者
+
   state.ladyCheckHistory.push({
+
     round: state.currentRound,
+
     holder: holderIdx,
+
     target: targetIdx,
+
     result: result
+
   });
+
   state.ladyLakeHolder = targetIdx;
+
   // Update tendencies based on lady check
+
   if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
+
   if (result === 'good') {
+
     state.tendencies[targetIdx] = Math.min(100, state.tendencies[targetIdx] + 15);
+
   } else if (result === 'evil') {
+
     state.tendencies[targetIdx] = Math.max(0, state.tendencies[targetIdx] - 15);
+
   }
+
   // 'uncertain' 不改变倾向值
+
   var resultLabel = result === 'good' ? '好人' : result === 'evil' ? '坏人' : '不报';
+
   renderGame();
+
   toast(holderLabel + '验' + playerLabel(targetIdx) + ' → ' + resultLabel + '，头衔已传递');
+
   resumePerSpeakerTimer();
+
 }
+
+
 
 /* 湖中女神发言环节内联验人界面 */
+
 var _ladySpeechSelected = null; // 发言环节中选中的查验目标
 
+
+
 function selectLadySpeechTarget(idx) {
+
   _ladySpeechSelected = idx;
+
   renderStepPanel();
+
 }
+
+
 
 function doLadyCheckInline(result) {
+
   if (_ladySpeechSelected === null) return;
+
   var targetIdx = _ladySpeechSelected;
+
   _ladySpeechSelected = null;
+
   recordLadyCheck(targetIdx, result);
+
 }
+
+
 
 function undoLadyCheck(round) {
+
   // 撤销本轮湖中女神查验
+
   for (var i = state.ladyLakeChecks.length - 1; i >= 0; i--) {
+
     if (state.ladyLakeChecks[i].round === round) {
+
       var c = state.ladyLakeChecks[i];
+
       // 恢复倾向值
+
       if (c.result === 'good' && (c.target in state.tendencies)) {
+
         state.tendencies[c.target] = Math.max(0, state.tendencies[c.target] - 15);
+
       } else if (c.result === 'evil' && (c.target in state.tendencies)) {
+
         state.tendencies[c.target] = Math.min(100, state.tendencies[c.target] + 15);
+
       }
+
       // 恢复湖中女神头衔给原来的持有者
+
       state.ladyLakeHolder = c.holder;
+
       state.ladyLakeChecks.splice(i, 1);
+
       break;
+
     }
+
   }
+
   // 也移除 ladyCheckHistory 中的对应记录
+
   for (var i = state.ladyCheckHistory.length - 1; i >= 0; i--) {
+
     if (state.ladyCheckHistory[i].round === round) {
+
       state.ladyCheckHistory.splice(i, 1);
+
       break;
+
     }
+
   }
+
   _ladySpeechSelected = null;
+
   renderGame();
+
   toast('已撤销本轮湖中女神查验');
+
 }
+
+
 
 /* ==================== IDENTITY PREDICTION ==================== */
+
 var PREDICT_ROLES = ['正方','反方','梅林','派西维尔','莫甘娜','刺客','莫德雷德','奥伯伦','忠臣'];
 
+
+
 function getTakenPredictions(excludeIdx) {
+
   var taken = {};
+
   var loyalCount = 0;
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (i === excludeIdx) continue;
+
     var pred = state.playerPredictions[i] || '';
+
     if (pred && pred !== '未标记' && pred !== '正方' && pred !== '反方') {
+
       taken[pred] = (taken[pred] || 0) + 1;
+
     }
+
     if (pred === '忠臣') loyalCount++;
+
   }
+
   taken._loyalCount = loyalCount;
+
   return taken;
+
 }
+
+
 
 function setPlayerPrediction(idx, role) {
+
   if (role === '未标记') {
+
     delete state.playerPredictions[idx];
+
   } else {
+
     state.playerPredictions[idx] = role;
+
   }
+
   renderPredictPlayerDropdowns();
+
   renderTendencyMini();
+
 }
+
+
 
 function renderPredictPlayerDropdowns() {
+
   renderPredictDropdownsTo('predict-player-dropdowns');
+
   renderPredictDropdownsTo('predict-player-dropdowns-full');
+
 }
+
+
 
 function renderPredictDropdownsTo(elId) {
+
   var el = document.getElementById(elId);
+
   if (!el) return;
+
   var pc = state.playerCount;
+
   var h = '';
+
   for (var i = 0; i < pc; i++) {
+
     var taken = getTakenPredictions(i);
+
     var curPred = state.playerPredictions[i] || '未标记';
+
     h += '<div class="predict-player-row">';
+
     h += '<span class="predict-pname">' + playerLabel(i) + '</span>';
+
     h += '<select onchange="setPlayerPrediction(' + i + ',this.value)" style="flex:1;min-width:100px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:38px;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%2710%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M6 8L1 3h10z%27 fill=%27%23c9a84c%27/%3E%3C/svg%3E\');background-repeat:no-repeat;background-position:right 8px center;padding-right:24px">';
+
     h += '<option value="未标记"' + (curPred === '未标记' ? ' selected' : '') + '>未标记</option>';
+
     for (var j = 0; j < PREDICT_ROLES.length; j++) {
+
       var r = PREDICT_ROLES[j];
+
       var disabled = false;
+
       if (r !== '未标记' && r !== '正方' && r !== '反方' && r !== curPred) {
+
         if (r === '忠臣') {
+
           if (taken._loyalCount >= 3) disabled = true;
+
         } else {
+
           if ((taken[r] || 0) >= 1) disabled = true;
+
         }
+
       }
+
       h += '<option value="' + r + '"' + (curPred === r ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + r + (disabled ? ' (已选)' : '') + '</option>';
+
     }
+
     h += '</select>';
+
     // Show computed probability
+
     var prob = computePredictProbability(i);
+
     if (prob !== null) {
+
       var pct = prob.good;
+
       var pcolor = pct >= 60 ? 'var(--green-bright)' : pct >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
+
       h += '<span style="font-size:12px;min-width:90px;text-align:right">好人<span style="color:' + pcolor + ';font-weight:700">' + pct + '%</span> / 反方' + prob.evil + '%</span>';
+
     }
+
     h += '</div>';
+
   }
+
   el.innerHTML = h;
+
 }
+
+
 
 function computePredictProbability(idx) {
+
   var pred = state.playerPredictions[idx];
+
   if (!pred || pred === '未标记') {
+
     // No prediction, show tendency-based
+
     var t = state.tendencies[idx] != null ? state.tendencies[idx] : 50;
+
     return { good: t, evil: 100 - t };
+
   }
+
+
 
   var goodScore = 50;
+
   // Base on tendency
+
   var t = state.tendencies[idx] != null ? state.tendencies[idx] : 50;
+
   goodScore = t;
 
+
+
   // Adjust based on prediction
+
   if (pred === '正方') { goodScore = Math.min(100, goodScore + 20); }
+
   else if (pred === '反方') { goodScore = Math.max(0, goodScore - 20); }
+
   else if (pred === '梅林' || pred === '派西维尔') { goodScore = Math.min(100, goodScore + 25); }
+
   else if (pred === '莫甘娜' || pred === '刺客' || pred === '莫德雷德' || pred === '奥伯伦') { goodScore = Math.max(0, goodScore - 25); }
 
+
+
   // Adjust based on vote history
+
   var pc = state.playerCount;
+
   var goodVotes = 0, badVotes = 0;
+
   for (var r = 0; r < state.missions.length; r++) {
+
     var m = state.missions[r];
+
     if (!m || !m.result) continue;
+
     var attempts = m.launchAttempts || [];
+
     for (var a = 0; a < attempts.length; a++) {
+
       var att = attempts[a];
+
       var vote = att.votes[idx];
+
       if (!vote) continue;
+
       var attApproves = 0;
+
       for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+
       if (attApproves <= Math.floor(pc / 2)) continue;
+
       if (m.result === 'success' && vote === 'approve') goodVotes++;
+
       else if (m.result === 'fail' && vote === 'reject') goodVotes++;
+
       else badVotes++;
+
     }
+
   }
+
   var totalVotes = goodVotes + badVotes;
+
   if (totalVotes > 0) {
+
     var voteAlly = Math.round(goodVotes / totalVotes * 100);
+
     goodScore = Math.round(goodScore * 0.5 + voteAlly * 0.5);
+
   }
+
+
 
   // Constraint: if predicted as evil, cap goodScore lower
+
   if (pred === '莫甘娜' || pred === '刺客' || pred === '莫德雷德' || pred === '奥伯伦' || pred === '反方') {
+
     goodScore = Math.min(goodScore, 30);
+
   }
+
   if (pred === '梅林' || pred === '派西维尔' || pred === '正方') {
+
     goodScore = Math.max(goodScore, 70);
+
   }
+
+
 
   goodScore = Math.max(0, Math.min(100, goodScore));
+
   return { good: goodScore, evil: 100 - goodScore };
+
 }
+
+
 
 /* ==================== DEDUCTION PAGE ==================== */
+
 function computePriorGoodProb(i, pc, si, myRole, activeRoles) {
+
   // Known self
+
   if (i === si) {
+
     if (myRole && EVIL_ROLES.indexOf(myRole) !== -1) return 5;
+
     if (myRole && GOOD_ROLES.indexOf(myRole) !== -1) return 95;
+
     return 50;
+
   }
+
   // Count good/evil from active roles
+
   var goodCount = 0, evilCount = 0;
+
   for (var r = 0; r < activeRoles.length; r++) {
+
     if (GOOD_ROLES.indexOf(activeRoles[r]) !== -1) goodCount++;
+
     else if (EVIL_ROLES.indexOf(activeRoles[r]) !== -1) evilCount++;
+
   }
+
   // Exclude self from pool to compute prior for others
+
   if (myRole && GOOD_ROLES.indexOf(myRole) !== -1) {
+
     var remainingGood = goodCount - 1;
+
     return Math.round(remainingGood / (pc - 1) * 100);
+
   } else if (myRole && EVIL_ROLES.indexOf(myRole) !== -1) {
+
     var remainingEvil = evilCount - 1;
+
     return Math.round((pc - 1 - remainingEvil) / (pc - 1) * 100);
+
   }
+
   // Unknown self role: flat prior
+
   return Math.round(goodCount / pc * 100);
+
 }
+
+
 
 /* ==================== 发言阶段信息：湖中女神 / 王者之剑 ==================== */
+
 function excaliburDirectionLabel(dir) {
+
   if (dir === 'fail_to_success') return '失败 → 成功';
+
   if (dir === 'success_to_fail') return '成功 → 失败';
+
   if (dir === 'unknown') return '未说明';
+
   if (dir === 'refused') return '拒绝说明';
+
   return '待反馈';
+
 }
+
+
 
 function ladyClaimLabel(res) {
+
   if (res === 'good') return '好人';
+
   if (res === 'evil') return '反方';
+
   if (res === 'unknown') return '未说明';
+
   if (res === 'refused') return '拒绝说明';
+
   return '未记录';
+
 }
+
+
 
 function getExcaliburRecord(round) {
+
   var arr = state.excaliburHistory || [];
+
   for (var i = 0; i < arr.length; i++) {
+
     if (arr[i].round === round) return arr[i];
+
   }
+
   return null;
+
 }
+
+
 
 function clearExcaliburRecord(round) {
+
   if (!state.excaliburHistory) return;
+
   state.excaliburHistory = state.excaliburHistory.filter(function(e) { return e.round !== round; });
+
 }
+
+
 
 function ensureExcaliburRecord(round) {
+
   if (!state.excaliburHistory) state.excaliburHistory = [];
+
   var rec = getExcaliburRecord(round);
+
   if (rec) return rec;
+
   var m = state.missions[round];
+
   rec = {
+
     round: round,
+
     leader: m ? m.leader : -1,
+
     team: m && m.team ? m.team.slice() : [],
+
     holder: -1,
+
     used: null,
+
     target: null,
+
     feedbackRecorded: false,
+
     feedbackRound: null,
+
     feedbackSpeaker: null,
+
     claimedDirection: '',
+
     note: '',
+
     createdAt: Date.now(),
+
     feedbackAt: null
+
   };
+
   state.excaliburHistory.push(rec);
+
   return rec;
+
 }
+
+
 
 function showExcaliburHolderModal(round, ladyTarget) {
+
   console.log('[holder] called round=' + round + ' excalEnabled=' + state.excaliburEnabled + ' timerMode=' + state.timerMode + ' ladyTarget=' + ladyTarget);
+
   if (!state.excaliburEnabled) return;
+
   var m = state.missions[round];
+
   if (!m || !m.team || m.team.length === 0) { console.log('[holder] no team'); return; }
+
   var rec = ensureExcaliburRecord(round);
+
   var h = '<h2>王者之剑</h2>';
+
   // 检查上轮未反馈的王者之剑使用记录，在本轮持剑者弹窗中一并展示
+
   console.log('[holder] checking prev excal feedback. round=' + round + ' hist=' + (state.excaliburHistory ? state.excaliburHistory.length : 0));
+
   if (round > 0 && state.excaliburHistory) {
+
     for (var _k = 0; _k < state.excaliburHistory.length; _k++) {
+
       var _pv = state.excaliburHistory[_k];
+
       var _match = _pv.used !== false && _pv.target !== null && !_pv.feedbackRecorded && _pv.round < round && _pv.holder >= 0;
+
       console.log('[holder]   rec r=' + _pv.round + ' used=' + _pv.used + ' target=' + _pv.target + ' fbRec=' + _pv.feedbackRecorded + ' holder=' + _pv.holder + ' MATCH=' + _match);
+
       if (_match) {
+
         var _pvRole = (state.playerRoles && state.playerRoles[_pv.target]) || null;
+
         var _pvVerdict = '';
+
         if (_pvRole === 'merlin' || _pvRole === 'percival') _pvVerdict = '<span style="color:var(--good);font-weight:700">好人方</span>';
+
         else if (_pvRole === 'morgana' || _pvRole === 'assassin' || _pvRole === 'mordred' || _pvRole === 'oberon' || _pvRole === 'bad') _pvVerdict = '<span style="color:var(--evil);font-weight:700">反方</span>';
+
         h += '<div style="background:rgba(201,168,76,0.08);border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px;text-align:center">';
+
         h += '<div style="font-size:14px;font-weight:700;color:var(--gold-light);margin-bottom:4px">上轮王者之剑反馈</div>';
+
         h += '<p style="font-size:13px;margin:0;color:var(--text-dim)">第' + (_pv.round + 1) + '轮持剑者 <b style="color:var(--gold-light)">' + playerLabel(_pv.holder) + '</b> 对 <b style="color:var(--gold-light)">' + playerLabel(_pv.target) + '</b> 使用了王者之剑</p>';
+
         if (_pvVerdict) h += '<p style="margin:4px 0 0;font-size:13px">结果：' + _pvVerdict + '</p>';
+
         h += '</div>';
+
         break; // 只展示最近一条
+
       }
+
     }
+
   }
+
   h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">队长指定本轮队伍成员持剑。后续若使用，只能对队伍中除持剑者外的玩家使用。</p>';
+
   // 全体模式：湖中女神验人并入持剑者弹窗（第3轮起）
+
   var _ladyCond = state.timerMode === 'all' && state.ladyOfLakeEnabled && round >= 2 && state.ladyLakeHolder >= 0 && !hasLadyClaimThisRound();
+
   console.log('[holder] lady cond: timerAll=' + (state.timerMode==='all') + ' enabled=' + state.ladyOfLakeEnabled + ' round>=3=' + (round>=3) + ' holder=' + state.ladyLakeHolder + ' !claimed=' + (!hasLadyClaimThisRound()) + ' => ' + _ladyCond);
+
   if (_ladyCond) {
+
     h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+
     if (ladyTarget !== undefined) {
+
       // 已选目标，显示验人结果选择（内联，不跳出弹窗）
+
       h += '<h2 style="color:var(--gold-light);margin-bottom:4px">湖中女神验人</h2>';
+
       h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">查验目标：<b style="color:var(--gold-light)">' + playerLabel(ladyTarget) + '</b> — 该玩家的阵营是？</p>';
+
       h += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+
       h += '<button class="winner-btn good" onclick="recordLadyCheckFromHolder(' + ladyTarget + ',\'good\',' + round + ')" style="flex:1">&#128737; 好人方</button>';
+
       h += '<button class="winner-btn evil" onclick="recordLadyCheckFromHolder(' + ladyTarget + ',\'evil\',' + round + ')" style="flex:1">&#128481; 反方</button>';
+
       h += '<button class="btn" onclick="recordLadyCheckFromHolder(' + ladyTarget + ',\'skip\',' + round + ')" style="flex:1;color:var(--text-dim)">不报</button>';
+
       h += '</div>';
+
     } else {
+
       // 未选目标，显示目标选择按钮
+
       h += '<h2 style="color:var(--gold-light);margin-bottom:4px">湖中女神验人</h2>';
+
       h += '<p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">选择一名其他玩家查验阵营</p>';
+
       h += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">';
+
       var _pc = state.playerCount;
+
       for (var _j = 0; _j < _pc; _j++) {
+
         if (_j === state.ladyLakeHolder && state.ladyLakeHolder >= 0) continue;
+
         h += '<button class="assassin-target-btn" onclick="onLadyCheckFromHolder(' + _j + ',' + round + ')" style="font-size:14px">' + playerLabel(_j) + '</button>';
+
       }
+
       h += '</div>';
+
     }
+
     h += '<hr style="margin:16px 0;border-color:var(--border-dim)">';
+
   }
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   for (var i = 0; i < m.team.length; i++) {
+
     var pi = m.team[i];
+
     if (pi === m.leader) continue;
+
     h += '<button class="assassin-target-btn" onclick="setExcaliburHolder(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+
   }
+
   h += '</div>';
+
   if (rec.holder >= 0) h += '<p style="font-size:12px;color:var(--text-dim);margin-top:10px">当前持剑者：' + playerLabel(rec.holder) + '</p>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="skipExcaliburHolder()">稍后指定</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function recordLadyCheckFromHolder(targetIdx, result, round) {
+
   var holderIdx = state.ladyLakeHolder;
+
   var holderLabel = playerLabel(holderIdx);
+
   // 记录验人
+
   state.ladyLakeChecks.push({
+
     round: state.currentRound,
+
     target: targetIdx,
+
     result: result,
+
     holder: holderIdx
+
   });
+
   state.ladyCheckHistory.push({
+
     round: state.currentRound,
+
     holder: holderIdx,
+
     target: targetIdx,
+
     result: result
+
   });
+
   state.ladyLakeHolder = targetIdx;
+
   // 更新倾向值（skip 不更新）
+
   if (!(targetIdx in state.tendencies)) state.tendencies[targetIdx] = 50;
+
   if (result === 'good') {
+
     state.tendencies[targetIdx] = Math.min(100, state.tendencies[targetIdx] + 15);
+
   } else if (result === 'evil') {
+
     state.tendencies[targetIdx] = Math.max(0, state.tendencies[targetIdx] - 15);
+
   }
+
   var resultLabel = result === 'good' ? '好人' : result === 'evil' ? '坏人' : '不报';
+
   toast(holderLabel + '验' + playerLabel(targetIdx) + ' → ' + resultLabel + '，头衔已传递');
+
   // 重新渲染持剑者弹窗（女神条件已不满足，不会再显示女神段）
+
   showExcaliburHolderModal(round);
+
 }
+
+
 
 function onLadyCheckFromHolder(targetIdx, round) {
+
   // 在持剑者弹窗内联显示验人结果选择
+
   showExcaliburHolderModal(round, targetIdx);
+
 }
+
+
 
 function skipLadyFromHolder(round) {
+
   // 记录跳过，头衔仍传递给被验者——但跳过时没有目标，
+
   // 所以只能先记录到历史再重渲染，实际跳过在 showLadyCheck 的"不报"按钮中处理
+
   showExcaliburHolderModal(round);
+
 }
+
+
 
 function skipExcaliburHolder() {
+
   closeModal();
+
   state._excaliburSkipped = true;
+
   if (state._excaliburPreConfirm) {
+
     state._excaliburPreConfirm = false;
+
     confirmTeam();
+
   }
+
 }
+
+
 
 function setExcaliburHolder(round, holderIdx) {
+
   saveUndo();
+
   var rec = ensureExcaliburRecord(round);
+
   rec.holder = holderIdx;
+
   rec.used = null;
+
   rec.target = null;
+
   closeModal();
+
   toast('王者之剑持剑者：' + playerLabel(holderIdx));
+
   if (state._excaliburPreConfirm) {
+
     // 持剑者指定后，弹出目标选择弹窗
+
     setTimeout(function() { showExcaliburTargetModal(round); }, 100);
+
   } else {
+
     renderGame();
+
   }
+
 }
+
+
 
 function showExcaliburTargetModal(round) {
+
   var rec = getExcaliburRecord(round);
+
   if (!rec || rec.holder < 0) { confirmTeam(); return; }
+
   var m = state.missions[round];
+
   if (!m || !m.team || m.team.length === 0) { confirmTeam(); return; }
+
   var h = '<h2>王者之剑 · 使用目标</h2>';
+
   h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">持剑者 ' + playerLabel(rec.holder) + ' 选择本轮使用目标（限本队除自己外）</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   for (var i = 0; i < m.team.length; i++) {
+
     var pi = m.team[i];
+
     if (pi === rec.holder) continue;
+
     h += '<button class="assassin-target-btn" onclick="onExcaliburTargetPicked(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:12px"><button class="btn" onclick="closeExcaliburTargetModal(' + round + ')" style="color:var(--text-dim)">不使用</button></div>';
+
   showModal(h);
+
 }
+
+
 
 function onExcaliburTargetPicked(round, targetIdx) {
+
   saveUndo();
+
   var rec = getExcaliburRecord(round);
+
   if (!rec) { closeModal(); confirmTeam(); return; }
+
   rec.target = targetIdx;
+
   rec.used = true;
+
   rec.feedbackRecorded = false;
+
   closeModal();
+
   toast('王者之剑目标：' + playerLabel(targetIdx));
+
   state._excaliburPreConfirm = false;
+
   confirmTeam();
+
 }
+
+
 
 function closeExcaliburTargetModal(round) {
+
   saveUndo();
+
   var rec = getExcaliburRecord(round);
+
   if (rec) { rec.used = false; rec.feedbackRecorded = true; rec.target = null; }
+
   closeModal();
+
   state._excaliburPreConfirm = false;
+
   confirmTeam();
+
 }
+
+
 
 function setExcaliburUsed(round, used) {
+
   saveUndo();
+
   var rec = ensureExcaliburRecord(round);
+
   if (rec.holder < 0) { toast('请先指定王者之剑持剑者', 'warn'); return; }
+
   rec.used = !!used;
+
   if (!used) {
+
     rec.target = null;
+
     rec.feedbackRecorded = true;
+
     rec.feedbackRound = null;
+
     rec.feedbackSpeaker = null;
+
     rec.claimedDirection = '';
+
     rec.note = '';
+
   } else {
+
     rec.feedbackRecorded = false;
+
   }
+
   renderStepPanelWithResult();
+
 }
+
+
 
 function setExcaliburTarget(round, targetIdx) {
+
   var rec = ensureExcaliburRecord(round);
+
   if (rec.holder === targetIdx) { toast('王者之剑不能对持剑者本人使用', 'warn'); return; }
+
   rec.target = targetIdx;
+
   renderStepPanelWithResult();
+
 }
+
+
 
 function buildExcaliburPreResultPanel(m) {
+
   if (!state.excaliburEnabled) return '';
+
   var round = state.currentRound;
+
   var rec = ensureExcaliburRecord(round);
+
   var h = '<div class="speech-info-card excalibur-card">';
+
   h += '<div class="speech-info-title">王者之剑 · 任务结果公布前确认</div>';
+
   if (rec.holder < 0) {
+
     h += '<div class="speech-info-sub">队长需要先从本轮队伍成员中指定持剑者。</div>';
+
     h += '<button class="btn small" onclick="showExcaliburHolderModal(' + round + ')">指定持剑者</button>';
+
     h += '</div>';
+
     return h;
+
   }
+
   h += '<div class="speech-info-sub">持剑者：<strong>' + playerLabel(rec.holder) + '</strong></div>';
+
   h += '<div class="btn-row" style="margin:6px 0">';
+
   h += '<button class="btn small' + (rec.used === false ? ' success' : '') + '" onclick="setExcaliburUsed(' + round + ',false)">不使用</button>';
+
   h += '<button class="btn small' + (rec.used === true ? ' warn' : '') + '" onclick="setExcaliburUsed(' + round + ',true)">使用</button>';
+
   h += '</div>';
+
   if (rec.used === true) {
+
     h += '<div class="speech-info-sub">使用目标（仅限本轮队伍中除持剑者外）：</div><div class="btn-row" style="gap:6px">';
+
     for (var i = 0; i < m.team.length; i++) {
+
       var pi = m.team[i];
+
       if (pi === rec.holder) continue;
+
       h += '<button class="btn small' + (rec.target === pi ? ' primary' : '') + '" onclick="setExcaliburTarget(' + round + ',' + pi + ')">' + playerLabel(pi) + '</button>';
+
     }
+
     h += '</div><div class="speech-info-sub">下一轮发言阶段只记录持剑者口述的改变方向。</div>';
+
   } else if (rec.used === false) {
+
     h += '<div class="speech-info-sub">本轮确认不使用，下一轮不会弹出王者之剑反馈。</div>';
+
   } else {
+
     h += '<div class="speech-info-sub">请在公布任务结果前确认是否使用。</div>';
+
   }
+
   h += '</div>';
+
   return h;
+
 }
+
+
 
 function hasLadyClaimThisRound() {
+
   var arr = state.ladyCheckHistory || [];
+
   for (var i = 0; i < arr.length; i++) {
+
     if (arr[i].round === state.currentRound) return true;
+
   }
+
   return false;
+
 }
+
+
 
 function shouldShowLadySpeechCard() {
+
   if (!state.ladyOfLakeEnabled || state.currentRound < 2 || state.ladyLakeHolder < 0 || hasLadyClaimThisRound()) return false;
+
   if (state.timerMode === 'all') return state._teamConfirmedPending;
+
   if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
+
     return state.speakerOrder[state.currentSpeakerIdx] === state.ladyLakeHolder;
+
   }
+
   return false;
+
 }
+
+
 
 function getPendingExcaliburFeedbacks() {
+
   var arr = state.excaliburHistory || [];
+
   var list = [];
+
   for (var i = 0; i < arr.length; i++) {
+
     var e = arr[i];
+
     if (e.used === true && e.target !== null && !e.feedbackRecorded && e.round < state.currentRound) {
+
       if (state.timerMode === 'all') list.push(e);
+
       else if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0 && state.speakerOrder[state.currentSpeakerIdx] === e.holder) list.push(e);
+
     }
+
   }
+
   return list;
+
 }
+
+
 
 function buildLadySpeechCard() {
+
   var holder = state.ladyLakeHolder;
+
   var h = '<div class="speech-info-card lady-card">';
+
   h += '<div class="speech-info-title">湖中女神声明</div>';
+
   h += '<div class="speech-info-sub">持有人：<strong>' + playerLabel(holder) + '</strong>。请在其发言时记录口述验人结果。</div>';
+
   h += '<label class="speech-info-label">口述验人对象</label><select id="lady-speech-target" class="speech-info-select">';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (i === holder) continue;
+
     h += '<option value="' + i + '">' + playerLabel(i) + '</option>';
+
   }
+
   h += '</select>';
+
   h += '<label class="speech-info-label">口述结果</label><select id="lady-speech-result" class="speech-info-select">';
+
   h += '<option value="good">好人</option><option value="evil">反方</option><option value="unknown">未说明</option><option value="refused">拒绝说明</option>';
+
   h += '</select>';
+
   h += '<input id="lady-speech-note" class="speech-info-input" placeholder="备注：记录原话或简述">';
+
   h += '<button class="btn small primary" onclick="saveLadySpeechClaim()">保存湖中女神声明</button>';
+
   h += '</div>';
+
   return h;
+
 }
+
+
 
 function saveLadySpeechClaim() {
+
   var holder = state.ladyLakeHolder;
+
   if (holder < 0) return;
+
   var targetEl = document.getElementById('lady-speech-target');
+
   var resultEl = document.getElementById('lady-speech-result');
+
   var noteEl = document.getElementById('lady-speech-note');
+
   if (!targetEl || !resultEl) return;
+
   var target = parseInt(targetEl.value);
+
   var result = resultEl.value;
+
   var note = noteEl ? noteEl.value : '';
+
   var speaker = (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) ? state.speakerOrder[state.currentSpeakerIdx] : null;
+
   var rec = { round: state.currentRound, holder: holder, target: target, result: result, note: note, recordedAtRound: state.currentRound, recordedAtSpeaker: speaker };
+
   state.ladyLakeChecks.push(rec);
+
   state.ladyCheckHistory.push(rec);
+
   state.ladyLakeHolder = target;
+
   toast('已记录湖中女神声明：' + playerLabel(holder) + ' → ' + playerLabel(target) + '：' + ladyClaimLabel(result));
+
   renderGame();
+
 }
+
+
 
 function buildExcaliburFeedbackCard(rec) {
+
   var h = '<div class="speech-info-card excalibur-card">';
+
   h += '<div class="speech-info-title">上一轮王者之剑反馈</div>';
+
   h += '<div class="speech-info-sub">第' + (rec.round + 1) + '轮持剑者：<strong>' + playerLabel(rec.holder) + '</strong>；使用目标：<strong>' + playerLabel(rec.target) + '</strong></div>';
+
   h += '<label class="speech-info-label">持剑者口述改变方向</label><select id="excalibur-feedback-dir-' + rec.round + '" class="speech-info-select">';
+
   h += '<option value="fail_to_success">失败 → 成功</option><option value="success_to_fail">成功 → 失败</option><option value="unknown">未说明</option><option value="refused">拒绝说明</option>';
+
   h += '</select>';
+
   h += '<input id="excalibur-feedback-note-' + rec.round + '" class="speech-info-input" placeholder="备注：记录原话或简述">';
+
   h += '<button class="btn small primary" onclick="saveExcaliburFeedback(' + rec.round + ')">保存王者之剑反馈</button>';
+
   h += '</div>';
+
   return h;
+
 }
+
+
 
 function saveExcaliburFeedback(round) {
+
   var rec = getExcaliburRecord(round);
+
   if (!rec) return;
+
   var dirEl = document.getElementById('excalibur-feedback-dir-' + round);
+
   var noteEl = document.getElementById('excalibur-feedback-note-' + round);
+
   rec.claimedDirection = dirEl ? dirEl.value : 'unknown';
+
   rec.note = noteEl ? noteEl.value : '';
+
   rec.feedbackRecorded = true;
+
   rec.feedbackRound = state.currentRound;
+
   rec.feedbackSpeaker = (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) ? state.speakerOrder[state.currentSpeakerIdx] : null;
+
   rec.feedbackAt = Date.now();
+
   toast('已记录王者之剑反馈：' + excaliburDirectionLabel(rec.claimedDirection));
+
   renderGame();
+
 }
+
+
 
 function buildSpeechPhaseInfoPanel() {
+
   if (!state._teamConfirmedPending) return '';
+
   // 计时模式由弹窗处理，不渲染行内卡片
+
   if (state.timerMode !== 'off') return '';
+
   var cards = [];
+
   if (shouldShowLadySpeechCard()) cards.push(buildLadySpeechCard());
+
   var exs = getPendingExcaliburFeedbacks();
+
   for (var i = 0; i < exs.length; i++) cards.push(buildExcaliburFeedbackCard(exs[i]));
+
   if (!cards.length) return '';
+
   var title = state.timerMode === 'all' ? '发言阶段信息记录' : '当前发言人信息记录';
+
   return '<div class="speech-info-panel"><div class="speech-info-panel-title">' + title + '（待处理 ' + cards.length + ' 项）</div>' + cards.join('') + '</div>';
+
 }
+
+
 
 /* ==================== TIMER ==================== */
+
 function renderTimerDisplay() {
+
   var el = $('timer-display');
+
   if (!el) return;
+
   if (state.timerMode === 'off' || state.timerInterval === null) {
+
     el.style.display = 'none';
+
     return;
+
   }
+
   el.style.display = 'block';
+
   var mins = Math.floor(state.timerRemaining / 60);
+
   var secs = state.timerRemaining % 60;
+
   var displayStr = (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+
   $('timer-value').textContent = displayStr;
 
+
+
   var lbl = (state.timerMode === 'all') ? '全体发言计时' : '当前发言计时';
+
   $('timer-label').textContent = lbl;
 
+
+
   var spkEl = $('timer-speaker-name');
+
   if (spkEl) {
+
     if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0 && state.currentSpeakerIdx < state.speakerOrder.length) {
+
       var spk = state.speakerOrder[state.currentSpeakerIdx];
+
       spkEl.textContent = '当前发言：' + playerLabel(spk);
+
       spkEl.style.display = 'block';
+
     } else {
+
       spkEl.style.display = 'none';
+
     }
+
   }
+
+
 
   if (state.timerRemaining > 0) {
+
     el.className = 'timer-display running';
+
   }
+
   if (state.timerRemaining <= 10 && state.timerRemaining > 0) {
+
     el.className = 'timer-display warning';
+
   }
+
 }
+
+
 
 function startTimer() {
+
   // 弹窗显示期间不启动计时器，由 resumePerSpeakerTimer 接管
+
   if (state._modalPausedTimer) return;
+
   stopTimer();
+
   if (state.timerMode === 'off') return;
+
   state._timerEnd = Date.now() + state.timerSeconds * 1000; // wall-clock end time
+
   state.timerRemaining = state.timerSeconds;
+
   if (state.timerMode === 'per' && state.currentSpeakerIdx >= 0) {
+
     var btnRow = document.getElementById('timer-btns');
+
     if (btnRow) btnRow.hidden = false;
+
   }
+
   if (state.timerMode === 'all') {
+
     var btnRowAll = document.getElementById('timer-btns');
+
     if (btnRowAll) btnRowAll.hidden = false;
+
   }
+
   state._timerEndFired = false;
+
   // Serial guard: increments on each startTimer/stopTimer to invalidate orphan intervals
+
   // that may have been created if timerInterval was nulled without clearInterval
+
   state._timerSerial = (state._timerSerial || 0) + 1;
+
   var mySerial = state._timerSerial;
+
   state.timerInterval = setInterval(function() {
+
     // Bail out immediately if this interval has been superseded (e.g. by stopTimer
+
     // incrementing serial to kill orphan intervals from confirmTeam double-click)
+
     if (state._timerSerial !== mySerial) return;
+
     var remaining = Math.max(0, Math.ceil((state._timerEnd - Date.now()) / 1000));
+
     state.timerRemaining = remaining;
+
     renderTimerDisplay();
+
     if (remaining <= 0 && !state._timerEndFired) {
+
       state._timerEndFired = true;
+
       stopTimer();
+
       playBeepSound();
+
       toast('计时结束！', 'warn');
+
       if (state.timerMode === 'per' && state.currentSpeakerIdx < state.speakerOrder.length - 1) {
+
         window._undoSpeakEndTimeout = setTimeout(function() { speakEnd(); }, 800);
+
       } else if (state._teamConfirmedPending) {
+
         window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 800);
+
       }
+
       return; // 防止 stopTimer 后代码继续执行
+
     }
+
   }, 250);
+
   renderTimerDisplay();
+
 }
+
+
 
 function stopTimer() {
+
   if (state.timerInterval) {
+
     clearInterval(state.timerInterval);
+
     state.timerInterval = null;
+
   }
+
   // Bump serial to invalidate any orphan intervals (created when timerInterval
+
   // was nulled without clearInterval, e.g. confirmTeam double-click).
+
   // The next tick of an orphan interval will see serial mismatch and bail out.
+
   state._timerSerial = (state._timerSerial || 0) + 1;
+
   state._timerEnd = 0;
+
   var el = $('timer-display');
+
   if (el) el.style.display = 'none';
+
   var btnRow = document.getElementById('timer-btns');
+
   if (btnRow) btnRow.hidden = true;
+
 }
+
+
 
 function speakEnd() {
+
   if (state.timerMode === 'all') {
+
     endAllSpeak();
+
     return;
+
   }
+
   if (state.currentSpeakerIdx < 0) return;
+
   var speaker = state.speakerOrder[state.currentSpeakerIdx];
+
   var elapsed = (state.timerMode === 'all') ? 0 : (state.timerSeconds - state.timerRemaining);
+
   state.speakTimes[speaker] = (state.speakTimes[speaker] || 0) + elapsed;
+
   stopTimer();
+
   if (state.currentSpeakerIdx < state.speakerOrder.length - 1) {
+
     state.currentSpeakerIdx++;
+
     state.timerRemaining = state.timerSeconds;
+
     var el = $('timer-display');
+
     if (el) el.style.display = 'block';
+
     var btnRow = document.getElementById('timer-btns');
+
     if (btnRow) btnRow.hidden = false;
+
     renderTimerDisplay();
+
     renderStepPanel();
+
     showPerSpeakerModals();
+
     startTimer();
+
   } else {
+
     state.currentSpeakerIdx = -1;
+
     state.speakerOrder = [];
+
     toast('所有玩家发言结束');
+
     if (state._teamConfirmedPending) {
+
       window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 800);
+
     }
+
   }
+
 }
+
+
 
 function endAllSpeak() {
+
   stopTimer();
+
   state.speakerOrder = [];
+
   state.currentSpeakerIdx = -1;
+
   state.speakTimes = {};
+
   var el = $('timer-display');
+
   if (el) el.style.display = 'none';
+
   var btnRow = document.getElementById('timer-btns');
+
   if (btnRow) btnRow.hidden = true;
+
   toast('已结束所有玩家发言');
+
   if (state._teamConfirmedPending) {
+
     window._undoTransitionTimeout = setTimeout(function() { transitionToVotes(); }, 500);
+
   }
+
 }
+
+
 
 function resetTimer() {
+
   stopTimer();
+
   state.timerRemaining = state.timerSeconds;
+
   startTimer();
+
 }
+
+
 
 function ensureAudioContext() {
+
   if (!window._audioCtx) {
+
     try {
+
       window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
     } catch(e) { return; }
+
   }
+
   if (window._audioCtx.state === 'suspended') {
+
     window._audioCtx.resume();
+
   }
+
 }
+
+
 
 function playBeepSound() {
+
   try {
+
     if (!window._audioCtx) return;
+
     var ctx = window._audioCtx;
+
     if (ctx.state === 'suspended') ctx.resume();
+
     // Play 3 repetitions of a louder, longer dual-tone beep
+
     for (var rep = 0; rep < 3; rep++) {
+
       var t0 = ctx.currentTime + rep * 0.6;
+
       var osc = ctx.createOscillator();
+
       var gain = ctx.createGain();
+
       osc.connect(gain);
+
       gain.connect(ctx.destination);
+
       osc.type = 'square';
+
       osc.frequency.value = 440;
+
       gain.gain.setValueAtTime(0.8, t0);
+
       gain.gain.exponentialRampToValueAtTime(0.01, t0 + 0.35);
+
       osc.start(t0);
+
       osc.stop(t0 + 0.35);
+
       var osc2 = ctx.createOscillator();
+
       var gain2 = ctx.createGain();
+
       osc2.connect(gain2);
+
       gain2.connect(ctx.destination);
+
       osc2.type = 'square';
+
       osc2.frequency.value = 880;
+
       gain2.gain.setValueAtTime(0.8, t0 + 0.05);
+
       gain2.gain.exponentialRampToValueAtTime(0.01, t0 + 0.4);
+
       osc2.start(t0 + 0.05);
+
       osc2.stop(t0 + 0.4);
+
     }
+
   } catch(e) {}
+
 }
+
+
 
 /* ==================== REVIEW / 复盘 ==================== */
+
 function renderReviewEntry() {
+
   var el = $('review-section');
+
   if (!el) return;
+
   el.style.display = 'block';
+
 }
 
+
+
 function toggleReview() {
+
   var panel = $('review-panel');
+
   if (panel.style.display === 'block') {
+
     panel.style.display = 'none';
+
     return;
+
   }
+
   panel.style.display = 'block';
+
   panel.innerHTML = buildReviewHTML();
+
 }
+
+
+
 
 
 function buildReviewSpecialInfo(round) {
+
   var parts = [];
+
   var ladyRecords = (state.ladyCheckHistory || []).filter(function(rec) {
+
     return rec && rec.round === round;
+
   });
+
   if (ladyRecords.length > 0) {
+
     var ladyHtml = '<div style="margin-top:8px;padding:8px;border:1px solid rgba(90,140,255,0.28);border-radius:8px;background:rgba(90,140,255,0.08)">';
+
     ladyHtml += '<div style="font-weight:700;color:#99bbff;margin-bottom:4px">湖中女神</div>';
+
     for (var li = 0; li < ladyRecords.length; li++) {
+
       var lr = ladyRecords[li];
+
       ladyHtml += '<div style="font-size:13px;line-height:1.6;color:var(--text)">';
+
       ladyHtml += playerLabel(lr.holder) + ' 验 ' + playerLabel(lr.target) + '：<strong>' + ladyClaimLabel(lr.result) + '</strong>';
+
       if (lr.recordedAtRound !== undefined && lr.recordedAtRound !== null && lr.recordedAtRound !== round) {
+
         ladyHtml += ' <span style="color:var(--text-dim)">（第' + (lr.recordedAtRound + 1) + '轮发言记录）</span>';
+
       }
+
       if (lr.recordedAtSpeaker !== undefined && lr.recordedAtSpeaker !== null) {
+
         ladyHtml += ' <span style="color:var(--text-dim)">发言人：' + playerLabel(lr.recordedAtSpeaker) + '</span>';
+
       }
+
       if (lr.note) ladyHtml += '<div style="font-size:12px;color:var(--text-dim)">备注：' + escapeHtml(lr.note) + '</div>';
+
       ladyHtml += '</div>';
+
     }
+
     ladyHtml += '</div>';
+
     parts.push(ladyHtml);
+
   }
+
+
 
   var ex = getExcaliburRecord(round);
+
   if (ex) {
+
     var exHtml = '<div style="margin-top:8px;padding:8px;border:1px solid rgba(201,168,76,0.32);border-radius:8px;background:rgba(201,168,76,0.08)">';
+
     exHtml += '<div style="font-weight:700;color:var(--gold-light);margin-bottom:4px">王者之剑</div>';
+
     exHtml += '<div style="font-size:13px;line-height:1.6;color:var(--text)">';
+
     exHtml += '持剑者：<strong>' + (ex.holder >= 0 ? playerLabel(ex.holder) : '未指定') + '</strong>';
+
     if (ex.used === false) {
+
       exHtml += '；本轮确认<strong>不使用</strong>';
+
     } else if (ex.used === true) {
+
       exHtml += '；对 <strong>' + (ex.target !== null && ex.target !== undefined ? playerLabel(ex.target) : '未选择目标') + '</strong> 使用';
+
       if (ex.feedbackRecorded) {
+
         exHtml += '；口述改变：<strong>' + excaliburDirectionLabel(ex.claimedDirection) + '</strong>';
+
         if (ex.feedbackRound !== null && ex.feedbackRound !== undefined) {
+
           exHtml += ' <span style="color:var(--text-dim)">（第' + (ex.feedbackRound + 1) + '轮发言记录）</span>';
+
         }
+
         if (ex.feedbackSpeaker !== null && ex.feedbackSpeaker !== undefined) {
+
           exHtml += ' <span style="color:var(--text-dim)">发言人：' + playerLabel(ex.feedbackSpeaker) + '</span>';
+
         }
+
       } else {
+
         exHtml += '；<span style="color:var(--orange)">待持剑者反馈改变方向</span>';
+
       }
+
       if (ex.note) exHtml += '<div style="font-size:12px;color:var(--text-dim)">备注：' + escapeHtml(ex.note) + '</div>';
+
     } else {
+
       exHtml += '；<span style="color:var(--orange)">尚未确认是否使用</span>';
+
     }
+
     exHtml += '</div></div>';
+
     parts.push(exHtml);
+
   }
 
+
+
   if (!parts.length) return '';
+
   return '<div style="margin-top:8px"><strong>特殊信息：</strong>' + parts.join('') + '</div>';
+
 }
 
+
+
 function buildReviewHTML() {
+
   var h = '';
+
   var pc = state.playerCount;
 
+
+
   for (var r = 0; r <= state.currentRound; r++) {
+
     var m = state.missions[r];
+
     if (!m) continue;
 
+
+
     h += '<div class="review-card">';
+
     h += '<div class="rc-header" onclick="toggleReviewCard(this)">';
+
     h += '<span class="rc-title">第' + (r + 1) + '轮 · ' + (m.result ? (m.result === 'success' ? '任务成功' : '任务失败') : '进行中') + '</span>';
+
     h += '<span class="rc-toggle">&#9654;</span>';
+
     h += '</div>';
+
     h += '<div class="rc-body">';
 
+
+
     // Show all launch attempts
+
     var attempts = m.launchAttempts || [];
+
     if (attempts.length > 0) {
+
       for (var a = 0; a < attempts.length; a++) {
+
         var att = attempts[a];
+
         var attApproves = 0;
+
         for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+
         var launched = attApproves > Math.floor(pc / 2);
 
+
+
         var firstClass = (a === 0) ? ' launch-first' : '';
+
         h += '<div class="launch-item' + firstClass + '">';
+
         h += '<strong>第' + (a + 1) + '次组队</strong> ';
+
         h += '<span class="launch-leader">' + playerLabel(att.leader) + '</span>';
+
         h += ' <span style="color:var(--text-dim)">带队：</span>';
+
         h += att.team.map(function(i) { return '<span class="launch-member">' + playerLabel(i) + '</span>'; }).join(' ');
+
         h += ' | 赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves);
+
         h += launched ? ' <span style="color:var(--green-bright)">组队成功</span>' : ' <span style="color:var(--red-bright)">组队未通过</span>';
 
+
+
         // Vote detail - two-column layout
+
         var approveList = [], rejectList = [];
+
         for (var k = 0; k < pc; k++) {
+
           if (att.votes[k] === 'approve') approveList.push(playerLabel(k));
+
           else rejectList.push(playerLabel(k));
+
         }
+
         h += '<div class="vote-result-split">';
+
         h += '<div class="vote-col-approve"><span class="vote-col-title">赞成 (' + approveList.length + '人)：</span>';
+
         if (approveList.length > 0) {
+
           h += approveList.map(function(n) { return '<span class="vote-player-name">' + n + '</span>'; }).join('');
+
         } else { h += '<span class="vote-col-empty">无</span>'; }
+
         h += '</div>';
+
         h += '<div class="vote-col-reject"><span class="vote-col-title">反对 (' + rejectList.length + '人)：</span>';
+
         if (rejectList.length > 0) {
+
           h += rejectList.map(function(n) { return '<span class="vote-player-name">' + n + '</span>'; }).join('');
+
         } else { h += '<span class="vote-col-empty">无</span>'; }
+
         h += '</div></div>';
+
         h += '</div>';
+
       }
+
     }
 
+
+
     if (m.result) {
+
       h += '<div style="margin-top:6px"><strong>任务结果：</strong>';
+
       h += '<span style="color:' + (m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)') + '">';
+
       if (m.result === 'success' && m.shieldedFails) {
+
         h += '成功（含' + m.shieldedFails + '张失败票）';
+
       } else if (m.result === 'success' && !m.failCount) {
+
         h += '成功（全票通过）';
+
       } else if (m.result === 'success') {
+
         h += '成功';
+
       } else {
+
         h += '失败';
+
         if (m.failCount) h += '（' + m.failCount + '张失败票）';
+
       }
+
       h += '</span></div>';
+
     }
+
+
 
     h += buildReviewSpecialInfo(r);
 
+
+
     if (m.launchFailures > 0) {
+
       h += '<div style="margin-top:4px;color:var(--orange)">组队未通过 ' + m.launchFailures + ' 次</div>';
+
     }
+
+
 
     h += '</div></div>';
+
   }
+
+
 
   h += '<div style="text-align:center;margin-top:8px"><button class="btn small" onclick="document.getElementById(\'review-panel\').style.display=\'none\'">收起</button></div>';
+
   return h;
+
 }
+
+
 
 function toggleReviewCard(header) {
+
   var body = header.nextElementSibling;
+
   var toggle = header.querySelector('.rc-toggle');
+
   if (body.classList.contains('open')) {
+
     body.classList.remove('open');
+
     toggle.classList.remove('open');
+
   } else {
+
     body.classList.add('open');
+
     toggle.classList.add('open');
+
   }
+
 }
+
+
 
 /* ==================== GAME ACTIONS ==================== */
+
 function selectLeader(idx) {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   m.leader = idx;
+
   m.team = [];
+
   m.votes = {};
+
   m.result = null;
+
   m.failCount = 0;
+
   // 仅在首次选队长（无发车尝试记录）时重置计数器，避免丢失已记录的发车失败历史
+
   if (m.launchAttempts.length === 0) {
+
     m.launchFailures = 0;
+
     m.launchAttempts = [];
+
   }
+
   state._firstLeaderPicked = true;
+
   state._lastLeaderIdx = idx;
+
   renderStepPanel();
+
 }
+
+
 
 function randomFirstLeader() {
+
   var pc = state.playerCount;
+
   var idx = Math.floor(Math.random() * pc);
+
   showModal(
+
     '<h2>随机队长</h2>' +
+
     '<p style="font-size:16px;text-align:center;margin:16px 0">随机选中：<strong>' + (idx + 1) + '号 ' + state.playerNames[idx] + '</strong></p>' +
+
     '<div class="modal-actions">' +
+
     '<button class="btn primary" onclick="closeModal();selectLeader(' + idx + ')">确认</button>' +
+
     '<button class="btn" onclick="closeModal()">手动选号</button>' +
+
     '</div>'
+
   );
+
 }
+
+
 
 function reSelectLeader() {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   m.leader = null;
+
   m.team = [];
+
   m.votes = {};
+
   state._firstLeaderPicked = false;
+
   renderStepPanel();
+
 }
+
+
 
 function toggleTeamMember(idx) {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   var pos = m.team.indexOf(idx);
+
   if (pos !== -1) m.team.splice(pos, 1);
+
   else if (m.team.length < m.size) m.team.push(idx);
+
   renderStepPanel();
+
 }
+
+
 
 function confirmTeam() {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   console.log('[debug-confirmTeam] round=' + state.currentRound + ' teamLen=' + m.team.length + ' size=' + m.size + ' excalEnabled=' + state.excaliburEnabled + ' teamPending=' + state._teamConfirmedPending + ' timerMode=' + state.timerMode);
+
   if (m.team.length !== m.size) { toast('队伍人数不正确', 'warn'); return; }
 
+
+
   // 湖中女神：第一轮队长确认后自动设定持有者
+
   if (state.currentRound === 0 && state.ladyOfLakeEnabled && state.ladyLakeHolder === -1) {
+
     var pc = state.playerCount;
+
     state.ladyLakeHolder = (m.leader - 1 + pc) % pc;
+
   }
+
+
 
   // Start speech phase before voting
+
   state._teamConfirmedPending = true;
 
+
+
   if (state.timerMode === 'per') {
+
     state.speakerOrder = [];
+
     state.speakTimes = {};
+
     var startIdx = m.leader;
+
     for (var si = 0; si < state.playerCount; si++) {
+
       state.speakerOrder.push((startIdx + si) % state.playerCount);
+
     }
+
     state.currentSpeakerIdx = 0;
+
     state.timerRemaining = state.timerSeconds;
+
     stopTimer();
+
     state.timerInterval = null;
+
     renderTimerDisplay();
+
     renderStepPanel();
+
     showCombinedConfirmModal();
+
     // 兜底：如果弹窗未出现（被 early return 吞掉），尝试显示调试信息
+
     if (!document.getElementById('dynamic-modal-overlay') && !state.winner) {
+
       console.warn('[confirmTeam] modal overlay not found after showCombinedConfirmModal');
+
     }
+
   } else if (state.timerMode === 'all') {
+
     state.timerRemaining = state.timerSeconds;
+
     stopTimer();
+
     state.timerInterval = null;
+
     state.speakerOrder = [];
+
     state.currentSpeakerIdx = -1;
+
     renderTimerDisplay();
+
     renderStepPanel();
+
     showCombinedConfirmModal();
+
     if (!document.getElementById('dynamic-modal-overlay') && !state.winner) {
+
       console.warn('[confirmTeam] modal overlay not found after showCombinedConfirmModal');
+
     }
+
   }
+
 }
+
+
 
 function showAllModeExcaliburFeedback(list, idx, showLadyAfter) {
+
   if (idx < list.length) {
+
     var rec = list[idx];
+
     showExcaliburFeedbackModal(rec);
+
     // 覆写 ack 行为：关闭后继续显示下一条
+
     var origAck = window.ackExcaliburFeedback;
+
     window.ackExcaliburFeedback = function(r) {
+
       if (origAck) origAck(r);
+
       window.ackExcaliburFeedback = origAck;
+
       setTimeout(function() { showAllModeExcaliburFeedback(list, idx + 1, showLadyAfter); }, 100);
+
     };
+
   } else if (showLadyAfter) {
+
     setTimeout(function() { showLadyCheck(); }, 50);
+
   }
+
 }
+
+
 
 // 轮流模式：组队确认后独立弹窗序列展示所有未反馈的王者之剑使用
+
 function showPerExcalFeedbackSequence(idx) {
+
   var seq = state._perExcalSeq;
+
   if (!seq || idx >= seq.length) {
+
     delete state._perExcalSeq;
+
     state._modalPausedTimer = false;
+
     showPerSpeakerModals();
+
     if (!state._modalPausedTimer) startTimer();
+
     return;
+
   }
+
   var rec = seq[idx];
+
   stopTimer();
+
   state._modalPausedTimer = true;
+
   showExcaliburFeedbackModal(rec);
+
   // 覆写 ack：关闭后不恢复计时器，继续序列下一项
+
   var origAck = window.ackExcaliburFeedback;
+
   window.ackExcaliburFeedback = function(r) {
+
     var _rec = getExcaliburRecord(r);
+
     if (_rec) _rec.feedbackRecorded = true;
+
     closeModal();
+
     window.ackExcaliburFeedback = origAck;
+
     setTimeout(function() { showPerExcalFeedbackSequence(idx + 1); }, 100);
+
   };
+
 }
+
+
 
 function transitionToVotes() {
+
   state._teamConfirmedPending = false;
+
   var m = state.missions[state.currentRound];
+
   m.votes = {};
+
   for (var i = 0; i < state.playerCount; i++) {
+
     m.votes[i] = 'approve';
+
   }
+
   stopTimer();
+
   var el = $('timer-display');
+
   if (el) el.style.display = 'none';
+
   renderStepPanel();
+
 }
+
+
 
 function castVote(idx, type) {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   m.votes[idx] = type;
+
   renderStepPanel();
+
 }
+
+
 
 function allApprove() {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   for (var i = 0; i < state.playerCount; i++) {
+
     m.votes[i] = 'approve';
+
   }
+
   renderStepPanel();
+
 }
+
+
 
 function allReject() {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   for (var i = 0; i < state.playerCount; i++) {
+
     m.votes[i] = 'reject';
+
   }
+
   renderStepPanel();
+
 }
 
+
+
 function confirmVotes() {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   var pc = state.playerCount;
 
+
+
   var approves = 0;
+
   var rejects = 0;
+
   for (var i = 0; i < pc; i++) {
+
     if (m.votes[i] === 'approve') approves++;
+
     else rejects++;
+
   }
 
+
+
   m.launchAttempts.push({
+
     team: m.team.slice(),
+
     votes: Object.assign({}, m.votes),
+
     leader: m.leader
+
   });
+
+
 
   applyLaunchTendencies();
 
+
+
   if (approves > rejects) {
+
     renderStepPanelWithResult();
+
   } else {
+
     clearExcaliburRecord(state.currentRound);
+
     m.launchFailures++;
 
+
+
     // Save tendency snapshot for this failed launch attempt
+
     var snap = {};
+
     for (var i = 0; i < pc; i++) {
+
       snap[i] = state.tendencies[i] != null ? state.tendencies[i] : 50;
+
     }
+
     state.roundTendencies.push({ v: snap, r: state.currentRound, a: m.launchFailures });
 
+
+
     if (m.launchFailures >= 5) {
+
       m.result = 'fail';
+
       m.failCount = 0;
+
       updateFinalTendencies();
+
       checkGameEnd();
+
       renderGame();
+
       var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮连续 <span class="count">5</span> 次组队未通过，任务自动失败！</div>';
+
       $('launch-fail-area').innerHTML = banner;
+
       return;
+
     }
+
+
 
     m.leader = (m.leader + 1) % pc;
+
     state._lastLeaderIdx = m.leader;
+
     m.team = [];
+
     m.votes = {};
 
+
+
     renderGame();
+
     var banner = '<div class="launch-fail-banner">第' + (state.currentRound + 1) + '轮第 <span class="count">' + m.launchFailures + '</span> 次组队未通过！赞成 ' + approves + ' / 反对 ' + rejects + '（赞成≤反对）队长轮换至 ' + playerLabel(m.leader) + '</div>';
+
     $('launch-fail-area').innerHTML = banner;
+
     toast('组队未通过！队长轮换', 'warn');
+
   }
+
 }
+
+
 
 function applyLaunchTendencies() {
+
   var m = state.missions[state.currentRound];
+
   var si = state.selfIndex;
+
   var lastAttempt = m.launchAttempts[m.launchAttempts.length - 1];
+
   var myVote = si >= 0 ? lastAttempt.votes[si] : null;
 
+
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (!(i in state.tendencies)) state.tendencies[i] = 50;
+
     var vote = lastAttempt.votes[i];
 
+
+
     // 客观评分：基于投票一致性，不参考本人身份
+
     if (myVote && i !== si) {
+
       if (vote === myVote) state.tendencies[i] += 2;
+
       else state.tendencies[i] -= 2;
+
     }
 
+
+
     if (state.tendencies[i] < 0) state.tendencies[i] = 0;
+
     if (state.tendencies[i] > 100) state.tendencies[i] = 100;
+
   }
+
   renderTendencyMini();
+
 }
+
+
 
 function renderStepPanelWithResult() {
+
   var m = state.missions[state.currentRound];
+
   var c = $('step-container');
+
   var h = '';
+
+
 
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+
   h += '<span class="step-label">第' + (state.currentRound + 1) + '轮 · 需要 ' + m.size + ' 人出任务</span>';
+
   h += '<span style="font-size:13px;color:var(--text-dim)">进行中</span></div>';
 
+
+
   h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + playerLabel(m.leader) + '</span>';
+
   h += '<span style="font-size:13px;color:var(--text-dim);margin-left:10px">队伍：' + m.team.map(function(i) { return playerLabel(i); }).join('、') + '</span></div>';
 
+
+
   var approves = Object.values(m.votes).filter(function(v) { return v === 'approve'; }).length;
+
   var rejects = state.playerCount - approves;
+
   h += '<div style="font-size:14px;color:var(--green-bright);margin-bottom:10px">组队成功！赞成 ' + approves + ' / 反对 ' + rejects + '</div>';
 
+
+
   h += buildExcaliburPreResultPanel(m);
+
   h += '<hr style="border-color:var(--border);margin-bottom:10px">';
+
   h += '<div class="step-label">步骤D：任务结果</div>';
+
   h += '<div class="mission-result-area">';
+
   h += '<div class="mission-btn success-btn' + (m.result === 'success' ? ' selected' : '') + '" onclick="setMissionResult(\'success\')"><span class="mission-icon">&#128737;</span><span class="mission-label">成功</span></div>';
+
   h += '<div class="mission-btn fail-btn' + (m.result === 'fail' ? ' selected' : '') + '" onclick="setMissionResult(\'fail\')"><span class="mission-icon">&#128481;</span><span class="mission-label">失败</span></div>';
+
   h += '</div>';
+
   h += '<div id="fail-count-row" class="fail-count-row" style="display:none">';
+
   h += '<div class="step-label">失败票数量</div>';
+
   h += '<div class="fail-count-btns" id="fail-count-btns"></div></div>';
+
   h += '<div style="text-align:center;margin-top:10px"><button class="btn primary" id="btn-finalize" style="display:none" onclick="finalizeMission()">确认任务结果，进入下一轮</button></div>';
+
   c.innerHTML = h;
 
+
+
   if (m.result) {
+
     document.getElementById('btn-finalize').style.display = 'inline-flex';
+
     if (m.result === 'fail') showFailCountSelector();
+
   }
+
 }
+
+
 
 function setMissionResult(result) {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   m.result = result;
+
   if (result === 'fail') {
+
     m.failCount = 0;
+
     showFailCountSelector();
+
   } else {
+
     m.failCount = 0;
+
     document.getElementById('fail-count-row').style.display = 'none';
+
   }
+
   document.getElementById('btn-finalize').style.display = 'inline-flex';
+
 }
+
+
 
 function showFailCountSelector() {
+
   var m = state.missions[state.currentRound];
+
   document.getElementById('fail-count-row').style.display = 'block';
+
   var fc = '';
+
   for (var i = 1; i <= m.team.length; i++) {
+
     fc += '<div class="fail-count-btn' + (m.failCount === i ? ' selected' : '') + '" onclick="setFailCount(' + i + ')">' + i + '</div>';
+
   }
+
   document.getElementById('fail-count-btns').innerHTML = fc;
+
   document.getElementById('btn-finalize').style.display = 'inline-flex';
+
 }
+
+
 
 function setFailCount(n) {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   m.failCount = n;
+
   var btns = document.querySelectorAll('#fail-count-btns .fail-count-btn');
+
   btns.forEach(function(b) {
+
     b.className = 'fail-count-btn' + (parseInt(b.textContent) === n ? ' selected' : '');
+
   });
+
 }
+
+
 
 function finalizeMission() {
+
   saveUndo();
+
   var m = state.missions[state.currentRound];
+
   if (!m.result) { toast('请选择任务结果', 'warn'); return; }
+
   if (m.result === 'fail' && !m.failCount) { toast('请选择失败票数量', 'warn'); return; }
+
   if (state.excaliburEnabled) {
+
     var exRec = getExcaliburRecord(state.currentRound);
+
     if (!exRec || exRec.holder < 0) { toast('请先指定王者之剑持剑者', 'warn'); return; }
+
     if (exRec.used === null || exRec.used === undefined) { toast('请先确认王者之剑是否使用', 'warn'); return; }
+
     if (exRec.used === true && (exRec.target === null || exRec.target === undefined)) { toast('请选择王者之剑使用目标', 'warn'); return; }
+
   }
+
+
 
   // 第4轮保护轮：需2张失败票任务才失败，1张失败任务仍成功（6人局例外，无保护）
+
   if (state.currentRound === 3 && m.result === 'fail' && (m.failCount || 0) === 1 && state.playerCount !== 6) {
+
     m.result = 'success';
+
     m.failCount = 1;
+
     m.shieldedFails = 1;
+
     toast('第4轮保护轮：1张失败票，任务仍成功');
+
   }
+
+
 
   stopTimer();
+
   state.speakerOrder = [];
+
   state.currentSpeakerIdx = -1;
+
   updateFinalTendencies();
 
+
+
   // Capture tendency snapshot for this round
+
   var snap = {};
+
   for (var i = 0; i < state.playerCount; i++) {
+
     snap[i] = state.tendencies[i] != null ? state.tendencies[i] : 50;
+
   }
+
   state.roundTendencies.push({ v: snap, r: state.currentRound, a: 0 });
 
+
+
   var hasLancelot = state.activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || state.activeRoles.indexOf('兰斯洛特(红)') !== -1;
+
   if (hasLancelot && state.currentRound >= 1) {
+
     var sc = state.missions.filter(function(mm) { return mm.result === 'success'; }).length;
+
     var fc = state.missions.filter(function(mm) { return mm.result === 'fail'; }).length;
+
   console.log('[debug-finalizeMission] round=' + state.currentRound + ' hasLancelot=' + hasLancelot + ' sc=' + sc + ' fc=' + fc + ' excalEnabled=' + state.excaliburEnabled + ' timerMode=' + state.timerMode);
+
     if (sc >= 3 || fc >= 3) {
+
       console.log('[debug-finalizeMission] game decided, skip Lancelot draw');
+
       // 已决定胜负，跳过抽卡直接推进游戏结束
+
       checkGameEnd();
+
       renderGame();
+
     } else {
+
       console.log('[debug-finalizeMission] entering Lancelot auto-draw');
+
       applyLancelotAutoDraw(state.currentRound);
+
     }
+
   } else {
+
     checkGameEnd();
+
     renderGame();
+
   }
+
 }
+
+
 
 function updateFinalTendencies() {
+
   var m = state.missions[state.currentRound];
+
   var si = state.selfIndex;
+
   var myVote = si >= 0 ? m.votes[si] : null;
+
   var result = m.result;
 
+
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (!(i in state.tendencies)) state.tendencies[i] = 50;
 
+
+
     var vote = m.votes[i];
+
     var inTeam = m.team.indexOf(i) !== -1;
 
+
+
     if (result === 'success') {
+
       if (vote === 'approve') state.tendencies[i] += 5;
+
       if (vote === 'reject') state.tendencies[i] -= 5;
+
       if (inTeam) state.tendencies[i] += 3;
+
     } else {
+
       if (vote === 'approve') state.tendencies[i] -= 8;
+
       if (vote === 'reject') state.tendencies[i] += 8;
+
       if (inTeam && vote === 'approve') state.tendencies[i] -= 10;
+
       if (!inTeam && vote === 'reject') state.tendencies[i] += 5;
+
       if (inTeam) state.tendencies[i] -= 3;
+
     }
+
+
 
     // 客观评分：基于投票一致性，不参考本人身份
+
     if (myVote && i !== si) {
+
       if (vote === myVote) state.tendencies[i] += 2;
+
       else state.tendencies[i] -= 2;
+
     }
+
+
 
     if (state.tendencies[i] < 0) state.tendencies[i] = 0;
+
     if (state.tendencies[i] > 100) state.tendencies[i] = 100;
+
   }
+
   renderTendencyMini();
+
 }
+
+
 
 function checkGameEnd() {
+
   var successCount = state.missions.filter(function(mm) { return mm.result === 'success'; }).length;
+
   var failCount = state.missions.filter(function(mm) { return mm.result === 'fail'; }).length;
 
+
+
   if (failCount >= 3) {
+
     state.winner = 'evil';
+
     stopTimer();
+
     showPage('end');
+
     return;
+
   }
+
   if (successCount >= 3) {
+
     state.assassinTarget = null;
+
     state.assassinFromMission = true;
+
     state._assassinAfterRound = state.currentRound;
+
     stopTimer();
+
     showPage('end');
+
     return;
+
   }
+
+
 
   state.currentRound++;
+
   if (state.currentRound >= 5) state.currentRound = 4;
+
   state._ladyCheckTriggeredThisRound = false;
+
 }
+
+
 
 /* ==================== ASSASSIN PHASE (inline on end page) ==================== */
+
 function renderEndAssassinPick() {
+
   var h = '<div id="assassin-countdown-display"></div>';
+
   h += '<p class="sub">好人方已完成 3 轮任务，请刺客选择刺杀目标（可参考下方复盘信息）</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     h += '<button class="assassin-target-btn' + (state.assassinTarget === i ? ' selected' : '') + '" onclick="pickEndAssassinTarget(' + i + ')">' + playerLabel(i) + '</button>';
+
   }
+
   h += '</div>';
+
   h += '<div style="text-align:center;margin-top:14px">';
+
   h += '<button class="btn primary" onclick="confirmEndAssassin()"';
+
   if (state.assassinTarget === null) h += ' disabled';
+
   h += '>确认刺杀目标</button></div>';
+
   $('end-assassin-pick-area').innerHTML = h;
+
   startAssassinTimer();
+
 }
+
+
 
 function pickEndAssassinTarget(idx) {
+
   state.assassinTarget = idx;
+
   var btns = document.querySelectorAll('#end-assassin-pick-area .assassin-target-btn');
+
   btns.forEach(function(b, i) {
+
     b.className = 'assassin-target-btn' + (i === idx ? ' selected' : '');
+
   });
+
   var confirmBtn = document.querySelector('#end-assassin-pick-area .btn.primary');
+
   if (confirmBtn) confirmBtn.disabled = false;
+
 }
+
+
 
 function confirmEndAssassin() {
+
   stopAssassinTimer();
+
   if (state.assassinTarget === null) return;
+
   $('end-assassin-pick-area').style.display = 'none';
+
   $('end-assassin-resolve-area').style.display = 'block';
+
   $('end-target-name').textContent = playerLabel(state.assassinTarget);
+
 }
+
+
 
 /* ==================== END PANEL ==================== */
+
 function getTakenUniqueRoles(exceptIdx) {
+
   var taken = {};
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (i === exceptIdx) continue;
+
     var role;
+
     // 互换身份进行中时，用交换后的值
+
     if (state._swapEndRole && (i in state._swapEndRole)) {
+
       role = state._swapEndRole[i];
+
     } else {
+
       var sel = document.getElementById('end-role-' + i);
+
       role = sel ? sel.value : '';
+
     }
+
     if (role && UNIQUE_ROLES.indexOf(role) !== -1) {
+
       taken[role] = true;
+
     }
+
   }
+
   return taken;
+
 }
+
+
 
 function renderEndIdentityDropdowns() {
+
   if (state._renderingIdentities) return;
+
   state._renderingIdentities = true;
+
   var grid = $('end-identity-grid');
+
   var h = '';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var taken = getTakenUniqueRoles(i);
+
     var curSel = document.getElementById('end-role-' + i);
+
     var curVal = curSel ? curSel.value : '';
+
     // 互换身份时使用交换后的值
+
     var isSwapped = state._swapEndRole && (i in state._swapEndRole);
+
     if (isSwapped) { curVal = state._swapEndRole[i]; }
+
     // 自动填入已知身份（如刺杀中确认的梅林），被互换的玩家跳过自动填入
+
     if (!curVal && !isSwapped && state.autoRoles && state.autoRoles[i]) {
+
       curVal = state.autoRoles[i];
+
     }
+
+
 
     h += '<div class="end-player-row">';
+
     // 临时玩家（"玩家N"）显示为可编辑行内输入框，而非静态文本
+
     var isTemp = /^玩家\d+$/.test(state.playerNames[i]);
+
     if (isTemp) {
+
       h += '<input type="text" id="end-name-' + i + '" value="' + escapeHtml(state.playerNames[i]) + '"';
+
       h += ' style="width:60px;padding:3px 5px;border-radius:4px;border:1px dashed var(--border);background:transparent;color:var(--text-dim);font-size:12px;outline:none;text-align:center"';
+
       h += ' title="临时玩家，可修改姓名">';
+
     } else {
+
       h += '<span class="ep-name">' + playerLabel(i) + '</span>';
+
     }
+
     h += '<select id="end-role-' + i + '" onchange="onEndRoleChange(' + i + ')">';
+
     h += '<option value="">-- 未选 --</option>';
+
     for (var j = 0; j < state.activeRoles.length; j++) {
+
       var r = state.activeRoles[j];
+
       if (UNIQUE_ROLES.indexOf(r) !== -1 && taken[r] && r !== curVal) continue;
+
       h += '<option value="' + r + '"' + (r === curVal ? ' selected' : '') + '>' + r + '</option>';
+
     }
+
     h += '</select>';
+
     h += '<button class="btn small swap-seat-btn" id="end-swap-role-' + i + '" onclick="swapEndRole(' + i + ')" title="互换身份">⇄</button>';
+
     // 混子跟随目标行内下拉（仅当角色为混子且未选择目标时显示）
+
     if (curVal === '混子' && state._huntFollowTarget === undefined) {
+
       h += '<select id="end-hunt-target" style="font-size:11px;padding:3px 4px;border-radius:4px;border:1px solid var(--gold-light);background:var(--bg-card);color:var(--gold-light);cursor:pointer;margin-left:4px;min-height:30px">';
+
       h += '<option value="">混谁？</option>';
+
       for (var hi = 0; hi < state.playerCount; hi++) {
+
         if (hi === i) continue;
+
         h += '<option value="' + hi + '">' + playerLabel(hi) + '</option>';
+
       }
+
       h += '</select>';
+
     }
+
     h += '</div>';
+
   }
+
   grid.innerHTML = h;
+
   state._renderingIdentities = false;
+
 }
+
+
 
 function swapEndRole(idx) {
+
   if (_endSwapRoleFirst === null) {
+
     _endSwapRoleFirst = idx;
+
     var btn = document.getElementById('end-swap-role-' + idx);
+
     if (btn) { btn.classList.add('swapping'); btn.textContent = '⇄'; }
+
     toast('已选中 ' + playerLabel(idx) + '，再点另一位的互换按钮完成互换');
+
   } else if (_endSwapRoleFirst === idx) {
+
     _endSwapRoleFirst = null;
+
     var btn = document.getElementById('end-swap-role-' + idx);
+
     if (btn) { btn.classList.remove('swapping'); btn.textContent = '⇄'; }
+
     toast('已取消');
+
   } else {
+
     var a = _endSwapRoleFirst;
+
     var b = idx;
+
     var selA = document.getElementById('end-role-' + a);
+
     var selB = document.getElementById('end-role-' + b);
+
     var valA = selA ? selA.value : '';
+
     var valB = selB ? selB.value : '';
+
     _endSwapRoleFirst = null;
+
     // 清除首次点击按钮的高亮
+
     var prevBtn = document.getElementById('end-swap-role-' + a);
+
     if (prevBtn) { prevBtn.classList.remove('swapping'); prevBtn.textContent = '⇄'; }
+
     // 不能直接 sel.value = ...，因为目标值可能不在对方下拉框选项里（被 taken 过滤了）
+
     // 用临时映射让 renderEndIdentityDropdowns 读取交换后的值来重建
+
     state._swapEndRole = {};
+
     state._swapEndRole[a] = valB;
+
     state._swapEndRole[b] = valA;
+
     renderEndIdentityDropdowns();
+
     delete state._swapEndRole;
+
     toast(playerLabel(a) + ' 与 ' + playerLabel(b) + ' 身份已互换');
+
   }
+
 }
+
+
 
 function renderEnd() {
+
   _endSwapRoleFirst = null;
+
   // Assassin phase
+
   if (state.assassinFromMission && !state.winner) {
+
     $('end-assassin-card').style.display = 'block';
+
     if (state.assassinTarget === null) {
+
       // Phase 1: pick assassin target
+
       $('end-assassin-pick-area').style.display = 'block';
+
       $('end-assassin-resolve-area').style.display = 'none';
+
       renderEndAssassinPick();
+
     } else {
+
       // Phase 2: resolve result
+
       $('end-assassin-pick-area').style.display = 'none';
+
       $('end-assassin-resolve-area').style.display = 'block';
+
       $('end-target-name').textContent = playerLabel(state.assassinTarget);
+
     }
+
   } else {
+
     $('end-assassin-card').style.display = 'none';
+
   }
+
+
 
   // Show review on end page
+
   $('end-review-content').innerHTML = buildReviewHTML();
 
+
+
   // Add replay button
+
   var reviewCard = document.getElementById('end-review-card');
+
   if (reviewCard) {
+
     var existingBtn = document.getElementById('end-replay-btn');
+
     if (existingBtn) existingBtn.remove();
+
     var btnRow = document.createElement('div');
+
     btnRow.id = 'end-replay-btn';
+
     btnRow.style.cssText = 'text-align:center;margin-top:12px';
+
     btnRow.innerHTML = '<button class="btn primary" onclick="showReplay()" style="font-size:16px;padding:12px 32px">复盘回放</button>';
+
     reviewCard.appendChild(btnRow);
+
   }
+
+
 
   if (state.assassinFromMission && !state.winner) {
+
     $('winner-toggle').innerHTML = '';
+
   } else {
+
     var h = '<button class="winner-btn good' + (state.winner === 'good' ? ' selected' : '') + '" onclick="setWinner(\'good\')">&#128737; 好人方获胜</button>';
+
     h += '<button class="winner-btn evil' + (state.winner === 'evil' ? ' selected' : '') + '" onclick="setWinner(\'evil\')">&#128481; 反方获胜</button>';
+
     $('winner-toggle').innerHTML = h;
+
   }
+
+
 
   // 兰斯洛特反转状态由游戏中累计的反转记录自动判定
+
   if (state.lancelotFlipCount > 0) {
+
     state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+
   }
+
+
 
   var sc = state.missions.filter(function(m) { return m.result === 'success'; }).length;
+
   var fc = state.missions.filter(function(m) { return m.result === 'fail'; }).length;
+
   $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
 
+
+
   renderEndIdentityDropdowns();
+
   // 强制结束按钮：始终隐藏（v104：单机模式下不需要）
+
   var forceEndCard = $('end-force-end-card');
+
   if (forceEndCard) {
+
     forceEndCard.style.display = 'none';
+
   }
+
 }
+
+
 
 /* ==================== END: TEMP PLAYER RENAME ==================== */
+
 function renderEndTempPlayerRenames() {
+
   var tempPlayers = [];
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var nm = state.playerNames[i];
+
     // 检测临时玩家：名字以"玩家"开头且后跟纯数字
+
     if (/^玩家\d+$/.test(nm)) {
+
       tempPlayers.push({ idx: i, name: nm });
+
     }
+
   }
+
   var card = $('end-rename-temp-card');
+
   if (tempPlayers.length === 0) {
+
     card.style.display = 'none';
+
     return;
+
   }
+
   card.style.display = 'block';
+
   var h = '';
+
   for (var j = 0; j < tempPlayers.length; j++) {
+
     var p = tempPlayers[j];
+
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">';
+
     h += '<span style="font-size:14px;min-width:50px;color:var(--text-dim)">' + playerLabel(p.idx) + '</span>';
+
     h += '<span style="color:var(--text-dim)">→</span>';
+
     h += '<input type="text" id="rename-temp-' + p.idx + '" value="' + p.name + '"';
+
     h += ' style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:15px;outline:none;min-width:120px">';
+
     h += '</div>';
+
   }
+
   $('end-rename-temp-grid').innerHTML = h;
+
 }
+
+
 
 function saveTempPlayerRenames() {
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var input = document.getElementById('rename-temp-' + i);
+
     if (!input) continue;
+
     var newName = input.value.trim();
+
     if (!newName || newName === state.playerNames[i]) continue;
+
     // 检查是否与其他玩家重名
+
     var dup = false;
+
     for (var k = 0; k < state.playerCount; k++) {
+
       if (k !== i && state.playerNames[k] === newName) { dup = true; break; }
+
     }
+
     if (dup) { toast('名字「' + newName + '」已被其他玩家使用', 'warn'); continue; }
+
     // 更新 playerNames
+
     state.playerNames[i] = newName;
+
     // 若 namePool 中尚无此名字，加入
+
     if (namePool.indexOf(newName) === -1) {
+
       namePool.push(newName);
+
     }
+
   }
+
   saveNamePool();
+
   // 同步云端名字库
+
   if (typeof sb !== 'undefined' && sb) {
+
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() })
+
       .then(function(res) {
+
         if (res.error) console.warn('sync name_pool failed:', res.error);
+
       });
+
   }
+
   // 重新渲染身份下拉和改名列表
+
   renderEndIdentityDropdowns();
+
   renderEndTempPlayerRenames();
+
   renderPlayerNames();
+
   toast('临时玩家名称已更新');
+
 }
+
+
 
 function onEndRoleChange(idx) {
+
   var sel = document.getElementById('end-role-' + idx);
+
   var role = sel ? sel.value : '';
+
   if (role && (UNIQUE_ROLES.indexOf(role) !== -1 || role === '混子')) {
+
     renderEndIdentityDropdowns();
+
   }
+
 }
+
+
 
 /* ==================== LANCELOT AUTO-DRAW ==================== */
+
 function shuffleLancelotDeck() {
+
   var deck = [true, true, false, false, false, false, false]; // 2反转+5空白
+
   for (var i = deck.length - 1; i > 0; i--) {
+
     var j = Math.floor(Math.random() * (i + 1));
+
     var tmp = deck[i]; deck[i] = deck[j]; deck[j] = tmp;
+
   }
+
   return deck;
+
 }
 
+
+
 function applyLancelotAutoDraw(round) {
+
   if (!state.lancelotDeck || state.lancelotDeck.length === 0) {
+
     showLancelotDrawToast(null, round);
+
     checkGameEnd();
+
     renderGame();
+
     return;
+
   }
+
+
 
   // Count available cards
+
   var flipCount = 0, blankCount = 0;
+
   for (var i = 0; i < state.lancelotDeck.length; i++) {
+
     if (state.lancelotDeck[i]) flipCount++;
+
     else blankCount++;
+
   }
+
   var remaining = state.lancelotDeck.length;
 
+
+
   // Mode selection modal
+
   var modeHtml = '<h2>兰斯洛特抽卡 · 第 ' + (round + 1) + ' 轮结束</h2>' +
+
     '<p style="font-size:14px;text-align:center;color:var(--text-dim);margin:8px 0">剩余牌堆：' + remaining + ' 张（反转 ' + flipCount + ' / 未反转 ' + blankCount + '）</p>' +
+
     '<div class="modal-actions" style="justify-content:center;gap:20px">' +
+
     '<button class="btn primary" id="lancelot-auto-draw-btn">自动抽卡</button>' +
+
     '<button class="btn" id="lancelot-manual-draw-btn">手动录入</button>' +
+
     '</div>';
+
+
 
   showModal(modeHtml);
 
+
+
   document.getElementById('lancelot-auto-draw-btn').addEventListener('click', function() {
+
     closeModal();
+
     lancelotDoAutoDraw(round);
+
   });
+
+
 
   document.getElementById('lancelot-manual-draw-btn').addEventListener('click', function() {
+
     closeModal();
+
     lancelotShowManualModal(round);
+
   });
+
 }
+
+
 
 function lancelotDoAutoDraw(round) {
+
   var card = state.lancelotDeck.shift();
+
   if (state.lancelotDrawResults.length <= round) {
+
     for (var i = state.lancelotDrawResults.length; i <= round; i++) state.lancelotDrawResults.push(null);
+
   }
+
   state.lancelotDrawResults[round] = card;
+
   if (card) {
+
     state.lancelotFlipCount++;
+
     state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+
     state.lancelotRoundFlips[round] = true;
+
   }
+
   showLancelotDrawToast(card, round);
+
   console.log('[debug-lancelotDraw] lancelot round=' + round + ' card=' + card + ' currentRound before checkGameEnd=' + state.currentRound);
+
   checkGameEnd();
+
   console.log('[debug-lancelotDraw] after checkGameEnd: currentRound=' + state.currentRound + ' winner=' + state.winner);
+
   renderGame();
+
 }
 
+
+
 function lancelotShowManualModal(round) {
+
   // Re-count in case of edge cases
+
   var flipCount = 0, blankCount = 0;
+
   for (var i = 0; i < state.lancelotDeck.length; i++) {
+
     if (state.lancelotDeck[i]) flipCount++;
+
     else blankCount++;
+
   }
 
+
+
   var flipDisabled = flipCount === 0 ? ' disabled style="opacity:0.35;cursor:not-allowed"' : '';
+
   var blankDisabled = blankCount === 0 ? ' disabled style="opacity:0.35;cursor:not-allowed"' : '';
 
+
+
   var flipCard = '<div style="width:72px;height:72px;margin:0 auto 6px;border-radius:50%;overflow:hidden;border:2px solid #ff3030"><img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover"></div>';
+
   var blankCard = '<div style="width:72px;height:72px;margin:0 auto 6px;border-radius:50%;background:rgba(150,150,150,0.2);border:2px solid #777;display:flex;align-items:center;justify-content:center;font-size:36px;color:#aaa">&#9675;</div>';
 
+
+
   var html = '<h2>手动录入 · 第 ' + (round + 1) + ' 轮结束</h2>' +
+
     '<p style="font-size:13px;text-align:center;color:var(--text-dim);margin:6px 0">请选择实际抽到的卡牌</p>' +
+
     '<div class="modal-actions" style="justify-content:center;gap:20px;flex-wrap:wrap">' +
+
     '<button class="btn" id="lancelot-manual-flip"' + flipDisabled + '>' + flipCard + '<span style="font-weight:700;color:var(--red-bright)">反转</span>' + (flipCount === 0 ? '<br><span style="font-size:10px;color:var(--text-dim)">已抽完</span>' : '') + '</button>' +
+
     '<button class="btn" id="lancelot-manual-blank"' + blankDisabled + '>' + blankCard + '<span>未反转</span>' + (blankCount === 0 ? '<br><span style="font-size:10px;color:var(--text-dim)">已抽完</span>' : '') + '</button>' +
+
     '</div>' +
+
     '<div class="modal-actions" style="margin-top:6px"><button class="btn" onclick="closeModal();applyLancelotAutoDraw(' + round + ')" style="font-size:12px">← 返回选择模式</button></div>';
+
+
 
   showModal(html);
 
+
+
   if (flipCount > 0) {
+
     document.getElementById('lancelot-manual-flip').addEventListener('click', function() {
+
       closeModal();
+
       lancelotDoManualDraw(round, true);
+
     });
+
   }
+
   if (blankCount > 0) {
+
     document.getElementById('lancelot-manual-blank').addEventListener('click', function() {
+
       closeModal();
+
       lancelotDoManualDraw(round, false);
+
     });
+
   }
+
 }
+
+
 
 function lancelotDoManualDraw(round, isFlip) {
+
   var idx = -1;
+
   for (var i = 0; i < state.lancelotDeck.length; i++) {
+
     if (state.lancelotDeck[i] === isFlip) { idx = i; break; }
+
   }
+
   if (idx === -1) return; // Safety guard
+
   state.lancelotDeck.splice(idx, 1);
 
+
+
   if (state.lancelotDrawResults.length <= round) {
+
     for (var i = state.lancelotDrawResults.length; i <= round; i++) state.lancelotDrawResults.push(null);
+
   }
+
   state.lancelotDrawResults[round] = isFlip;
 
+
+
   if (isFlip) {
+
     state.lancelotFlipCount++;
+
     state.lancelotFlipped = (state.lancelotFlipCount % 2 !== 0);
+
     state.lancelotRoundFlips[round] = true;
+
   }
+
+
 
   showLancelotDrawToast(isFlip, round);
+
   checkGameEnd();
+
   renderGame();
+
 }
+
+
 
 function showLancelotDrawToast(card, round) {
+
   if (card === null) {
+
     showModal(
+
       '<h2>兰斯洛特抽卡</h2>' +
+
       '<p style="font-size:16px;text-align:center;margin:10px 0">第 ' + (round + 1) + ' 轮结束</p>' +
+
       '<p style="font-size:14px;text-align:center;color:var(--orange)">牌堆已耗尽，本轮无法抽卡</p>' +
+
       '<div class="modal-actions"><button class="btn" onclick="closeModal()">确定</button></div>'
+
     );
+
     return;
+
   }
+
   var isFlip = card === true;
+
   var cardDisplay = isFlip
+
     ? '<div style="width:100px;height:100px;margin:12px auto;border-radius:50%;overflow:hidden;border:3px solid #ff3030;box-shadow:0 0 30px rgba(255,48,48,0.7);animation:lancelot-draw-reveal 0.6s ease-out"><img src="images/兰斯洛特转移.png?v=3" style="width:100%;height:100%;object-fit:cover"></div>'
+
     : '<div style="width:100px;height:100px;margin:12px auto;border-radius:50%;background:rgba(150,150,150,0.2);border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:42px;color:#aaa;animation:lancelot-draw-reveal 0.6s ease-out">&#9675;</div>';
+
   var msg = isFlip
+
     ? '<span style="color:var(--red-bright);font-weight:700">反转卡！阵营反转</span>'
+
     : '<span style="color:var(--text-dim)">未反转，无变化</span>';
+
   var statusNote = isFlip
+
     ? (state.lancelotFlipped ? '（当前状态：已反转）' : '（第2次翻转，恢复原阵营）')
+
     : '';
+
   var remaining = state.lancelotDeck ? state.lancelotDeck.length : 0;
 
+
+
   showModal(
+
     '<h2>兰斯洛特抽卡 · 第 ' + (round + 1) + ' 轮结束</h2>' +
+
     cardDisplay +
+
     '<p style="font-size:16px;text-align:center;margin:8px 0">' + msg + ' ' + statusNote + '</p>' +
+
     '<p style="font-size:12px;text-align:center;color:var(--text-dim)">剩余牌堆：' + remaining + ' 张</p>' +
+
     '<div class="modal-actions"><button class="btn primary" onclick="closeModal()">确定</button></div>'
+
   );
+
 }
+
+
 
 // Legacy: kept for backward compatibility but no longer called from game flow
+
 function resolveAssassin(isMerlin) {
+
   state.winner = isMerlin ? 'evil' : 'good';
+
   state.assassinFromMission = false;
+
   if (isMerlin && state.assassinTarget !== null) {
+
     state.autoRoles = state.autoRoles || {};
+
     state.autoRoles[state.assassinTarget] = '梅林';
+
   }
+
   $('end-assassin-card').style.display = 'none';
+
   renderEnd();
+
   toast(isMerlin ? '刺杀成功！反方获胜' : '刺杀失败！好人方获胜');
+
 }
+
+
 
 function setWinner(w) {
+
   state.winner = w;
+
   renderEnd();
+
 }
+
+
 
 function saveGameRecord() {
+
   if (!state.winner) { toast('请确定获胜方', 'warn'); return; }
 
+
+
   // 保存行内修改的临时玩家名称
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var nameInput = document.getElementById('end-name-' + i);
+
     if (!nameInput) continue;
+
     var newName = nameInput.value.trim();
+
     if (!newName || newName === state.playerNames[i]) continue;
+
     var dupName = false;
+
     for (var k = 0; k < state.playerCount; k++) {
+
       if (k !== i && state.playerNames[k] === newName) { dupName = true; break; }
+
     }
+
     if (dupName) { toast('名字「' + newName + '」已被其他玩家使用', 'warn'); return; }
+
     state.playerNames[i] = newName;
+
     if (namePool.indexOf(newName) === -1) namePool.push(newName);
+
   }
+
   saveNamePool();
 
+
+
   var identities = [];
+
   var allFilled = true;
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var sel = document.getElementById('end-role-' + i);
+
     var role = sel ? sel.value : '';
+
     identities.push({ name: state.playerNames[i], index: i, role: role });
+
     if (!role) allFilled = false;
+
   }
+
   if (!allFilled) { toast('请为所有玩家选择身份', 'warn'); return; }
 
+
+
   // 混子：从行内下拉读取跟随目标
+
   var huntTargetSel = document.getElementById('end-hunt-target');
+
   if (huntTargetSel && huntTargetSel.value !== '') {
+
     state._huntFollowTarget = parseInt(huntTargetSel.value, 10);
+
   }
+
+
 
   var lancelotFlips = {};
+
   for (var i = 0; i < state.playerCount; i++) {
+
     var role = identities[i].role;
+
     if (role === '兰斯洛特(蓝)' || role === '兰斯洛特(红)') {
+
       lancelotFlips[i] = state.lancelotFlipped;
+
     }
+
   }
+
+
 
   var _uuid = generateUUID();
+
   var history = loadHistory();
+
   var record = {
+
     _uuid: _uuid,
+
     date: _bjDate(),
+
     startTime: state.gameStartTime || '',
+
     endTime: _bjTimestamp(),
+
     playerCount: state.playerCount,
+
     winner: state.winner,
+
     identities: identities,
+
     lancelotFlips: lancelotFlips,
+
     activeRoles: state.activeRoles.slice(),
+
     roundTendencies: state.roundTendencies || [],
+
     assassinTarget: state.assassinTarget !== null ? playerLabel(state.assassinTarget) : null,
+
     assassinSuccess: (state.winner === 'evil' && state.assassinTarget !== null),
+
     assassinAfterRound: state._assassinAfterRound !== null ? state._assassinAfterRound : null,
+
     assassinFromMission: !!state.assassinFromMission,
+
     huntFollow: state._huntFollowTarget !== undefined ? state._huntFollowTarget : null,
+
     currentRound: state._assassinAfterRound !== null ? state._assassinAfterRound : state.currentRound,
+
     identityMarks: state.identityMarks.map(function(m) {
+
       return { target: m.target, targetName: playerLabel(m.target), level: m.level, timestamp: m.timestamp };
+
     }),
+
     missions: state.missions.map(function(m) {
+
       return {
+
         round: m.round,
+
         size: m.size,
+
         leader: m.leader !== null ? playerLabel(m.leader) : '',
+
         team: m.team.map(function(i) { return playerLabel(i); }),
+
         result: m.result,
+
         failCount: m.failCount,
+
         shieldedFails: m.shieldedFails || 0,
+
         launchFailures: m.launchFailures,
+
         launchAttempts: (m.launchAttempts || []).map(function(att) {
+
           return {
+
             team: att.team.map(function(i) { return playerLabel(i); }),
+
             votes: Object.keys(att.votes).reduce(function(acc, k) {
+
               acc[playerLabel(parseInt(k))] = att.votes[k];
+
               return acc;
+
             }, {}),
+
             leader: playerLabel(att.leader)
+
           };
+
         }),
+
         votes: Object.keys(m.votes || {}).reduce(function(acc, k) {
+
           acc[playerLabel(parseInt(k))] = m.votes[k];
+
           return acc;
+
         }, {})
+
       };
+
     }),
+
     ladyCheckHistory: state.ladyCheckHistory.map(function(h) {
+
       return {
+
         round: h.round,
+
         holder: h.holder,
+
         holderName: playerLabel(h.holder),
+
         target: h.target,
+
         targetName: playerLabel(h.target),
+
         result: h.result,
+
         note: h.note || '',
+
         recordedAtRound: h.recordedAtRound,
+
         recordedAtSpeaker: h.recordedAtSpeaker
+
       };
+
     }),
+
     excaliburEnabled: state.excaliburEnabled,
+
     excaliburHistory: (state.excaliburHistory || []).map(function(e) {
+
       return {
+
         round: e.round,
+
         leader: e.leader,
+
         leaderName: e.leader >= 0 ? playerLabel(e.leader) : '',
+
         team: (e.team || []).map(function(ti) { return playerLabel(ti); }),
+
         holder: e.holder,
+
         holderName: e.holder >= 0 ? playerLabel(e.holder) : '',
+
         used: e.used,
+
         target: e.target,
+
         targetName: e.target !== null && e.target !== undefined ? playerLabel(e.target) : '',
+
         feedbackRecorded: e.feedbackRecorded,
+
         feedbackRound: e.feedbackRound,
+
         feedbackSpeaker: e.feedbackSpeaker,
+
         claimedDirection: e.claimedDirection || '',
+
         note: e.note || ''
+
       };
+
     })
+
   };
+
   var recordV2 = toRecordV2(record);
+
   recordV2._uuid = _uuid;
 
+
+
   // 顺序：先 Supabase，成功后写 localStorage
+
   var sb = getSupabase();
+
   var done = false;
+
   function finishSave() {
+
     if (done) return;
+
     done = true;
+
     var savedCount = state.playerCount;
+
     var savedNames = state.playerNames.slice();
+
     var savedSelf = state.selfIndex;
+
     var savedRoles = state.activeRoles.slice();
+
     initState(savedCount);
+
     state.activeRoles = savedRoles;
+
     state.playerNames = savedNames;
+
     state.selfIndex = savedSelf;
+
     state.myRole = null;
+
     showPage('setup');
+
   }
+
   function writeLocalAndFinish(sid) {
+
     if (sid) {
+
       recordV2._sid = sid;
+
     }
+
     history.push(recordV2);
+
     saveHistory(history);
+
     finishSave();
+
   }
+
   if (sb) {
+
     sb.from('game_records').insert({ game_data: record, game_data_v2: recordV2 }).select('id').single().then(function(res) {
+
       if (res.error) {
+
         console.warn('[Supabase] saveGameRecord failed:', res.error);
+
         // 云端保存失败：先存本地（无 _sid），同时入重推队列
+
         var queue = getPendingQueue();
+
         queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+
         savePendingQueue(queue);
+
         writeLocalAndFinish(null);
+
         toast('云端保存失败，记录已保存到本地', 'warn');
+
       } else if (res.data && res.data.id) {
+
         writeLocalAndFinish(res.data.id);
+
       } else {
+
         writeLocalAndFinish(null);
+
       }
+
     });
+
     // 同步 name_pool 到云端
+
     sb.from('key_value').upsert({ key: 'name_pool', value: namePool, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(function(res) {
+
       if (res.error) console.warn('[Supabase] save name_pool failed:', res.error);
+
     });
+
     // 超时兜底：5 秒后如果还没结束，强制写本地并跳转
+
     setTimeout(function() {
+
       if (!done) {
+
         var q2 = getPendingQueue();
+
         q2.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+
         savePendingQueue(q2);
+
         writeLocalAndFinish(null);
+
         toast('云端保存超时，记录已保存到本地', 'warn');
+
       }
+
     }, 5000);
+
   } else {
+
     console.warn('[Supabase] saveGameRecord: no connection');
+
     // 无网络：先存本地（无 _sid），同时入重推队列
+
     var queue = getPendingQueue();
+
     queue.push({ _uuid: _uuid, record: record, recordV2: recordV2 });
+
     savePendingQueue(queue);
+
     writeLocalAndFinish(null);
+
     toast('无网络连接，记录已保存到本地', 'warn');
+
   }
+
 }
+
+
 
 /* ==================== 混子跟随选择 ==================== */
+
 function showHuntFollowModal(huntIndex, identities) {
+
   var huntName = state.playerNames[huntIndex];
+
   var h = '<h2>混子选择跟随目标</h2>';
+
   h += '<p style="color:var(--text-dim);font-size:14px;margin-bottom:12px">';
+
   h += '<strong style="color:var(--gold-light)">' + huntName + '</strong>（' + (huntIndex + 1) + '号）是混子，请选择本轮跟随的玩家：</p>';
+
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
+
   for (var i = 0; i < state.playerCount; i++) {
+
     // 跳过自己
+
     if (i === huntIndex) continue;
+
     h += '<button class="assassin-target-btn" onclick="onHuntFollowSelect(' + i + ')">';
+
     h += (i + 1) + '号 ' + escapeHtml(state.playerNames[i]);
+
     h += '</button>';
+
   }
+
   h += '</div>';
+
   showModal(h);
+
 }
+
+
 
 function onHuntFollowSelect(targetIdx) {
+
   state._huntFollowTarget = targetIdx;
+
   closeModal();
+
   toast('混子跟随：' + (targetIdx + 1) + '号 ' + state.playerNames[targetIdx]);
+
   saveGameRecord();
+
 }
+
+
 
 /* ==================== STATS PANEL ==================== */
+
 function scheduleRenderStats() {
+
   if (state._currentPage !== 'stats') return;
+
   if (_statsRenderScheduled) return;
+
   _statsRenderScheduled = true;
+
   var run = function() {
+
     _statsRenderScheduled = false;
+
     if (state._currentPage === 'stats') renderStats();
+
   };
+
   if (window.requestAnimationFrame) requestAnimationFrame(run);
+
   else setTimeout(run, 16);
+
 }
 
+
+
 function renderStats() {
+
   renderConnectionStatus();
+
   var history = loadNormalizedHistory();
+
   var total = history.length;
+
   var goodWins = history.filter(function(h) { return h.winner === 'good'; }).length;
+
   var evilWins = history.filter(function(h) { return h.winner === 'evil'; }).length;
+
   var winRate = total > 0 ? Math.round(goodWins / total * 100) : 0;
 
+
+
   var h = '<div class="stat-card"><div class="stat-value">' + total + '</div><div class="stat-label">总对局</div></div>';
+
   h += '<div class="stat-card"><div class="stat-value" style="color:#99ff99">' + goodWins + '</div><div class="stat-label">好人胜场</div>';
+
   h += '<div class="stat-sub">' + winRate + '%</div></div>';
+
   h += '<div class="stat-card"><div class="stat-value" style="color:#ff9999">' + evilWins + '</div><div class="stat-label">反方胜场</div>';
+
   h += '<div class="stat-sub">' + (total > 0 ? Math.round(evilWins / total * 100) : 0) + '%</div></div>';
 
+
+
   // Merlin assassination rate: count all games except evil won by 3 mission failures
+
   var merlinGames = 0, merlinKilled = 0;
+
   for (var i = 0; i < history.length; i++) {
+
     var rec = history[i];
+
     if (!rec.missions) continue;
+
     var failCount = rec.missions.filter(function(m) { return m.result === 'fail'; }).length;
+
     if (!(failCount >= 3 && rec.winner === 'evil')) {
+
       merlinGames++;
+
       if (rec.assassinSuccess === true) merlinKilled++;
+
     }
+
   }
+
   if (merlinGames > 0) {
+
     var maRate = Math.round(merlinKilled / merlinGames * 100);
+
     h += '<div class="stat-card"><div class="stat-value" style="color:#ff6666">' + maRate + '%</div><div class="stat-label">梅林被刺率</div>';
+
     h += '<div class="stat-sub" style="font-size:11px">' + merlinKilled + '次被刺 / ' + merlinGames + '局</div></div>';
+
   }
+
+
 
   $('stats-overview').innerHTML = h;
 
+
+
   // Apply filters
+
   var filtered = getFilteredHistory(history);
+
   state._filteredHistory = filtered; // store for pagination
 
+
+
   // Compact history list
+
   var ps = state._historyPageSize;
+
   var totalPages = Math.ceil(filtered.length / ps);
+
   if (state._historyPage >= totalPages && totalPages > 0) state._historyPage = totalPages - 1;
+
   if (state._historyPage < 0) state._historyPage = 0;
+
   var start = state._historyPage * ps;
+
   var end = Math.min(filtered.length, start + ps);
 
+
+
   // 调试信息：已加载记录数和 UTC 转北京时间统计
+
   var debugInfo = $('history-debug-info');
+
   if (!debugInfo) {
+
     var histCard = document.getElementById('history-card');
+
     if (histCard) {
+
       debugInfo = document.createElement('div');
+
       debugInfo.id = 'history-debug-info';
+
       debugInfo.style.cssText = 'font-size:10px;color:#7a6e5e;padding:4px 12px;text-align:center';
+
       histCard.insertBefore(debugInfo, histCard.firstChild.nextSibling);
+
     }
+
   }
+
   if (debugInfo) {
+
     debugInfo.textContent = '\u5df2\u52a0\u8f7d ' + total + ' \u6761\u8bb0\u5f55\uff0c\u5176\u4e2d ' + _migratedCount + ' \u6761\u5df2\u8f6c\u6362\u4e3a\u5317\u4eac\u65f6\u95f4';
+
   }
+
+
 
   var cl = $('history-compact-list');
+
   h = '';
+
   for (var fi = start; fi < end; fi++) {
+
     var frec = filtered[fi];
+
     var rec = frec.rec;
+
     var i = frec.origIdx;
+
     if (!rec) continue;
+
     var winnerColor = rec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)';
+
     var winnerLabel = rec.winner === 'good' ? '好人方胜' : '反方胜';
 
+
+
     // --- One-line summary ---
+
     var successCount = 0, failCount = 0;
+
     if (rec.missions) {
+
       for (var mi2 = 0; mi2 < rec.missions.length; mi2++) {
+
         if (rec.missions[mi2].result === 'success') successCount++;
+
         else if (rec.missions[mi2].result === 'fail') failCount++;
+
       }
+
     }
+
     var oneLiner = successCount + ':' + failCount;
+
     if (rec.winner === 'good') oneLiner = '好人' + oneLiner + '胜利';
+
     else oneLiner = '反方' + oneLiner + '胜利';
+
     if (rec.assassinTarget) {
+
       oneLiner += '，刺' + rec.assassinTarget + (rec.assassinSuccess ? '命中' : '未中');
+
     }
+
+
 
     h += '<div class="history-compact-item">';
+
     h += '<div class="hci-header" onclick="openHistoryModal(' + i + ')">';
+
     var timeStr = rec.startTime ? rec.startTime.slice(11, 16) : '';
+
     h += '<span class="hci-date">' + rec.date + (timeStr ? ' ' + timeStr : '') + '</span>';
+
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
+
     if (rec.startTime && rec.endTime) {
+
       var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
+
       if (durMin > 0) h += '<span class="hci-duration" style="font-size:11px;color:var(--text-dim);margin-left:4px">' + durMin + '分钟</span>';
+
     }
+
     h += '<div class="hci-right">';
+
     h += '<span class="hci-result" style="color:' + winnerColor + '">' + winnerLabel + '</span>';
+
     h += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + oneLiner + '</span>';
 
+
+
     h += '</div></div>';
+
     h += '</div>';
+
   }
+
   cl.innerHTML = h;
+
   $('no-history').style.display = filtered.length === 0 ? 'block' : 'none';
 
+
+
   // Pagination
+
   var pageArea = $('pagination-area');
+
   if (totalPages <= 1) {
+
     pageArea.innerHTML = '';
+
   } else {
+
     var ph = '<div class="pagination">';
+
     ph += '<button class="page-btn" onclick="goHistoryPage(' + (state._historyPage - 1) + ')"' + (state._historyPage === 0 ? ' disabled' : '') + '>‹</button>';
+
     var pageButtons = [];
+
     if (totalPages <= 7) {
+
       for (var p = 0; p < totalPages; p++) pageButtons.push(p);
+
     } else {
+
       pageButtons.push(0);
+
       if (state._historyPage > 3) pageButtons.push('...');
+
       var pStart = Math.max(1, state._historyPage - 1);
+
       var pEnd = Math.min(totalPages - 2, state._historyPage + 1);
+
       for (var p = pStart; p <= pEnd; p++) pageButtons.push(p);
+
       if (state._historyPage < totalPages - 4) pageButtons.push('...');
+
       pageButtons.push(totalPages - 1);
+
     }
+
     for (var k = 0; k < pageButtons.length; k++) {
+
       var bp = pageButtons[k];
+
       if (bp === '...') {
+
         ph += '<span class="page-ellipsis">…</span>';
+
       } else {
+
         ph += '<button class="page-btn' + (bp === state._historyPage ? ' active' : '') + '" onclick="goHistoryPage(' + bp + ')">' + (bp + 1) + '</button>';
+
       }
+
     }
+
     ph += '<button class="page-btn" onclick="goHistoryPage(' + (state._historyPage + 1) + ')"' + (state._historyPage >= totalPages - 1 ? ' disabled' : '') + '>›</button>';
+
     ph += '</div>';
+
     pageArea.innerHTML = ph;
+
   }
+
+
 
   // Player stats
+
   var playerSet = {};
+
   for (var i = 0; i < history.length; i++) {
+
     var rec = history[i];
+
     for (var j = 0; j < rec.identities.length; j++) {
+
       var id = rec.identities[j];
+
       var nm = id.name;
+
       if (!playerSet[nm]) playerSet[nm] = [];
+
       playerSet[nm].push({
+
         winner: rec.winner,
+
         role: id.role,
+
         flipped: rec.lancelotFlips && rec.lancelotFlips[id.index],
+
         recIndex: i,
+
         huntFollow: rec.huntFollow || null
+
       });
+
     }
+
   }
+
   var names = Object.keys(playerSet).sort(function(a, b) {
+
     return playerSet[b].length - playerSet[a].length;
+
   });
+
   // Populate filter-player dropdown
+
   var fpSel = document.getElementById('filter-player');
+
   if (fpSel) {
+
     var curFpVal = fpSel.value;
+
     var fpOpts = '<option value="">全部</option>';
+
     for (var i = 0; i < names.length; i++) {
+
       fpOpts += '<option value="' + names[i] + '"' + (curFpVal === names[i] ? ' selected' : '') + '>' + names[i] + '</option>';
+
     }
+
     fpSel.innerHTML = fpOpts;
+
   }
+
   // Player stats section - larger dropdown, separated from profile
+
   h = '<select id="player-stat-select" onchange="togglePlayerStat(this.value)" style="width:100%;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:16px;cursor:pointer;min-height:48px;font-weight:600;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M6 8L1 3h10z%27 fill=%27%23c9a84c%27/%3E%3C/svg%3E\');background-repeat:no-repeat;background-position:right 12px center;padding-right:36px">';
+
   h += '<option value="">-- 选择玩家查看统计 --</option>';
+
   for (var i = 0; i < names.length; i++) {
+
     h += '<option value="' + names[i] + '">' + names[i] + '</option>';
+
   }
+
   h += '</select>';
+
   $('player-stat-btns').innerHTML = h;
+
   // 个人主页放在下方独立区域
+
   var profileBtn = '<button class="btn" style="width:100%;margin-top:12px;padding:10px;font-size:15px;font-weight:600" onclick="showPlayerProfilePopup()">&#128100; 个人主页</button>';
+
   $('player-profile-row').innerHTML = profileBtn;
+
   state._playerSetCache = playerSet;
 
+
+
   // 今日胜率排行榜：第一天19:00到次日18:59:59为一天
+
   var now = new Date();
+
   var todayDateStr = now.getFullYear() + '-' +
+
     String(now.getMonth() + 1).padStart(2, '0') + '-' +
+
     String(now.getDate()).padStart(2, '0');
+
   var yesterday = new Date(now);
+
   yesterday.setDate(yesterday.getDate() - 1);
+
   var yesterdayDateStr = yesterday.getFullYear() + '-' +
+
     String(yesterday.getMonth() + 1).padStart(2, '0') + '-' +
+
     String(yesterday.getDate()).padStart(2, '0');
+
   var tomorrow = new Date(now);
+
   tomorrow.setDate(tomorrow.getDate() + 1);
+
   var tomorrowDateStr = tomorrow.getFullYear() + '-' +
+
     String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' +
+
     String(tomorrow.getDate()).padStart(2, '0');
 
+
+
   var todayDates = {};
+
   if (now.getHours() < 19) {
+
     todayDates[yesterdayDateStr] = true;
+
     todayDates[todayDateStr] = true;
+
   } else {
+
     todayDates[todayDateStr] = true;
+
     todayDates[tomorrowDateStr] = true;
+
   }
+
+
 
   // 按玩家汇总今日数据
+
   var todayPlayerSet = {};
+
   for (var i = 0; i < history.length; i++) {
+
     var rec = history[i];
+
     if (!todayDates[rec.date]) continue;
+
     for (var j = 0; j < rec.identities.length; j++) {
+
       var id = rec.identities[j];
+
       var nm = id.name;
+
       if (!todayPlayerSet[nm]) todayPlayerSet[nm] = [];
+
       todayPlayerSet[nm].push({
+
         winner: rec.winner,
+
         role: id.role,
+
         flipped: rec.lancelotFlips && rec.lancelotFlips[id.index],
+
         huntFollow: rec.huntFollow || null,
+
         recIndex: i
+
       });
+
     }
+
   }
+
+
 
   var lb = [];
+
   for (var nm in todayPlayerSet) {
+
     var items = todayPlayerSet[nm];
+
     var totalGames = items.length;
+
     var goodCount = 0, evilCount = 0, wins = 0;
+
     for (var g = 0; g < items.length; g++) {
+
       var faction = getFinalFaction(items[g].role, items[g].flipped);
+
       // 混子：根据跟随目标解析阵营
+
       if (items[g].role === '混子' && items[g].huntFollow != null && items[g].recIndex < history.length) {
+
         var rec_ = history[items[g].recIndex];
+
         faction = resolveHuntFaction(rec_, items[g].huntFollow);
+
       }
+
       if (faction === 'good') goodCount++;
+
       else if (faction === 'evil') evilCount++;
+
       if (items[g].winner === faction) wins++;
+
     }
+
     var rate = totalGames > 0 ? wins / totalGames : 0;
+
     lb.push({ name: nm, total: totalGames, goodWins: goodCount, evilWins: evilCount, rate: rate });
+
   }
+
   lb.sort(function(a, b) { return b.rate - a.rate || b.total - a.total; });
 
+
+
   var showAll = state._showAllLeaderboard || false;
+
   var maxShow = showAll ? lb.length : Math.min(10, lb.length);
+
   var lh = '';
+
   for (var r = 0; r < maxShow; r++) {
+
     var p = lb[r];
+
     var topClass = '';
+
     if (r === 0) topClass = ' top1';
+
     else if (r === 1) topClass = ' top2';
+
     else if (r === 2) topClass = ' top3';
+
     lh += '<div class="win-rate-card' + topClass + '">';
+
     var rateColor = p.rate >= 0.6 ? '#4caf50' : p.rate >= 0.4 ? '#ff9800' : '#f44336';
+
     lh += '<span class="wc-rank">' + (r + 1) + '</span>';
+
     lh += '<span class="wc-name">' + p.name + '</span>';
+
     lh += '<div><div class="wc-rate" style="font-size:24px;color:' + rateColor + ';font-weight:bold;">' + Math.round(p.rate * 100) + '%</div>';
+
     lh += '<div class="wc-sub">好人' + p.goodWins + ' / 反方' + p.evilWins + ' / 共' + p.total + '场</div></div>';
+
     lh += '</div>';
+
   }
+
   if (lb.length > 10) {
+
     lh += '<div style="text-align:center;margin-top:8px">';
+
     lh += '<button class="btn small" onclick="toggleLeaderboard()">' + (showAll ? '收起' : '展开全部（共' + lb.length + '名）') + '</button>';
+
     lh += '</div>';
+
   }
+
   if (lb.length === 0) {
+
     // 今日无对局，隐藏整个排行榜区域
+
     var leaderboardCard = document.getElementById('win-rate-leaderboard').parentNode;
+
     if (leaderboardCard) leaderboardCard.style.display = 'none';
+
   } else {
+
     var leaderboardCard = document.getElementById('win-rate-leaderboard').parentNode;
+
     if (leaderboardCard) leaderboardCard.style.display = '';
+
   }
+
   $('win-rate-leaderboard').innerHTML = lh;
+
   renderNamePoolList();
+
 }
+
+
 
 function toggleLeaderboard() {
+
   state._showAllLeaderboard = !state._showAllLeaderboard;
+
   renderStats();
+
 }
+
+
 
 function toggleHciDetail(toggle) {
+
   var content = toggle.nextElementSibling;
+
   toggle.classList.toggle('open');
+
   if (content) content.classList.toggle('open');
+
 }
+
+
 
 function toggleCompactHistory(header) {
+
   var body = header.nextElementSibling;
+
   var toggle = header.querySelector('.hci-toggle');
+
   if (body.classList.contains('open')) {
+
     body.classList.remove('open');
+
     toggle.classList.remove('open');
+
   } else {
+
     body.classList.add('open');
+
     toggle.classList.add('open');
+
   }
+
 }
+
+
 
 function goHistoryPage(p) {
+
   var filtered = state._filteredHistory || loadHistory();
+
   var totalPages = Math.ceil(filtered.length / state._historyPageSize);
+
   if (p < 0 || p >= totalPages) return;
+
   state._historyPage = p;
+
   renderStats();
+
 }
+
+
 
 function getFilteredHistory(history) {
+
   var dateFrom = document.getElementById('filter-date-from') ? document.getElementById('filter-date-from').value : '';
+
   var dateTo = document.getElementById('filter-date-to') ? document.getElementById('filter-date-to').value : '';
+
   var winner = document.getElementById('filter-winner') ? document.getElementById('filter-winner').value : '';
+
   var player = document.getElementById('filter-player') ? document.getElementById('filter-player').value : '';
 
+
+
   var result = [];
+
   for (var i = 0; i < history.length; i++) {
+
     var rec = history[i];
+
     if (!rec) continue;
 
+
+
     if (dateFrom && rec.date < dateFrom) continue;
+
     if (dateTo && rec.date > dateTo) continue;
+
     if (winner && rec.winner !== winner) continue;
 
+
+
     if (player) {
+
       var hasPlayer = false;
+
       if (rec.identities) {
+
         for (var j = 0; j < rec.identities.length; j++) {
+
           if (rec.identities[j].name === player) { hasPlayer = true; break; }
+
         }
+
       }
+
       if (!hasPlayer) continue;
+
     }
+
+
 
     result.push({ rec: rec, origIdx: i });
+
   }
+
   // 按日期倒序排列（最近的在前）
+
   result.sort(function(a, b) {
+
     if (a.rec.date > b.rec.date) return -1;
+
     if (a.rec.date < b.rec.date) return 1;
+
     return b.origIdx - a.origIdx;
+
   });
+
   return result;
+
 }
+
+
 
 function applyHistoryFilter() {
+
   state._historyPage = 0;
+
   renderStats();
+
 }
+
+
 
 function clearHistoryFilter() {
+
   var from = document.getElementById('filter-date-from');
+
   var to = document.getElementById('filter-date-to');
+
   var winner = document.getElementById('filter-winner');
+
   var player = document.getElementById('filter-player');
+
   if (from) from.value = '';
+
   if (to) to.value = '';
+
   if (winner) winner.value = '';
+
   if (player) player.value = '';
+
   state._historyPage = 0;
+
   renderStats();
+
 }
+
+
 
 /* ==================== PLAYER STAT ==================== */
+
 function getFinalFaction(role, flipped) {
+
   if (role === '兰斯洛特(蓝)') return flipped ? 'evil' : 'good';
+
   if (role === '兰斯洛特(红)') return flipped ? 'good' : 'evil';
+
   if (role === '混子') return 'neutral';
+
   return GOOD_ROLES.indexOf(role) !== -1 ? 'good' : 'evil';
+
 }
+
+
 
 // 根据跟随目标解析混子的阵营
+
 function resolveHuntFaction(rec, huntTargetIdx) {
+
   if (huntTargetIdx == null || rec.identities.length === 0) return 'neutral';
+
   var target = rec.identities.find(function(id) { return id.index === huntTargetIdx; });
+
   if (!target) return 'neutral';
+
   var flipped = rec.lancelotFlips ? rec.lancelotFlips[huntTargetIdx] : false;
+
   return getFinalFaction(target.role, flipped);
+
 }
 
+
+
 function togglePlayerStat(name) {
+
   var detailEl = $('player-stat-detail');
+
   var safeId = 'ps-' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+
   var existing = document.getElementById(safeId);
 
+
+
   // 追踪阵营过滤状态，区分"关闭"和"切换过滤"
+
   var currentFaction = state._playerStatFaction || 'all';
+
   var filterChanged = state._lastStatPlayer === name && state._lastStatFaction !== currentFaction;
 
+
+
   // Close if clicking the same player (same filter toggle)
+
   if (existing && !filterChanged) {
+
     existing.remove();
+
     state._lastStatPlayer = null;
+
     state._lastStatFaction = null;
+
     return;
+
   }
+
   // 过滤切换：移除旧元素，重新渲染
+
   if (existing) {
+
     existing.remove();
+
   }
+
   state._lastStatPlayer = name;
+
   state._lastStatFaction = currentFaction;
 
+
+
   // Close any other open detail
+
   var allDetails = detailEl.querySelectorAll('.player-stat-expand');
+
   for (var d = 0; d < allDetails.length; d++) allDetails[d].remove();
 
+
+
   var data = state._playerSetCache[name];
+
   if (!data) return;
 
+
+
   var total = data.length;
+
   var totalWins = 0;
+
   var gamesGood = 0, winsGood = 0;
+
   var gamesEvil = 0, winsEvil = 0;
+
   var roleStats = {};
+
   var history = loadNormalizedHistory();
 
+
+
   for (var i = 0; i < data.length; i++) {
+
     var d = data[i];
+
     var role = d.role;
+
     var flipped = d.flipped || false;
+
     var finalFaction = getFinalFaction(role, flipped);
+
     // 混子：根据跟随目标解析阵营
+
     if (role === '混子' && d.huntFollow != null && d.recIndex < history.length) {
+
       var rec = history[d.recIndex];
+
       finalFaction = resolveHuntFaction(rec, d.huntFollow);
+
     }
+
     // 调试日志：所有玩家的每局胜负和阵营归属
+
     var recDebug = history[d.recIndex];
+
     console.log('[胜负调试] 玩家=' + name + ' 局#' + d.recIndex + ' 日期=' + (recDebug ? recDebug.date : '?') + ' 身份=' + role + ' 翻转=' + flipped + ' 最终阵营=' + finalFaction + ' 胜方=' + d.winner + ' 计为' + (d.winner === finalFaction ? '胜' : '负'));
 
+
+
     if (finalFaction === 'good') {
+
       gamesGood++;
+
       if (d.winner === 'good') winsGood++;
+
     } else if (finalFaction === 'evil') {
+
       gamesEvil++;
+
       if (d.winner === 'evil') winsEvil++;
+
     }
+
+
 
     if (d.winner === finalFaction) totalWins++;
 
+
+
     if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
+
     roleStats[role].total++;
+
     // 身份胜率使用最终阵营判定（考虑翻转），确保兰斯洛特变节后按实际阵营计算
+
     if (d.winner === finalFaction) roleStats[role].wins++;
+
   }
 
+
+
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
+
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
+
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
+
+
 
   var h = '<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+
   h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px">' + total + '</div><div class="stat-label" style="font-size:13px">总场次</div></div>';
+
   h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--gold-light)">' + totalRate + '%</div><div class="stat-label" style="font-size:13px">总胜率</div></div>';
+
   h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--green-bright)">' + goodRate + '%</div><div class="stat-label" style="font-size:13px">好人胜率</div></div>';
+
   h += '<div class="stat-card" style="flex:1;min-width:70px"><div class="stat-value" style="font-size:28px;color:var(--red-bright)">' + evilRate + '%</div><div class="stat-label" style="font-size:13px">反方胜率</div></div>';
+
   h += '</div>';
+
   h += '<div style="font-size:14px;color:var(--text-dim);margin-bottom:6px">好人 ' + winsGood + '/' + gamesGood + ' · 反方 ' + winsEvil + '/' + gamesEvil + '</div>';
+
   // \u9635\u8425\u8fc7\u6ee4\u6309\u94ae
+
   var factionFilter = state._playerStatFaction || 'all';
+
   h += '<div style="display:flex;gap:4px;margin-bottom:6px">';
+
   h += '<button class="btn small" style="' + (factionFilter === 'all' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="state._playerStatFaction=\'all\';var sel=document.getElementById(\'player-stat-select\');if(sel)togglePlayerStat(sel.value)">\u5168\u90e8</button>';
+
   h += '<button class="btn small" style="' + (factionFilter === 'good' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="state._playerStatFaction=\'good\';var sel=document.getElementById(\'player-stat-select\');if(sel)togglePlayerStat(sel.value)">\u597d\u4eba</button>';
+
   h += '<button class="btn small" style="' + (factionFilter === 'evil' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="state._playerStatFaction=\'evil\';var sel=document.getElementById(\'player-stat-select\');if(sel)togglePlayerStat(sel.value)">\u53cd\u65b9</button>';
+
   h += '</div>';
+
   h += '<div style="font-size:15px;font-weight:600;margin-bottom:6px">\u5404\u8eab\u4efd\u80dc\u7387</div>';
+
   h += '<table style="width:100%;font-size:14px">';
+
   var roleList = (state.activeRoles && state.activeRoles.length > 0) ? state.activeRoles.slice() : ALL_ROLES.slice();
+
   // \u8865\u5168 roleStats \u4e2d\u6709\u573a\u6b21\u4f46\u4e0d\u5728\u5217\u8868\u4e2d\u7684\u8eab\u4efd\uff083c\uff09
+
   for (var rsr in roleStats) { if (roleList.indexOf(rsr) === -1) roleList.push(rsr); }
+
   for (var j = 0; j < roleList.length; j++) {
+
     var r = roleList[j];
+
     var rs = roleStats[r];
+
     // \u8df3\u8fc7 0 \u573a\u6b21\u7684\u8eab\u4efd\uff083b\uff09
+
     if (!rs || rs.total === 0) continue;
+
     // \u9635\u8425\u8fc7\u6ee4\uff083a\uff09
+
     var naturalFaction = getFinalFaction(r, false);
+
     if (factionFilter === 'good' && naturalFaction !== 'good') continue;
+
     if (factionFilter === 'evil' && naturalFaction !== 'evil') continue;
+
     h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + rs.wins + '/' + rs.total + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
+
   }
+
   h += '</table>';
 
+
+
   // 掩护梅林次数（被刺次数）：统计该玩家为好人且非梅林时被刺客选中的次数
+
   var shieldCount = 0;
+
   for (var si = 0; si < data.length; si++) {
+
     var sd = data[si];
+
     var rec = history[sd.recIndex];
+
     if (!rec || rec.assassinTarget == null) continue;
+
     var srole = sd.role;
+
     var sflipped = sd.flipped || false;
+
     var sfaction = getFinalFaction(srole, sflipped);
+
     if (srole === '混子' && sd.huntFollow != null && sd.recIndex < history.length) {
+
       sfaction = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
+
     }
+
     if (sfaction !== 'good' || srole === '梅林') continue;
+
     if (rec.winner !== 'good') continue;
+
     if (rec.identities) {
+
       for (var ji = 0; ji < rec.identities.length; ji++) {
+
         if (rec.identities[ji].name === name) {
+
           if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
+
             shieldCount++;
+
           }
+
           break;
+
         }
+
       }
+
     }
+
   }
+
   h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin-top:10px;background:rgba(255,102,102,0.06);border:1px solid rgba(255,102,102,0.2);border-radius:var(--radius-sm)">';
+
   h += '<span style="font-size:14px;font-weight:600">掩护梅林次数（被刺次数）</span>';
+
   h += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
+
   h += '</div>';
 
+
+
   var div = document.createElement('div');
+
   div.id = safeId;
+
   div.className = 'player-stat-expand';
+
   div.innerHTML = h;
+
   detailEl.appendChild(div);
+
 }
+
+
 
 function showPlayerProfilePopup() {
+
   var playerSet = state._playerSetCache;
+
   var history = loadNormalizedHistory();
+
   var names = Object.keys(playerSet || {}).sort(function(a, b) {
+
     return playerSet[b].length - playerSet[a].length;
+
   });
+
   if (names.length === 0) { toast('暂无对局记录', 'warn'); return; }
 
+
+
   // Step 1: select player
+
   var h = '<h2>&#128100; 个人主页</h2><p style="color:var(--text-dim)">选择玩家查看详细数据</p>';
+
   h += '<select id="profile-player-sel" onchange="renderPlayerProfile()" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;cursor:pointer;min-height:48px">';
+
   h += '<option value="">-- 选择玩家 --</option>';
+
   for (var i = 0; i < names.length; i++) {
+
     h += '<option value="' + names[i] + '">' + names[i] + '</option>';
+
   }
+
   h += '</select>';
+
   h += '<div id="profile-content" style="margin-top:12px"></div>';
+
   h += '<div class="modal-actions"><button class="btn" onclick="closeModal()">关闭</button></div>';
+
   showModal(h);
+
 }
 
+
+
 function renderPlayerProfile() {
+
   var sel = document.getElementById('profile-player-sel');
+
   if (!sel || !sel.value) return;
+
   var name = sel.value;
 
+
+
   var playerSet = state._playerSetCache;
+
   var history = loadNormalizedHistory();
+
   var data = playerSet[name];
+
   if (!data) return;
 
+
+
   var total = data.length;
+
   var totalWins = 0, winsGood = 0, winsEvil = 0;
+
   var gamesGood = 0, gamesEvil = 0;
+
   var roleStats = {}; // role -> { good: {total,wins}, evil: {total,wins} }
+
   var streak = 0, maxStreak = 0, streakType = '';
+
   var recentResults = []; // for streak calc: ordered by recIndex desc
 
+
+
   // Sort data by recIndex desc for streak calculation
+
   var sortedData = data.slice().sort(function(a, b) { return b.recIndex - a.recIndex; });
 
+
+
   for (var i = 0; i < sortedData.length; i++) {
+
     var d = sortedData[i];
+
     var flipped = d.flipped || false;
+
     var finalFaction = getFinalFaction(d.role, flipped);
+
     // 混子：根据跟随目标解析阵营
+
     if (d.role === '混子' && d.huntFollow != null && d.recIndex < history.length) {
+
       var rec = history[d.recIndex];
+
       finalFaction = resolveHuntFaction(rec, d.huntFollow);
+
     }
+
     var isWin = d.winner === finalFaction;
+
     if (isWin) totalWins++;
 
+
+
     if (finalFaction === 'good') {
+
       gamesGood++;
+
       if (d.winner === 'good') winsGood++;
+
     } else if (finalFaction === 'evil') {
+
       gamesEvil++;
+
       if (d.winner === 'evil') winsEvil++;
+
     }
+
+
 
     // Role stats by faction
+
     var rn = d.role;
+
     if (!roleStats[rn]) roleStats[rn] = { good: { total: 0, wins: 0 }, evil: { total: 0, wins: 0 } };
+
     if (finalFaction === 'good') {
+
       roleStats[rn].good.total++;
+
       if (d.winner === 'good') roleStats[rn].good.wins++;
+
     } else {
+
       roleStats[rn].evil.total++;
+
       if (d.winner === 'evil') roleStats[rn].evil.wins++;
+
     }
+
+
 
     // Streak calculation
+
     var factionTag = finalFaction === 'good' ? 'G' : 'E';
+
     if (i === 0) {
+
       streak = 1;
+
       maxStreak = 1;
+
       streakType = isWin ? factionTag : 'L';
+
     } else if (finalFaction === getFinalFaction(sortedData[i-1].role, sortedData[i-1].flipped) && d.winner === sortedData[i-1].winner) {
+
       // same faction + same result
+
       // Actually this isn't right. Let me recalculate streak differently.
+
     }
+
   }
+
+
 
   // Simpler streak calculation
+
   streak = 0; maxStreak = 0; streakType = '';
+
   var prevSW = null;
+
   for (var s = 0; s < sortedData.length; s++) {
+
     var sd = sortedData[s];
+
     var sf = getFinalFaction(sd.role, sd.flipped);
+
     if (sd.role === '混子' && sd.huntFollow != null && sd.recIndex < history.length) {
+
       sf = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
+
     }
+
     var sw = sd.winner === sf;
+
     if (s === 0) {
+
       streak = 1;
+
       maxStreak = 1;
+
       streakType = sw ? 'W' : 'L';
+
     } else {
+
       if (sw === prevSW) {
+
         streak++;
+
       } else {
+
         streak = 1;
+
       }
+
       if (streak > maxStreak) maxStreak = streak;
+
     }
+
     prevSW = sw;
+
   }
+
+
 
   // Recent: 7/15/30 days
+
   var now = new Date();
+
   var d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+
   var d15 = new Date(now); d15.setDate(d15.getDate() - 15);
+
   var d30 = new Date(now); d30.setDate(d30.getDate() - 30);
 
+
+
   var recent = { d7: { total: 0, wins: 0 }, d15: { total: 0, wins: 0 }, d30: { total: 0, wins: 0 } };
+
   for (var ri = 0; ri < data.length; ri++) {
+
     var rd = data[ri];
+
     var rec = history[rd.recIndex];
+
     var gameDate = new Date(rec.date);
+
     var rf = getFinalFaction(rd.role, rd.flipped);
+
     if (rd.role === '混子' && rd.huntFollow != null && rd.recIndex < history.length) {
+
       rf = resolveHuntFaction(history[rd.recIndex], rd.huntFollow);
+
     }
+
     var rw = rd.winner === rf;
+
     var buckets = [];
+
     if (gameDate >= d7) buckets.push('d7');
+
     if (gameDate >= d15) buckets.push('d15');
+
     if (gameDate >= d30) buckets.push('d30');
+
     for (var b = 0; b < buckets.length; b++) {
+
       recent[buckets[b]].total++;
+
       if (rw) recent[buckets[b]].wins++;
+
     }
+
   }
 
+
+
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
+
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
+
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
 
+
+
   var streakLabel = streakType === 'W' ? '连胜' : (streakType === 'L' ? '连败' : '');
+
   var streakColor = streakType === 'W' ? 'var(--green-bright)' : 'var(--red-bright)';
+
+
 
   var initial = name.charAt(0);
 
+
+
   // 掩护梅林次数（被刺次数）：统计该玩家为好人且非梅林时被刺客选中的次数
+
   var shieldCount = 0;
+
   for (var si = 0; si < data.length; si++) {
+
     var sd = data[si];
+
     var rec = history[sd.recIndex];
+
     if (!rec || rec.assassinTarget == null) continue;
+
     var srole = sd.role;
+
     var sflipped = sd.flipped || false;
+
     var sfaction = getFinalFaction(srole, sflipped);
+
     if (srole === '混子' && sd.huntFollow != null && sd.recIndex < history.length) {
+
       sfaction = resolveHuntFaction(history[sd.recIndex], sd.huntFollow);
+
     }
+
     if (sfaction !== 'good' || srole === '梅林') continue;
+
     if (rec.winner !== 'good') continue;
+
     if (rec.identities) {
+
       for (var ji = 0; ji < rec.identities.length; ji++) {
+
         if (rec.identities[ji].name === name) {
+
           if (rec.assassinTarget === (rec.identities[ji].index + 1) + '号 ' + rec.identities[ji].name) {
+
             shieldCount++;
+
           }
+
           break;
+
         }
+
       }
+
     }
+
   }
+
+
 
   var ph = '<div style="text-align:center;margin-bottom:16px">';
+
   ph += '<div style="display:inline-block;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8b6914);line-height:60px;font-size:28px;font-weight:700;color:#fff;margin-bottom:8px">' + initial + '</div>';
+
   ph += '<div style="font-size:20px;font-weight:700">' + name + '</div>';
+
   ph += '</div>';
+
+
 
   // Total win rate card
+
   ph += '<div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-radius:var(--radius-sm);padding:16px;text-align:center;margin-bottom:12px">';
+
   ph += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">总胜率</div>';
+
   ph += '<div style="font-size:42px;font-weight:700;color:var(--gold-light);line-height:1">' + totalRate + '%</div>';
+
   ph += '<div style="margin-top:8px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">';
+
   ph += '<div style="height:100%;width:' + totalRate + '%;background:var(--gold-light);border-radius:3px"></div></div>';
+
   ph += '</div>';
+
+
 
   // Stats grid 2x2
+
   ph += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+
   ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">总场次</div><div style="font-size:24px;font-weight:700">' + total + '</div></div>';
+
   ph += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">当前' + streakLabel + '</div><div style="font-size:24px;font-weight:700;color:' + streakColor + '">' + streak + '</div><div style="font-size:10px;color:var(--text-dim)">最高' + maxStreak + '</div></div>';
+
   ph += '<div style="background:rgba(153,255,153,0.04);border:1px solid rgba(153,255,153,0.15);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">蓝方胜率</div><div style="font-size:24px;font-weight:700;color:var(--green-bright)">' + goodRate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + gamesGood + '场</div></div>';
+
   ph += '<div style="background:rgba(255,153,153,0.04);border:1px solid rgba(255,153,153,0.15);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">红方胜率</div><div style="font-size:24px;font-weight:700;color:var(--red-bright)">' + evilRate + '%</div><div style="font-size:10px;color:var(--text-dim)">' + gamesEvil + '场</div></div>';
+
   ph += '</div>';
+
+
 
   // 掩护梅林次数（被刺次数）
+
   ph += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin-bottom:12px;background:rgba(255,102,102,0.06);border:1px solid rgba(255,102,102,0.2);border-radius:var(--radius-sm)">';
+
   ph += '<span style="font-size:14px;font-weight:600">掩护梅林次数（被刺次数）</span>';
+
   ph += '<span style="font-size:22px;font-weight:700;color:#ff6666">' + shieldCount + '次</span>';
+
   ph += '</div>';
+
+
 
   // Role performance tabs
+
   var goodRoles = [], evilRoles = [];
+
   for (var rn in roleStats) {
+
     var rs = roleStats[rn];
+
     var goodAll = rs.good.total + rs.good.wins; // actually total is correct
+
     if (rs.good.total > 0) goodRoles.push({ role: rn, total: rs.good.total, wins: rs.good.wins });
+
     if (rs.evil.total > 0) evilRoles.push({ role: rn, total: rs.evil.total, wins: rs.evil.wins });
+
   }
+
   goodRoles.sort(function(a, b) { return b.total - a.total; });
+
   evilRoles.sort(function(a, b) { return b.total - a.total; });
 
+
+
   var activeTab = state._profileRoleTab || 'good';
+
   ph += '<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">角色表现</div>';
+
   ph += '<div style="display:flex;gap:4px;margin-bottom:8px">';
+
   ph += '<button class="btn small" style="' + (activeTab === 'good' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="switchProfileTab(\'good\')">蓝方</button>';
+
   ph += '<button class="btn small" style="' + (activeTab === 'evil' ? 'background:var(--gold-light);color:#000' : '') + '" onclick="switchProfileTab(\'evil\')">红方</button>';
+
   ph += '</div>';
+
+
 
   var tabRoles = activeTab === 'good' ? goodRoles : evilRoles;
+
   if (tabRoles.length === 0) {
+
     ph += '<div style="text-align:center;color:var(--text-dim);padding:20px">暂无数据</div>';
+
   } else {
+
     for (var tr = 0; tr < tabRoles.length; tr++) {
+
       var t = tabRoles[tr];
+
       var tRate = Math.round(t.wins / t.total * 100);
+
       var tColor = tRate >= 60 ? 'var(--green-bright)' : tRate >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
+
       ph += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm)">';
+
       ph += '<span>' + t.role + ' <span style="font-size:11px;color:var(--text-dim)">' + t.wins + '/' + t.total + '</span></span>';
+
       ph += '<span style="font-weight:700;color:' + tColor + '">' + tRate + '%</span>';
+
       ph += '</div>';
+
     }
+
   }
+
   ph += '</div>';
 
+
+
   // Game history list
+
   var sortedByRec = data.slice().sort(function(a, b) { return b.recIndex - a.recIndex; });
+
   ph += '<div style="margin-bottom:8px">';
+
   ph += '<div style="font-size:13px;font-weight:600;margin-bottom:6px;cursor:pointer" onclick="var el=document.getElementById(\'player-game-list\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">&#9660; 参赛记录 (' + total + '场)</div>';
+
   ph += '<div id="player-game-list" style="max-height:360px;overflow-y:auto;display:none">';
+
   for (var gi = 0; gi < sortedByRec.length; gi++) {
+
     var gd = sortedByRec[gi];
+
     var gf = getFinalFaction(gd.role, gd.flipped || false);
+
     if (gd.role === '混子' && gd.huntFollow != null && gd.recIndex < history.length) {
+
       gf = resolveHuntFaction(history[gd.recIndex], gd.huntFollow);
+
     }
+
     var gw = gd.winner === gf;
+
     var gRec = history[gd.recIndex];
+
     var gDate = gRec ? gRec.date : '--';
+
     var gPlayerCount = gRec ? gRec.playerCount : '?';
+
     var gWinner = gRec ? (gRec.winner === 'good' ? '好人方' : '反方') : '?';
+
     var gRoleColor = gf === 'evil' ? 'var(--red-bright)' : gf === 'good' ? 'var(--green-bright)' : 'var(--gold-light)';
+
     ph += '<div class="history-compact-item">';
+
     ph += '<div class="hci-header" onclick="closeModal();openHistoryModal(' + gd.recIndex + ')">';
+
     ph += '<span class="hci-date">' + gDate + '</span>';
+
     ph += '<span class="hci-players">' + gPlayerCount + '人</span>';
+
     ph += '<span style="font-size:12px;color:' + gRoleColor + ';font-weight:600;margin-left:6px">' + gd.role + '</span>';
+
     ph += '<div class="hci-right">';
+
     ph += '<span class="hci-result" style="color:' + (gRec && gRec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)') + '">' + gWinner + '</span>';
+
     ph += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + (gw ? '&#9989;' : '&#10060;') + '</span>';
+
     ph += '</div></div></div>';
+
   }
+
   ph += '</div></div>';
 
+
+
   var contentEl = document.getElementById('profile-content');
+
   if (contentEl) contentEl.innerHTML = ph;
+
 }
+
+
 
 function switchProfileTab(tab) {
+
   state._profileRoleTab = tab;
+
   renderPlayerProfile();
+
 }
+
+
 
 function goToPlayerHistory(name) {
+
   var fpSel = document.getElementById('filter-player');
+
   if (fpSel) {
+
     fpSel.value = name;
+
     renderStats();
+
   }
+
 }
 
+
+
 /* ==================== GAME DETAIL & EDIT ==================== */
+
 function showGameDetail(idx) {
+
   var history = loadHistory();
+
   var rec = normalizeRecord(history[idx]);
+
   if (!rec) return;
 
+
+
   var h = '<h2>对局详情</h2>';
+
   h += '<p><strong>日期：</strong>' + rec.date + ' | <strong>人数：</strong>' + rec.playerCount + '人 | <strong>胜方：</strong>' + (rec.winner === 'good' ? '好人方' : '反方') + '</p>';
+
   if (rec.startTime) {
+
     h += '<p><strong>开始时间：</strong>' + rec.startTime + ' | <strong>结束时间：</strong>' + (rec.endTime || '--') + '</p>';
+
   }
+
   if (rec.assassinFromMission && rec.assassinTarget) {
+
     // 游戏内拍刀 - 仅在顶部简要显示
+
     h += '<p><strong>反方拍刀：</strong>';
+
     if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+
       h += '第' + (rec.assassinAfterRound + 1) + '轮任务后 | ';
+
     }
+
     h += '<strong>目标：</strong>' + rec.assassinTarget + ' | <strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中梅林，反方胜</span>' : '<span style="color:#99ff99">未命中，好人方胜</span>') + '</p>';
+
   }
+
   if (rec.activeRoles) {
+
     h += '<p><strong>使用角色：</strong>' + rec.activeRoles.join('、') + '</p>';
+
   }
+
+
 
   h += '<h3 style="margin-top:10px">身份分配</h3>';
+
   // Sort by faction (good first, then evil), then by index within each faction
+
   var sortedIds = rec.identities.slice().map(function(id) {
+
     var final = getFinalFaction(id.role, rec.lancelotFlips && rec.lancelotFlips[id.index]);
+
     // 混子：根据跟随目标解析阵营
+
     if (id.role === '混子' && rec.huntFollow != null) {
+
       final = resolveHuntFaction(rec, rec.huntFollow);
+
     }
+
     return { id: id, faction: final };
+
   });
+
   sortedIds.sort(function(a, b) {
+
     if (a.faction === b.faction) return a.id.index - b.id.index;
+
     return a.faction === 'good' ? -1 : 1;
+
   });
+
   for (var i = 0; i < sortedIds.length; i++) {
+
     var id = sortedIds[i].id;
+
     var final = sortedIds[i].faction;
+
     var evilStyle = '';
+
     var factionBadge = '';
+
     if (final === 'evil') {
+
       evilStyle = ' style="background:rgba(255,80,80,0.08);padding:2px 8px;border-radius:4px;margin-bottom:2px"';
+
       factionBadge = ' <span style="display:inline-block;padding:0 8px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);border-radius:10px;color:#ff6b6b;font-size:11px;font-weight:700">反方</span>';
+
     } else if (final === 'neutral') {
+
       factionBadge = ' <span style="display:inline-block;padding:0 8px;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);border-radius:10px;color:#c9a84c;font-size:11px;font-weight:700">中立</span>';
+
     }
+
     var flipNote = '';
+
     if (rec.lancelotFlips && rec.lancelotFlips[id.index]) {
+
       flipNote = ' <span style="color:var(--orange);font-size:11px">[反转→' + (final === 'good' ? '好人方' : '反方') + ']</span>';
+
     }
+
     // 混子跟随信息
+
     var huntNote = '';
+
     if (id.role === '混子' && rec.huntFollow != null && rec.huntFollow >= 0 && rec.huntFollow < rec.playerCount) {
+
       var followedName = rec.identities.find(function(x) { return x.index === rec.huntFollow; });
+
       huntNote = ' <span style="color:var(--gold-light);font-size:11px">→ 混' + (rec.huntFollow + 1) + '号' + (followedName ? followedName.name : '') + '</span>';
+
     }
+
     h += '<div' + evilStyle + '>' + (id.index + 1) + '号 ' + id.name + '：' + id.role + factionBadge + flipNote + huntNote + '</div>';
+
   }
+
+
 
   h += '<h3 style="margin-top:10px">任务记录</h3>';
+
   // Build index-to-name mapping and faction lookup
+
   var nameByIndex = {};
+
   var nameToFaction = {};
+
   for (var ii = 0; ii < rec.identities.length; ii++) {
+
     var idt = rec.identities[ii];
+
     nameByIndex[idt.index] = idt.name;
+
     nameByIndex[(idt.index + 1) + '号 ' + idt.name] = idt.name;
+
     var faction = getFinalFaction(idt.role, rec.lancelotFlips && rec.lancelotFlips[idt.index]);
+
     if (idt.role === '混子' && rec.huntFollow != null) {
+
       faction = resolveHuntFaction(rec, rec.huntFollow);
+
     }
+
     nameToFaction[idt.name] = faction;
+
     nameToFaction[(idt.index + 1) + '号 ' + idt.name] = faction;
+
     nameToFaction['玩家' + (idt.index + 1)] = faction;
+
   }
+
   var evilSpan = function(n) {
+
     if (nameToFaction[n] === 'evil') return '<span style="color:#66aaff;font-weight:700">' + n + '</span>';
+
     return n;
+
   };
+
   var namesToHtml = function(arr) { return arr.map(evilSpan).join(' / '); };
+
   var isGameAssassin = rec.assassinFromMission === true && rec.assassinTarget;
+
   var isEndGameAssassin = !rec.assassinFromMission && rec.assassinTarget;
+
   var assassinCutoff = isGameAssassin ? rec.assassinAfterRound : null;
+
   for (var i = 0; i < rec.missions.length; i++) {
+
     // 反方拍刀：到达拍刀轮次后截断
+
     if (isGameAssassin && assassinCutoff !== null && i > assassinCutoff) break;
+
     // 反方拍刀：在拍刀轮次显示拍刀事件
+
     if (isGameAssassin && i === assassinCutoff) {
+
       h += '<div style="margin-bottom:4px;padding:8px 12px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)"><span style="font-weight:700">第' + (i + 1) + '轮：</span><span style="color:#ff9999;font-weight:700">反方拍刀</span> — 游戏在此轮终止</div>';
+
       continue;
+
     }
+
     var m = rec.missions[i];
+
       // 游戏已结束，本轮未实际执行（result 为 null 且无组队尝试）→ 静默跳过
+
       if (!m.result && (m.launchAttempts ? m.launchAttempts.length === 0 : true)) {
+
         continue;
+
       }
+
       // Show launch attempts (including failures) before the final mission result
+
       if (m.launchAttempts && m.launchAttempts.length > 0) {
+
         for (var la = 0; la < m.launchAttempts.length; la++) {
+
           var att = m.launchAttempts[la];
+
           var approveCount = 0, rejectCount = 0;
+
           for (var vk in att.votes) {
+
             if (att.votes[vk] === 'approve') approveCount++;
+
             else rejectCount++;
+
           }
+
           var isLastAttempt = (la === m.launchAttempts.length - 1);
+
           var isSucceeded = isLastAttempt && m.result === 'success';
+
           var isFailed = isLastAttempt && m.result === 'fail';
+
           var label = isSucceeded ? '组队成功，任务执行成功' : (isFailed ? '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '') : '组队未通过');
+
           var bg = isSucceeded ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
+
           var borderColor = isSucceeded ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
+
           var labelColor = isSucceeded ? 'var(--green-bright)' : 'var(--red-bright)';
+
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);font-size:14px">';
+
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
+
           h += '<span style="font-weight:700;color:' + labelColor + '">' + label + '</span> ';
+
           h += '| 队长 ' + evilSpan(nameByIndex[att.leader] || att.leader) + ' | 队伍 ' + att.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
+
           // Per-player vote details
+
           var approveNames = [], rejectNames = [];
+
           for (var vk in att.votes) {
+
             var vidx = parseInt(vk) - 1;
+
             var vn = nameByIndex[vidx];
+
             if (!vn) vn = '玩家' + (parseInt(vk));
+
             if (att.votes[vk] === 'approve') approveNames.push(vn);
+
             else rejectNames.push(vn);
+
           }
+
           if (approveNames.length || rejectNames.length) {
+
             var totalVotes = approveNames.length + rejectNames.length;
+
             var allApprove = (rejectNames.length === 0);
+
             h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:13px">';
+
             if (allApprove) {
+
               h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + totalVotes + '人)</span></div>';
+
             } else {
+
               if (approveNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + approveNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(approveNames) + '</span></div>';
+
               if (rejectNames.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + rejectNames.length + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(rejectNames) + '</span></div>';
+
             }
+
             h += '</div>';
+
           }
+
           h += '</div>';
+
         }
+
       } else {
+
         // Legacy data: no launchAttempts, render from mission data with same style
+
         var lf = m.launchFailures || 0;
+
         var isSuccess = m.result === 'success';
+
         // Precompute legacy vote details (shared by failures and result)
+
         var lgc = 0, lbc = 0;
+
         var lgn = [], lbn = [];
+
         if (m.votes) {
+
           for (var lvk in m.votes) {
+
             if (m.votes[lvk] === 'approve') lgc++; else lbc++;
+
           }
+
           for (var lvk in m.votes) {
+
             var lidx = parseInt(lvk) - 1;
+
             var ln = nameByIndex[lidx];
+
             if (!ln) ln = '玩家' + (parseInt(lvk));
+
             if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
+
           }
+
         }
+
         for (var f = 0; f < lf; f++) {
+
           h += '<div style="margin-bottom:3px;padding:6px 10px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm);font-size:14px">';
+
           h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
+
           h += '<span style="font-weight:700;color:var(--red-bright)">组队未通过</span>';
+
           h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
+
           if (m.votes && (lgc + lbc > 0)) {
+
             var ltotal = lgc + lbc;
+
             var lall = (lbc === 0);
+
             h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:13px">';
+
             if (lall) {
+
               h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
+
             } else {
+
               if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lgn) + '</span></div>';
+
               if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lbn) + '</span></div>';
+
             }
+
             h += '</div>';
+
           }
+
           h += '</div>';
+
         }
+
         var bg2 = isSuccess ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
+
         var border2 = isSuccess ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
+
         var color2 = isSuccess ? 'var(--green-bright)' : 'var(--red-bright)';
+
         h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:14px">';
+
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
+
         h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '')) + '</span>';
+
         h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
+
         // Vote details for legacy data
+
         if (m.votes && (lgc + lbc > 0)) {
+
           h += ' | 投票 ' + lgc + ':' + lbc;
+
           var ltotal = lgc + lbc;
+
           var lall = (lbc === 0);
+
           h += '<div style="margin-top:4px;display:flex;gap:8px;font-size:13px">';
+
           if (lall) {
+
             h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">全员同意(' + ltotal + '人)</span></div>';
+
           } else {
+
             if (lgn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(153,255,153,0.06);border:1px solid rgba(153,255,153,0.2);border-radius:4px"><span style="color:var(--green-bright);font-weight:700">同意(' + lgc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lgn) + '</span></div>';
+
             if (lbn.length) h += '<div style="flex:1;min-width:0;padding:3px 8px;background:rgba(255,153,153,0.06);border:1px solid rgba(255,153,153,0.2);border-radius:4px"><span style="color:var(--red-bright);font-weight:700">反对(' + lbc + '人)</span><span style="color:var(--text-dim);margin-left:6px">' + namesToHtml(lbn) + '</span></div>';
+
           }
+
           h += '</div>';
+
         }
+
         h += '</div>';
+
       }
+
   }
+
   // 反方拍刀后的剩余轮次提示
+
   if (isGameAssassin && assassinCutoff !== null && assassinCutoff + 1 < rec.missions.length) {
+
     h += '<div style="color:var(--text-dim);font-size:14px;margin-top:4px">（后续' + (rec.missions.length - assassinCutoff - 1) + '轮未进行，游戏在反方拍刀后终止）</div>';
+
   }
+
+
 
   // 正常流程结束后的刺杀环节（独立于轮次之外）
+
   if (isEndGameAssassin) {
+
     h += '<h3 style="margin-top:10px">刺杀环节</h3>';
+
     h += '<div style="padding:10px 14px;background:rgba(255,153,153,0.08);border:1px solid rgba(255,153,153,0.25);border-radius:var(--radius-sm)">';
+
     h += '<strong>目标：</strong>' + rec.assassinTarget + ' | ';
+
     if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+
       h += '<strong>时机：</strong>第' + (rec.assassinAfterRound + 1) + '轮任务后 | ';
+
     }
+
     h += '<strong>结果：</strong>' + (rec.assassinSuccess ? '<span style="color:#ff9999">命中梅林，反方胜</span>' : '<span style="color:#99ff99">未命中，好人方胜</span>');
+
     h += '</div>';
+
   }
 
+
+
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+
     h += '<h3 style="margin-top:10px">湖中女神验人</h3>';
+
     for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+
       var lh = rec.ladyCheckHistory[li];
+
       h += '<div style="margin-bottom:3px;font-size:13px">';
+
       h += '<strong>第' + (li + 1) + '任女神：</strong>' + lh.holderName + ' → 验 ' + lh.targetName;
+
       h += ' <span style="font-weight:700;color:' + (lh.result === 'good' ? 'var(--blue-light)' : 'var(--red-bright)') + '">女神说' + (lh.result === 'good' ? '好人' : '反方') + '</span>';
+
       h += ' <span style="font-size:11px;color:var(--text-dim)">（女神说的不一定准）</span>';
+
       h += '</div>';
+
     }
+
   }
+
+
+
 
 
   if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
+
     h += '<h3 style="margin-top:10px">王者之剑</h3>';
+
     for (var ei = 0; ei < rec.excaliburHistory.length; ei++) {
+
       var ex = rec.excaliburHistory[ei];
+
       h += '<div style="margin-bottom:5px;padding:6px 10px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.18);border-radius:var(--radius-sm);font-size:13px">';
+
       h += '<strong>第' + (ex.round + 1) + '轮：</strong>';
+
       h += '持剑者 ' + (ex.holderName || (ex.holder !== undefined ? (ex.holder + 1) + '号' : '未指定'));
+
       if (ex.used === false) {
+
         h += '，<span style="color:var(--text-dim)">未使用</span>';
+
       } else if (ex.used === true) {
+
         h += '，对 ' + (ex.targetName || (ex.target !== undefined && ex.target !== null ? (ex.target + 1) + '号' : '未记录目标')) + ' 使用';
+
         h += '，反馈：<span style="font-weight:700;color:var(--gold-light)">' + excaliburDirectionLabel(ex.claimedDirection) + '</span>';
+
         if (ex.feedbackRound !== null && ex.feedbackRound !== undefined) h += '（第' + (ex.feedbackRound + 1) + '轮发言记录）';
+
       } else {
+
         h += '，<span style="color:var(--orange)">待确认是否使用</span>';
+
       }
+
       if (ex.note) h += '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">备注：' + ex.note + '</div>';
+
       h += '</div>';
+
     }
+
   }
+
+
 
   if (rec.roundTendencies && rec.roundTendencies.length > 0) {
+
     h += '<h3 style="margin-top:10px">倾向值变化</h3>';
+
     h += '<table style="font-size:11px;width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid var(--border)"><th style="padding:2px 4px;text-align:left;white-space:nowrap">玩家</th>';
+
     for (var r = 0; r < rec.roundTendencies.length; r++) {
+
       var entry = rec.roundTendencies[r];
+
       var label;
+
       if (entry && typeof entry.v === 'object') {
+
         // 新格式：{ v: snap, r: round, a: attempt }
+
         var roundNum = (entry.r || 0) + 1;
+
         if (entry.a > 0) {
+
           label = 'R' + roundNum + '(' + entry.a + ')';
+
         } else {
+
           label = 'R' + roundNum;
+
         }
+
       } else {
+
         // 旧格式兼容
+
         label = 'R' + (r + 1);
+
       }
+
       h += '<th style="padding:2px 4px;text-align:center;white-space:nowrap">' + label + '</th>';
+
     }
+
     h += '</tr>';
+
     for (var i = 0; i < rec.identities.length; i++) {
+
       var id = rec.identities[i];
+
       h += '<tr style="border-bottom:1px solid var(--border)"><td style="padding:2px 4px;font-weight:600;white-space:nowrap">' + (id.index + 1) + '号 ' + id.name + '</td>';
+
       for (var r = 0; r < rec.roundTendencies.length; r++) {
+
         var entry = rec.roundTendencies[r];
+
         var val;
+
         if (entry && typeof entry.v === 'object') {
+
           val = entry.v[id.index];
+
         } else {
+
           val = entry[id.index];
+
         }
+
         if (val !== undefined) {
+
           var color = val >= 50 ? 'var(--green-bright)' : 'var(--red-bright)';
+
           h += '<td style="padding:2px 4px;text-align:center;color:' + color + ';font-weight:700;white-space:nowrap">' + val + '</td>';
+
         } else {
+
           h += '<td style="padding:2px 4px;text-align:center;color:var(--text-dim)">-</td>';
+
         }
+
       }
+
       h += '</tr>';
+
     }
+
     h += '</table>';
+
   }
 
+
+
   h += '<div class="modal-actions">';
+
   h += '<button class="btn" onclick="showEditGameRecord(' + idx + ')">编辑</button>';
+
   h += '<button class="btn" onclick="closeModal()">关闭</button>';
+
   h += '</div>';
+
   showModal(h);
+
 }
+
+
 
 function showEditGameRecord(idx) {
+
   closeModal();
+
   var history = loadHistory();
+
   var rec = normalizeRecord(history[idx]);
+
   if (!rec) return;
+
+
 
   var h = '<h2>编辑对局</h2>';
+
   h += '<p style="font-size:13px;color:var(--text-dim)">' + rec.date + ' · ' + rec.playerCount + '人</p>';
 
+
+
   h += '<h3 style="margin-top:8px">胜方</h3>';
+
   h += '<div class="winner-toggle" style="margin-bottom:8px">';
+
   h += '<button class="winner-btn good' + (rec.winner === 'good' ? ' selected' : '') + '" id="edit-winner-good" onclick="editToggleWinner(\'good\')">&#128737; 好人方</button>';
+
   h += '<button class="winner-btn evil' + (rec.winner === 'evil' ? ' selected' : '') + '" id="edit-winner-evil" onclick="editToggleWinner(\'evil\')">&#128481; 反方</button>';
+
   h += '</div>';
 
+
+
   if (rec.assassinTarget) {
+
     var editAssassinTitle = rec.assassinFromMission ? '拍刀' : '刺杀环节';
+
     h += '<h3 style="margin-top:8px">' + editAssassinTitle + '</h3>';
+
     h += '<p style="font-size:13px">目标：' + rec.assassinTarget;
+
     if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+
       h += ' | 第' + (rec.assassinAfterRound + 1) + '轮任务后';
+
     }
+
     h += '</p>';
+
     h += '<div class="btn-row" style="margin-bottom:8px">';
+
     h += '<button class="btn small' + (rec.assassinSuccess ? ' selected' : '') + '" id="edit-assassin-success" onclick="editToggleAssassin(true)">刺杀成功</button>';
+
     h += '<button class="btn small' + (!rec.assassinSuccess ? ' selected' : '') + '" id="edit-assassin-fail" onclick="editToggleAssassin(false)">刺杀失败</button>';
+
     h += '</div>';
+
   }
+
+
 
   h += '<h3 style="margin-top:8px">玩家身份</h3>';
+
   var activeRoles = rec.activeRoles || ALL_ROLES.slice(0, 8);
+
   for (var i = 0; i < rec.identities.length; i++) {
+
     var id = rec.identities[i];
+
     // Collect names already taken by other players
+
     var takenEditNames = {};
+
     for (var k = 0; k < rec.identities.length; k++) {
+
       if (k === i) continue;
+
       takenEditNames[rec.identities[k].name] = true;
+
     }
+
     h += '<div class="edit-player-row">';
+
     h += '<span class="ep-name">' + (id.index + 1) + '号</span>';
+
     h += '<select id="edit-name-' + i + '" style="flex:0;min-width:72px;padding:7px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;min-height:40px">';
+
     var sortedEditPool = getSortedNamePool();
+
     for (var k = 0; k < sortedEditPool.length; k++) {
+
       var nm = sortedEditPool[k];
+
       if (takenEditNames[nm] && nm !== id.name) continue;
+
       h += '<option value="' + nm + '"' + (nm === id.name ? ' selected' : '') + '>' + nm + '</option>';
+
     }
+
     if (namePool.indexOf(id.name) === -1) {
+
       h += '<option value="' + id.name + '" selected>' + id.name + '</option>';
+
     }
+
     h += '</select>';
+
     h += '<select id="edit-role-' + i + '">';
+
     h += '<option value="">-- 未选 --</option>';
+
     for (var j = 0; j < activeRoles.length; j++) {
+
       h += '<option value="' + activeRoles[j] + '"' + (activeRoles[j] === id.role ? ' selected' : '') + '>' + activeRoles[j] + '</option>';
+
     }
+
     h += '</select>';
+
     h += '</div>';
+
   }
+
+
 
   var hasLancelot = activeRoles.indexOf('兰斯洛特(蓝)') !== -1 || activeRoles.indexOf('兰斯洛特(红)') !== -1;
+
   var anyFlipped = false;
+
   if (rec.lancelotFlips) {
+
     for (var k = 0; k < rec.identities.length; k++) {
+
       if (rec.lancelotFlips[rec.identities[k].index]) { anyFlipped = true; break; }
+
     }
+
   }
+
   h += '<h3 style="margin-top:8px">兰斯洛特反转</h3>';
+
   h += '<div class="winner-toggle" style="margin-bottom:8px">';
+
   h += '<button class="winner-btn good' + (anyFlipped ? ' selected' : '') + '" id="edit-lancelot-yes" onclick="setEditLancelotFlip(true)">&#9989; 是，反转</button>';
+
   h += '<button class="winner-btn evil' + (!anyFlipped ? ' selected' : '') + '" id="edit-lancelot-no" onclick="setEditLancelotFlip(false)">&#10060; 否，不反转</button>';
+
   h += '</div>';
 
+
+
   h += '<div class="modal-actions">';
+
   h += '<button class="btn primary" onclick="saveEditGameRecord(' + idx + ')">保存修改</button>';
+
   h += '<button class="btn" onclick="showGameDetail(' + idx + ')">取消</button>';
+
   h += '</div>';
+
+
 
   // Store current edit state
+
   state._editRec = JSON.parse(JSON.stringify(rec));
+
   state._editRec._lancelotFlipped = anyFlipped;
+
   state._editIdx = idx;
 
+
+
   showModal(h);
+
 }
+
+
 
 function setEditLancelotFlip(val) {
+
   state._editRec._lancelotFlipped = val;
+
   var yBtn = document.getElementById('edit-lancelot-yes');
+
   var nBtn = document.getElementById('edit-lancelot-no');
+
   if (yBtn) yBtn.className = 'winner-btn good' + (val ? ' selected' : '');
+
   if (nBtn) nBtn.className = 'winner-btn evil' + (!val ? ' selected' : '');
+
 }
+
+
 
 function editToggleWinner(w) {
+
   state._editRec.winner = w;
+
   var gBtn = document.getElementById('edit-winner-good');
+
   var eBtn = document.getElementById('edit-winner-evil');
+
   if (gBtn) gBtn.className = 'winner-btn good' + (w === 'good' ? ' selected' : '');
+
   if (eBtn) eBtn.className = 'winner-btn evil' + (w === 'evil' ? ' selected' : '');
+
 }
+
+
 
 function editToggleAssassin(val) {
+
   state._editRec.assassinSuccess = val;
+
   var sBtn = document.getElementById('edit-assassin-success');
+
   var fBtn = document.getElementById('edit-assassin-fail');
+
   if (sBtn) sBtn.className = 'btn small' + (val ? ' selected' : '');
+
   if (fBtn) fBtn.className = 'btn small' + (!val ? ' selected' : '');
+
 }
+
+
 
 function saveEditGameRecord(idx) {
+
   var history = loadHistory();
+
   var rec = state._editRec;
+
   if (!rec) return;
 
+
+
   // Collect identities from form
+
   for (var i = 0; i < rec.identities.length; i++) {
+
     var sel = document.getElementById('edit-role-' + i);
+
     var nameSel = document.getElementById('edit-name-' + i);
+
     if (sel) rec.identities[i].role = sel.value;
+
     if (nameSel) rec.identities[i].name = nameSel.value;
+
   }
+
+
 
   // Apply global Lancelot flip
+
   rec.lancelotFlips = {};
+
   for (var i = 0; i < rec.identities.length; i++) {
+
     var role = rec.identities[i].role;
+
     if (role === '兰斯洛特(蓝)' || role === '兰斯洛特(红)') {
+
       rec.lancelotFlips[rec.identities[i].index] = rec._lancelotFlipped || false;
+
     }
+
   }
+
   delete rec._lancelotFlipped;
 
+
+
   // If winner was changed, recalculate assassinSuccess
+
   if (rec.assassinTarget) {
+
     if (rec.winner === 'evil') rec.assassinSuccess = true;
+
     else rec.assassinSuccess = false;
+
   }
+
+
 
   history[idx] = toRecordV2(rec);
+
   saveHistory(history);
+
   closeModal();
+
   toast('对局记录已更新');
+
   renderStats();
+
 }
+
+
 
 /* ===== 历史对局改玩家名 ===== */
+
 function startRenameHistoryPlayer(origIdx, playerIdx) {
+
   var selector = '.hci-name-edit[onclick="event.stopPropagation();startRenameHistoryPlayer(' + origIdx + ',' + playerIdx + ')"]';
+
   var editBtn = document.querySelector(selector);
+
   if (!editBtn) {
+
     // 备选：用 role-item 内找 name span
+
     var items = document.querySelectorAll('.hci-role-item');
+
     for (var k = 0; k < items.length; k++) {
+
       var btn = items[k].querySelector('.hci-name-edit');
+
       if (btn && btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf('startRenameHistoryPlayer(' + origIdx + ',' + playerIdx + ')') !== -1) {
+
         editBtn = btn;
+
         break;
+
       }
+
     }
+
   }
+
   if (!editBtn) return;
+
   var roleItem = editBtn.parentElement;
+
   var nameSpan = roleItem.querySelector('.hci-name');
+
   if (!nameSpan) return;
+
   var oldName = nameSpan.textContent;
+
   var input = document.createElement('input');
+
   input.type = 'text';
+
   input.value = oldName;
+
   input.className = 'hci-name-input';
+
   input.onblur = function() { finishRenameHistoryPlayer(origIdx, playerIdx, input.value, oldName); };
+
   input.onkeydown = function(e) {
+
     if (e.key === 'Enter') { e.preventDefault(); finishRenameHistoryPlayer(origIdx, playerIdx, input.value, oldName); }
+
     if (e.key === 'Escape') { renderStats(); }
+
   };
+
   nameSpan.replaceWith(input);
+
   editBtn.style.display = 'none';
+
   input.focus();
+
   input.select();
+
 }
+
+
 
 function finishRenameHistoryPlayer(origIdx, playerIdx, newName, oldName) {
+
   if (!newName || newName.trim() === '' || newName.trim() === oldName) return renderStats();
+
   var trimmed = newName.trim();
+
   var history = loadHistory();
+
   var rec = history[origIdx];
+
   if (rec && rec.ids && rec.ids[playerIdx]) {
+
     var old = rec.ids[playerIdx].n;
+
     rec.ids[playerIdx].n = trimmed;
+
     // 同步更新记录中所有引用旧名的字段
+
     _updateNameRefs(rec, old, trimmed);
+
     saveHistory(history);
+
     // 新名字加入名称池
+
     if (namePool.indexOf(trimmed) === -1) { namePool.push(trimmed); saveNamePool(); }
+
     toast('「' + old + '」→「' + trimmed + '」已保存');
+
   }
+
   renderStats();
+
 }
+
+
 
 function _updateNameRefs(rec, oldName, newName) {
+
   if (!rec || oldName === newName) return;
+
   // excaliburHistory
+
   if (rec.ex) {
+
     for (var i = 0; i < rec.ex.length; i++) {
+
       var e = rec.ex[i];
+
       if (e.hn === oldName) e.hn = newName;
+
       if (e.tn === oldName) e.tn = newName;
+
       if (e.ldn === oldName) e.ldn = newName;
+
     }
+
   }
+
   // ladyCheckHistory
+
   if (rec.lch) {
+
     for (var i = 0; i < rec.lch.length; i++) {
+
       var l = rec.lch[i];
+
       if (l.hn === oldName) l.hn = newName;
+
       if (l.tn === oldName) l.tn = newName;
+
     }
+
   }
+
   // identityMarks
+
   if (rec.im) {
+
     for (var i = 0; i < rec.im.length; i++) {
+
       if (rec.im[i].tn === oldName) rec.im[i].tn = newName;
+
     }
+
   }
+
   // assassinTarget
+
   if (rec.at === oldName) rec.at = newName;
+
 }
+
+
 
 function deleteGameRecord(idx) {
+
   var h = '<h2>确认删除</h2>';
+
   h += '<p>确定要删除这条对局记录吗？此操作不可撤销。</p>';
+
   h += '<div class="modal-actions">';
+
   h += '<button class="btn danger" onclick="confirmDeleteGame(' + idx + ')">确认删除</button>';
+
   h += '<button class="btn" onclick="closeModal()">取消</button>';
+
   h += '</div>';
+
   showModal(h);
+
 }
+
+
 
 function confirmDeleteGame(idx) {
+
   closeModal();
+
   var history = loadHistory();
+
   if (idx < 0 || idx >= history.length) return;
+
   var recRaw = history[idx];
+
   var record = normalizeRecord(recRaw);
+
   var key = makeRecordKey(recRaw);
+
   var sb = getSupabase();
 
+
+
   // 先删除 Supabase，确保云端同步后再更新本地
+
   function doLocalDelete() {
+
     var deletedKeys = loadDeletedKeys();
+
     if (key && deletedKeys.indexOf(key) === -1) {
+
       deletedKeys.push(key);
+
       saveDeletedKeys(deletedKeys);
+
     }
+
     history.splice(idx, 1);
+
     saveHistory(history);
+
     toast('已删除该对局记录');
+
     renderStats();
+
   }
+
+
 
   if (sb) {
+
     // 按 _supabaseId 删除；若无则按 game_data 匹配查找后删除
+
     function doDeleteById(sid) {
+
       sb.from('game_records').delete().eq('id', sid).then(function(res) {
+
         if (!res.error) {
+
           console.log('[Supabase] deleteGameRecord success by id:', sid);
+
           doLocalDelete();
+
         } else {
+
           console.warn('[Supabase] deleteGameRecord failed:', res.error);
+
           doLocalDelete();
+
         }
+
       });
+
     }
+
+
 
     if (record._supabaseId) {
+
       doDeleteById(record._supabaseId);
+
     } else if (recRaw._sid) {
+
       doDeleteById(recRaw._sid);
+
     } else {
+
       // 无 _supabaseId，按 date + playerCount + identities 匹配查找
+
       sb.from('game_records').select('id')
+
         .eq('game_data->>date', record.date)
+
         .eq('game_data->>playerCount', record.playerCount)
+
         .then(function(res) {
+
           if (res.error || !res.data || !res.data.length) {
+
             // 云端无匹配，直接本地删除
+
             doLocalDelete();
+
             return;
+
           }
+
           // 进一步按 identities 匹配
+
           var recIds = (record.identities || []).map(function(id) { return (id.name||'')+'|'+(id.role||''); }).sort().join(',');
+
           var found = null;
+
           for (var i = 0; i < res.data.length; i++) {
+
             var gd = res.data[i].game_data;
+
             if (!gd || !gd.identities) continue;
+
             var cIds = gd.identities.map(function(id) { return (id.name||'')+'|'+(id.role||''); }).sort().join(',');
+
             if (cIds === recIds) { found = res.data[i].id; break; }
+
           }
+
           if (found) {
+
             doDeleteById(found);
+
           } else {
+
             doLocalDelete();
+
           }
+
         });
+
     }
+
   } else {
+
     console.warn('[Supabase] deleteGameRecord: no connection');
+
     doLocalDelete();
+
   }
+
 }
+
+
 
 /* ==================== MODAL ==================== */
+
 function showModal(html, onClose) {
+
   var overlay = document.createElement('div');
+
   overlay.className = 'modal-overlay active';
+
   overlay.id = 'dynamic-modal-overlay';
+
   overlay.setAttribute('style', 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center');
+
   overlay.innerHTML = '<div class="modal" id="temp-modal">' + html + '</div>';
+
   overlay.addEventListener('click', function(e) {
+
     if (e.target === overlay) {
+
       if (onClose) onClose();
+
       else overlay.remove();
+
     }
+
   });
+
   document.body.appendChild(overlay);
+
 }
+
 function closeModal() {
+
   var overlay = document.getElementById('dynamic-modal-overlay');
+
   if (overlay) overlay.remove();
+
 }
+
+
 
 function confirmClearStats() {
+
   closeModal();
+
   localStorage.removeItem('avalon_history_v2');
+
   localStorage.removeItem('avalon_last_sync');
+
   invalidateHistoryCache();
+
   toast('已清除所有统计');
+
   renderStats();
+
 }
+
+
 
 /* ==================== DATA EXPORT / IMPORT ==================== */
+
 function exportData() {
+
   var data = {};
+
   var keys = ['avalon_name_pool', 'avalon_history_v2', 'avalon_last_game'];
+
   for (var i = 0; i < keys.length; i++) {
+
     var val = localStorage.getItem(keys[i]);
+
     if (val !== null) {
+
       try { data[keys[i]] = JSON.parse(val); } catch(e) { data[keys[i]] = val; }
+
     }
+
   }
+
   var json = JSON.stringify(data, null, 2);
+
   var blob = new Blob([json], { type: 'application/json' });
+
   var url = URL.createObjectURL(blob);
+
   var a = document.createElement('a');
+
   a.href = url;
+
   a.download = 'avalon-data-' + _bjDate() + '.json';
+
   document.body.appendChild(a);
+
   a.click();
+
   document.body.removeChild(a);
+
   URL.revokeObjectURL(url);
+
   toast('数据已导出');
+
 }
+
+
 
 function importData() {
+
   var h = '<h2>导入数据</h2>';
+
   h += '<p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">选择 JSON 文件导入。按 fingerprint 去重合并到现有数据，不会覆盖已有记录。</p>';
+
   h += '<input type="file" accept=".json" id="import-file-input" style="display:block;margin:10px auto;padding:8px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;width:100%;max-width:300px">';
+
   h += '<div class="modal-actions">';
+
   h += '<button class="btn primary" onclick="doImportFile()">确认导入</button>';
+
   h += '<button class="btn" onclick="closeModal()">取消</button>';
+
   h += '</div>';
+
   showModal(h);
+
 }
 
+
+
 function doImportFile() {
+
   var input = document.getElementById('import-file-input');
+
   if (!input || !input.files || !input.files[0]) { toast('请选择文件', 'warn'); return; }
+
   var file = input.files[0];
+
   var reader = new FileReader();
+
   reader.onload = function(e) {
+
     var raw = e.target.result;
+
     var data;
+
     try { data = JSON.parse(raw); } catch(err) { toast('JSON 格式错误', 'warn'); return; }
+
     if (!data || typeof data !== 'object') { toast('数据格式无效', 'warn'); return; }
+
+
 
     var importedCount = 0;
 
+
+
     // 导入 name_pool
+
     if (data['avalon_name_pool'] && Array.isArray(data['avalon_name_pool'])) {
+
       var existingPool = [];
+
       try { existingPool = JSON.parse(localStorage.getItem('avalon_name_pool') || '[]'); } catch(e) {}
+
       var poolSet = {};
+
       for (var i = 0; i < existingPool.length; i++) poolSet[existingPool[i]] = true;
+
       for (var i = 0; i < data['avalon_name_pool'].length; i++) {
+
         if (!poolSet[data['avalon_name_pool'][i]]) {
+
           existingPool.push(data['avalon_name_pool'][i]);
+
           poolSet[data['avalon_name_pool'][i]] = true;
+
         }
+
       }
+
       localStorage.setItem('avalon_name_pool', JSON.stringify(existingPool));
+
       importedCount++;
+
     }
+
+
 
     // 导入 history_v2 — 按 fingerprint 去重合并
+
     if (data['avalon_history_v2'] && Array.isArray(data['avalon_history_v2'])) {
+
       var existingHistory = loadHistory();
+
       var existingKeys = {};
+
       for (var i = 0; i < existingHistory.length; i++) {
+
         existingKeys[makeRecordKey(existingHistory[i])] = true;
+
       }
+
       var toAdd = [];
+
       for (var i = 0; i < data['avalon_history_v2'].length; i++) {
+
         var rec = data['avalon_history_v2'][i];
+
         if (!existingKeys[makeRecordKey(rec)]) {
+
           toAdd.push(rec);
+
         }
+
       }
+
       if (toAdd.length > 0) {
+
         existingHistory = existingHistory.concat(toAdd);
+
         saveHistory(existingHistory);
+
         // push 到 Supabase
+
         var sb = getSupabase();
+
         if (sb) {
+
           for (var j = 0; j < toAdd.length; j++) {
+
             var recV2 = toAdd[j];
+
             var recOld = toRecordV2 ? null : null;
+
             (function(r) {
+
               sb.from('game_records').insert({ game_data: null, game_data_v2: r }).select('id').single().then(function(res) {
+
                 if (res.error) console.warn('[Import] Supabase push failed:', res.error);
+
               });
+
             })(recV2);
+
           }
+
         }
+
         importedCount++;
+
         toast('导入 ' + toAdd.length + ' 条新对局记录');
+
         invalidateHistoryCache();
+
         if (state._currentPage === 'stats') renderStats();
+
       } else {
+
         toast('没有新的对局记录需要导入');
+
       }
+
     }
+
+
 
     closeModal();
+
   };
+
   reader.readAsText(file);
+
 }
+
+
 
 // Supabase Realtime 订阅：跨设备实时同步
+
 // 页面加载时从 Supabase 拉取历史数据合并到本地（补充实时推送之前的记录）
+
 function pullInitialData(sb) {
+
   // 全量拉取云端记录，_uuid 去重合并
+
   sb.from('game_records').select('id, game_data, game_data_v2, created_at').order('created_at', { ascending: true }).then(function(gameRes) {
+
     if (gameRes.error) {
+
       console.warn('[InitPull] game_records fetch failed:', gameRes.error);
+
       return;
+
     }
+
     if (!gameRes.data || gameRes.data.length === 0) {
+
       console.log('[InitPull] no records in cloud');
+
       return;
+
     }
+
+
 
     var localHistory = loadHistory();
+
     var localDeletedKeys = loadDeletedKeys();
 
+
+
     // 构建云端记录按 _sid 索引（稳定去重键，避免 refresh 时 UUID 漂移）
+
     var cloudBySid = {};
+
     var cloudRecords = [];
+
     for (var i = 0; i < gameRes.data.length; i++) {
+
       var row = gameRes.data[i];
+
       var recordV2 = row.game_data_v2 ? row.game_data_v2 : (row.game_data ? toRecordV2(row.game_data) : null);
+
       if (!recordV2) continue;
+
       recordV2._sid = row.id;
+
       // 从 game_data_v2 内读取 _uuid（已由 saveGameRecord 存入 JSONB）
+
       if (!recordV2._uuid) recordV2._uuid = generateUUID();
 
+
+
       var key = makeRecordKey(recordV2);
+
       if (localDeletedKeys.indexOf(key) !== -1) {
+
         console.log('[InitPull] skipped deleted:', key);
+
         continue;
+
       }
 
+
+
       cloudRecords.push(recordV2);
+
       cloudBySid[recordV2._sid] = true;
+
     }
+
+
 
     // 合并：云端记录全量采用，本地未同步的补充（按 _sid 去重）
+
     var merged = cloudRecords.slice();
+
     var hasNew = false;
+
     for (var i = 0; i < localHistory.length; i++) {
+
       var lr = localHistory[i];
+
       if (!isRecordV2(lr)) lr = toRecordV2(lr);
+
       // 有 _sid 的记录跟随云端状态：云端存在则已含在 cloudRecords 中，
+
       // 云端不存在该 _sid 说明被其他设备删了，同步从本地移除
+
       if (lr._sid) continue;
+
       merged.push(lr);
+
       hasNew = true;
+
     }
+
+
 
     if (hasNew || merged.length !== localHistory.length) {
+
       merged.sort(function(a, b) {
+
         var da = (a.date || '');
+
         var db = (b.date || '');
+
         if (da < db) return -1;
+
         if (da > db) return 1;
+
         return (a.startTime || '').localeCompare(b.startTime || '');
+
       });
+
       // 按内容指纹去重，只保留一份
+
       merged = deduplicateHistory(merged);
+
       saveHistory(merged);
+
       console.log('[InitPull] merged ' + cloudRecords.length + ' cloud + ' +
+
         (merged.length - cloudRecords.length) + ' local = ' + merged.length);
+
     } else {
+
       console.log('[InitPull] already in sync, no changes');
+
     }
 
+
+
     scheduleRenderStats();
+
   });
+
+
 
   // 拉取 name_pool
+
   sb.from('key_value').select('value').eq('key', 'name_pool').single().then(function(res) {
+
     if (res.error || !res.data) return;
+
     var cloudPool = res.data.value;
+
     if (!cloudPool || !cloudPool.length) return;
+
     // 以云端为准，直接覆盖本地
+
     namePool = cloudPool;
+
     localStorage.setItem('avalon_name_pool', JSON.stringify(cloudPool));
+
     console.log('[InitPull] name_pool synced, total:', cloudPool.length);
+
   });
+
 }
 
+
+
 function setupRealtimeSubscriptions() {
+
   if (_supabaseChannel) return; // 避免重复订阅
+
   var sb = getSupabase();
+
   if (!sb) return;
 
+
+
   // 首次加载时从 Supabase 回拉历史数据（补充 realtime 订阅之前的记录）
+
   pullInitialData(sb);
+
+
 
   _supabaseChannel = sb.channel('game-records-channel');
 
+
+
   // 订阅 game_records 的 INSERT 事件
+
   _supabaseChannel.on(
+
     'postgres_changes',
+
     { event: 'INSERT', schema: 'public', table: 'game_records' },
+
     function(payload) {
+
       console.log('[Realtime] new game_record inserted:', payload.new.id);
+
       try {
+
         var newRecord = payload.new.game_data_v2 || payload.new.game_data;
+
         if (!newRecord) return;
+
         if (!isRecordV2(newRecord) && newRecord.date) {
+
           newRecord = toRecordV2(newRecord);
+
         }
+
         newRecord._sid = payload.new.id;
+
         // 从 game_data_v2 内读取 _uuid（已由 saveGameRecord 存入 JSONB）
+
         if (!newRecord._uuid) newRecord._uuid = generateUUID();
+
         // 检查删除黑名单
+
         var dk = loadDeletedKeys();
+
         if (dk.indexOf(makeRecordKey(newRecord)) !== -1) { console.log('[Realtime] skipped deleted record'); return; }
+
         var localHistory = loadHistory();
+
         // 按 _uuid 去重
+
         var exists = false;
+
         for (var i = 0; i < localHistory.length; i++) {
+
           if (localHistory[i]._uuid && localHistory[i]._uuid === newRecord._uuid) { exists = true; break; }
+
         }
+
         if (!exists) {
+
           localHistory.push(newRecord);
+
           saveHistory(localHistory);
+
           console.log('[Realtime] added new record, total:', localHistory.length);
+
         } else {
+
           console.log('[Realtime] skipped duplicate record by _uuid:', newRecord._uuid);
+
         }
+
         // 当前在 stats 页面则刷新
+
         scheduleRenderStats();
+
       } catch(e) {
+
         console.warn('[Realtime] failed to process game_record:', e);
+
       }
+
     }
+
   );
+
+
 
   // 订阅 key_value 的 UPDATE 事件（name_pool）
+
   _supabaseChannel.on(
+
     'postgres_changes',
+
     { event: 'UPDATE', schema: 'public', table: 'key_value', filter: 'key=eq.name_pool' },
+
     function(payload) {
+
       console.log('[Realtime] name_pool updated:', payload.new.value);
+
       try {
+
         var cloudPool = payload.new.value;
+
         if (!cloudPool) return;
+
         // 以云端为准，直接覆盖本地
+
         namePool = cloudPool;
+
         localStorage.setItem('avalon_name_pool', JSON.stringify(cloudPool));
+
         console.log('[Realtime] name_pool synced, total:', cloudPool.length);
+
       } catch(e) {
+
         console.warn('[Realtime] failed to process name_pool update:', e);
+
       }
+
     }
+
   );
+
+
 
   // 订阅 game_records 的 DELETE 事件
+
   _supabaseChannel.on(
+
     'postgres_changes',
+
     { event: 'DELETE', schema: 'public', table: 'game_records' },
+
     function(payload) {
+
       console.log('[Realtime] game_record deleted:', payload.old.id);
+
       try {
+
         var deletedId = payload.old.id;
+
         var localHistory = loadHistory();
+
         var found = -1;
+
         for (var i = 0; i < localHistory.length; i++) {
+
           if (localHistory[i]._sid === deletedId || localHistory[i]._supabaseId === deletedId) { found = i; break; }
+
         }
+
         if (found >= 0) {
+
           localHistory.splice(found, 1);
+
           saveHistory(localHistory);
+
           console.log('[Realtime] removed deleted record, total:', localHistory.length);
+
           scheduleRenderStats();
+
         }
+
       } catch(e) {
+
         console.warn('[Realtime] failed to process game_record delete:', e);
+
       }
+
     }
+
   );
 
+
+
   var _prevRealtimeStatus = null;
+
   _supabaseChannel.subscribe(function(status) {
+
     console.log('[Realtime] channel status:', status);
+
     if (status === 'SUBSCRIBED') {
+
       if (_prevRealtimeStatus !== null && _prevRealtimeStatus !== 'SUBSCRIBED') {
+
         console.log('[Realtime] reconnected, triggering full pull');
+
         var sb = getSupabase();
+
         if (sb) pullInitialData(sb);
+
       }
+
       _supabaseConnected = true;
+
     } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+
       _supabaseConnected = false;
+
     }
+
     _prevRealtimeStatus = status;
+
     // Update connection indicator if on stats page
+
     if (state._currentPage === 'stats') {
+
       renderConnectionStatus();
+
     }
+
   });
+
 }
+
+
 
 function renderConnectionStatus() {
+
   var el = document.getElementById('connection-indicator');
+
   if (!el) {
+
     // 在统计页卡片区域创建连接指示器
+
     var statsCard = document.querySelector('#page-stats .card');
+
     if (!statsCard) return;
+
     el = document.createElement('div');
+
     el.id = 'connection-indicator';
+
     el.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:14px;font-weight:600';
+
     statsCard.parentNode.insertBefore(el, statsCard);
+
   }
+
   if (_supabaseConnected) {
+
     el.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,0.6)"></span> 实时同步已连接';
+
     el.style.background = 'rgba(74,222,128,0.08)';
+
     el.style.color = '#4ade80';
+
   } else {
+
     el.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6b7280"></span> 离线';
+
     el.style.background = 'rgba(107,114,128,0.1)';
+
     el.style.color = '#9ca3af';
+
   }
+
 }
+
+
 
 // 合并去重：基于 date + playerCount + identities 生成唯一键
+
 function mergeHistories(local, cloud) {
+
   // 以云端为准，本地新增的保留（云端已删则本地同步删除）
+
   var seen = {};
+
   var result = cloud.slice();
+
   for (var i = 0; i < result.length; i++) {
+
     seen[makeRecordKey(result[i])] = true;
+
   }
+
   for (var j = 0; j < local.length; j++) {
+
     var lk = makeRecordKey(local[j]);
+
     if (!seen[lk]) {
+
       result.push(local[j]);
+
       seen[lk] = true;
+
     }
+
   }
+
   return result;
+
 }
+
+
 
 function makeRecordKey(record) {
+
   var rec = normalizeGameData(record);
+
   if (!rec) return '';
+
   var identities = rec.identities || [];
+
   var date = rec.date || '';
+
   var playerCount = rec.playerCount || 0;
+
   var identityStr = identities.map(function(id) {
+
     return (id.name || '') + '|' + (id.role || '');
+
   }).sort().join(',');
+
   return date + '|' + playerCount + '|' + identityStr;
+
 }
+
+
 
 function deduplicateHistory(history) {
+
   // 归一化到长格式以确保指纹一致性
+
   var normalized = history.map(function(r) { return normalizeGameData(r) || r; });
+
   var groups = {};
+
   for (var i = 0; i < normalized.length; i++) {
+
     var rec = normalized[i];
+
     var date = rec.date || '';
+
     var pc = rec.playerCount || 0;
+
     var winner = rec.winner || '';
+
     var ids = rec.identities || [];
+
     var nameStr = ids.map(function(id) { return id.name || ''; }).sort().join(',');
+
     var fp = date + '|' + pc + '|' + winner + '|' + nameStr;
+
     // 用原始记录（含 _sid 等附加字段）入组
+
     groups[fp] = groups[fp] || [];
+
     groups[fp].push(history[i]);
+
   }
+
   var result = [];
+
   var dedupCount = 0;
+
   for (var fp in groups) {
+
     var items = groups[fp];
+
     if (items.length === 1) {
+
       result.push(items[0]);
+
     } else {
+
       var best = items[0];
+
       for (var j = 1; j < items.length; j++) {
+
         var cur = items[j];
+
         var bestHasSid = best._sid || best._supabaseId;
+
         var curHasSid = cur._sid || cur._supabaseId;
+
         if (curHasSid && !bestHasSid) {
+
           best = cur;
+
         } else if (curHasSid && bestHasSid && (cur._sid || cur._supabaseId) < (best._sid || best._supabaseId)) {
+
           best = cur;
+
         }
+
       }
+
       result.push(best);
+
       dedupCount += items.length - 1;
+
     }
+
   }
+
   if (dedupCount > 0) {
+
     console.log('[Dedup] removed ' + dedupCount + ' duplicate records (from ' + history.length + ' to ' + result.length + ')');
+
   }
+
   return result;
+
 }
 
+
+
 /* ==================== INIT ==================== */
+
 (function() {
+
   // iPad/移动端兼容：首次用户交互时预初始化 AudioContext（绕过浏览器自动播放限制）
+
   var initAudioOnce = function() {
+
     ensureAudioContext();
+
     document.removeEventListener('click', initAudioOnce);
+
     document.removeEventListener('touchstart', initAudioOnce);
+
   };
+
   document.addEventListener('click', initAudioOnce);
+
   document.addEventListener('touchstart', initAudioOnce);
 
+
+
   var last = loadLastGame();
+
   if (last && last.playerCount >= 5 && last.playerCount <= 10) {
+
     state.playerCount = last.playerCount;
+
     state.activeRoles = (last.playerCount === 10) ? ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德'] : DEFAULT_ACTIVE_ROLES.slice();
+
     state.playerNames = last.playerNames.slice();
+
     state.selfIndex = last.selfIndex;
+
     state.tendencies = {};
+
     state.consecutiveRejects = {};
+
     for (var i = 0; i < state.playerCount; i++) {
+
       state.tendencies[i] = 50;
+
       state.consecutiveRejects[i] = 0;
+
     }
+
   } else {
+
     initState(7);
+
   }
+
   showPage('setup');
 
+
+
   // 尝试重推待发送队列
+
   processOfflineQueues();
 
+
+
   // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
+
   setTimeout(function() {
+
     setupRealtimeSubscriptions();
+
   }, 1200);
+
+
 
 })();
 
+
+
 /* ==================== NEW TENDENCY SYSTEM ==================== */
 
+
+
 function escapeHtml(str) {
+
   var div = document.createElement('div');
+
   div.appendChild(document.createTextNode(str));
+
   return div.innerHTML;
+
 }
+
+
 
 var ROLE_CATEGORY = {
+
   '梅林': 'good', '派西维尔': 'good', '忠臣': 'good', '兰斯洛特(蓝)': 'good',
+
   '莫甘娜': 'evil', '刺客': 'evil', '莫德雷德': 'evil',
+
   '奥伯伦': 'evil', '爪牙': 'evil', '兰斯洛特(红)': 'evil'
+
 };
 
+
+
 function isGoodRole(role) { return ROLE_CATEGORY[role] === 'good'; }
+
 function isEvilRole(role) { return ROLE_CATEGORY[role] === 'evil'; }
 
+
+
 function getPerspective() {
+
   if (!state.myRole) return 'unknown';
+
   // Lancelot: faction depends on flip count
+
   if (state.myRole === '兰斯洛特(蓝)' || state.myRole === '兰斯洛特(红)') {
+
     return (state.lancelotFlipCount % 2 === 0) ? isGoodRole(state.myRole) ? 'good' : 'evil' : isGoodRole(state.myRole) ? 'evil' : 'good';
+
   }
+
   return isGoodRole(state.myRole) ? 'good' : 'evil';
+
 }
+
+
 
 function getKnownLabel(idx) {
+
   return state.knownIdentities[idx] || null;
+
 }
+
+
 
 function getRoleOptions() {
+
   return [
+
     { value: '', label: '不明' },
+
     { value: '正方', label: '正方（通用）' },
+
     { value: '反方', label: '反方（通用）' },
+
     { value: '梅林', label: '梅林' },
+
     { value: '派西维尔', label: '派西维尔' },
+
     { value: '忠臣', label: '忠臣' },
+
     { value: '莫甘娜', label: '莫甘娜' },
+
     { value: '刺客', label: '刺客' },
+
     { value: '莫德雷德', label: '莫德雷德' },
+
     { value: '奥伯伦', label: '奥伯伦' },
+
     { value: '爪牙', label: '爪牙' },
+
     { value: '兰斯洛特(蓝)', label: '兰斯洛特(蓝)' },
+
     { value: '兰斯洛特(红)', label: '兰斯洛特(红)' }
+
   ];
+
 }
+
+
 
 /* ------- Tend Role Selector ------- */
+
 function setTendRole(role) {
+
   state.myRole = role;
+
   state.knownIdentities[state.selfIndex] = role;
+
   renderTendRoleSelector();
+
   renderTendPerspective();
+
   renderKnownIdentityGrid();
+
   renderTendResult();
+
 }
+
 function clearTendRole() {
+
   state.myRole = null;
+
   delete state.knownIdentities[state.selfIndex];
+
   renderTendRoleSelector();
+
   renderTendPerspective();
+
   renderKnownIdentityGrid();
+
   renderTendResult();
+
 }
+
 function renderTendRoleSelector() {
+
   var grid = document.getElementById('tend-role-grid');
+
   var card = document.getElementById('tend-role-card');
+
   if (!grid || !card) return;
+
   var h = '';
+
   if (state.myRole) {
+
     h += '<div style="display:flex;align-items:center;gap:8px">';
+
     h += '<span style="font-size:14px;font-weight:600;color:var(--gold-light)">当前身份：' + escapeHtml(state.myRole) + '</span>';
+
     h += '<button class="btn tiny" onclick="clearTendRole()">清除</button>';
+
     h += '</div>';
+
   }
+
   h += '<select onchange="setTendRole(this.value)" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.25);background:var(--parchment);color:var(--text);font-size:15px;cursor:pointer;min-height:44px;margin-top:6px">';
+
   h += '<option value="">-- 选择身份 --</option>';
+
   for (var j = 0; j < ALL_ROLES.length; j++) {
+
     var r = ALL_ROLES[j];
+
     var sel = state.myRole === r ? ' selected' : '';
+
     h += '<option value="' + r + '"' + sel + '>' + r + '</option>';
+
   }
+
   h += '</select>';
+
   grid.innerHTML = h;
+
 }
+
+
 
 /* ------- Perspective header ------- */
+
 function renderTendPerspective() {
+
   var persp = getPerspective();
+
   var titleEl = document.getElementById('tend-perspective-title');
+
   var descEl = document.getElementById('tend-perspective-desc');
 
+
+
   if (!state.myRole) {
+
     titleEl.textContent = '倾向分析';
+
     descEl.textContent = '请在上方「我的身份」卡片中选择你的角色';
+
     return;
+
   }
+
+
 
   if (persp === 'good') {
+
     titleEl.textContent = '好人视角：寻找反方';
+
     descEl.textContent = '你当前身份是「' + state.myRole + '」，正在分析其他玩家是反方的概率';
+
   } else {
+
     titleEl.textContent = '反方视角：寻找梅林';
+
     descEl.textContent = '你当前身份是「' + state.myRole + '」，正在分析其他玩家是梅林的概率';
+
   }
+
 }
+
+
 
 /* ------- Known identity grid ------- */
+
 function renderKnownIdentityGrid() {
+
   var el = document.getElementById('known-identity-grid');
+
   var opts = getRoleOptions();
+
   var h = '<div class="known-identity-row">';
 
+
+
   for (var i = 0; i < state.playerCount; i++) {
+
     if (i === state.selfIndex) continue;
+
     var cur = state.knownIdentities[i] || '';
+
     h += '<div class="known-item">';
+
     h += '<span class="known-name">' + escapeHtml(state.playerNames[i]) + '</span>';
+
     h += '<select class="known-select" onchange="setKnownIdentity(' + i + ', this.value)"' +
+
          ' id="known-sel-' + i + '">';
+
     for (var j = 0; j < opts.length; j++) {
+
       h += '<option value="' + opts[j].value + '"' + (opts[j].value === cur ? ' selected' : '') + '>' +
+
            opts[j].label + '</option>';
+
     }
+
     h += '</select>';
+
     h += '</div>';
+
   }
+
+
 
   h += '</div>';
+
   el.innerHTML = h;
+
 }
+
+
 
 function setKnownIdentity(idx, value) {
+
   if (value === '') {
+
     delete state.knownIdentities[idx];
+
   } else {
+
     state.knownIdentities[idx] = value;
+
   }
+
   renderTendResult();
+
 }
+
+
 
 function buildTendScoreCacheKey() {
+
   var missionSig = (state.missions || []).map(function(m) {
+
     return {
+
       r: m.round,
+
       s: m.size,
+
       ld: m.leader,
+
       t: m.team,
+
       v: m.votes,
+
       res: m.result,
+
       fc: m.failCount,
+
       lf: m.launchFailures
+
     };
+
   });
+
   return JSON.stringify({
+
     pc: state.playerCount,
+
     names: state.playerNames,
+
     self: state.selfIndex,
+
     role: state.myRole,
+
     known: state.knownIdentities,
+
     lady: state.ladyLakeChecks,
+
     ex: state.excaliburHistory,
+
     lanc: state.lancelotFlipped,
+
     missions: missionSig
+
   });
+
 }
+
+
 
 function cloneTendScoreList(list) {
+
   if (!list) return null;
+
   var cloned = list.map(function(item) {
+
     return {
+
       idx: item.idx,
+
       score: item.score,
+
       evidence: (item.evidence || []).slice()
+
     };
+
   });
+
   cloned._dataQuality = list._dataQuality;
+
   cloned._totalRounds = list._totalRounds;
+
   return cloned;
+
 }
 
+
+
 /* ------- Scoring engine ------- */
+
 /* ---------- v7 Progressive Evidence-Accumulation Scoring Engine ---------- */
+
 function computeSuspectScores() {
+
   var cacheKey = buildTendScoreCacheKey();
+
   if (_tendScoreCacheKey === cacheKey && _tendScoreCacheValue) {
+
     return cloneTendScoreList(_tendScoreCacheValue);
+
   }
+
+
 
   var pc = state.playerCount;
+
   var persp = getPerspective();
+
   var selfIdx = state.selfIndex;
 
+
+
   // Evidence accumulation: good_ev / evil_ev with 10/10 smooth prior
+
   var ev = {};
+
   for (var i = 0; i < pc; i++) {
+
     if (i === selfIdx) {
+
       ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
+
       var _myPersp = getPerspective();
+
       if (_myPersp === 'good') {
+
         ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
+
         ev[i].lockReason = '自己（' + state.myRole + '）';
+
         ev[i].reasons.push(ev[i].lockReason);
+
       } else if (_myPersp === 'evil') {
+
         ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
+
         ev[i].lockReason = '自己（' + state.myRole + '）';
+
         ev[i].reasons.push(ev[i].lockReason);
+
       }
+
       continue;
+
     }
+
     ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
+
   }
+
+
 
   var knownIdentities = state.knownIdentities || {};
 
+
+
   // Step 1: Lock known identities (hard anchors)
+
   for (var i = 0; i < pc; i++) {
+
     if (i === selfIdx) continue;  // self handled above
+
     var label = knownIdentities[i];
+
     if (!label) continue;
+
     if (isGoodRole(label) || label === '正方' || label === '好人') {
+
       ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
+
       ev[i].lockReason = '已知：' + label;
+
       ev[i].reasons.push('已知正派：' + label);
+
       if (label === '梅林') ev[i].merlin = 100;
+
     } else if (isEvilRole(label) || label === '反方' || label === '坏人') {
+
       ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
+
       ev[i].lockReason = '已知：' + label;
+
       ev[i].reasons.push('已知反派：' + label);
+
     }
+
   }
 
+
+
   // Step 2: Lady of the Lake checks (strong signal, non-locking)
+
   var ladyChecks = state.ladyLakeChecks || [];
+
   for (var c = 0; c < ladyChecks.length; c++) {
+
     var check = ladyChecks[c];
+
     var target = check.target;
+
     if (target === undefined || target === selfIdx) continue;
+
     if (!ev[target] || ev[target].locked) continue;
+
     if (check.result === 'good') {
+
       ev[target].good_ev += 20;
+
       ev[target].reasons.push('湖中仙女：' + (state.playerNames[target] || '') + '为好 +20');
+
     } else if (check.result === 'evil') {
+
       ev[target].evil_ev += 20;
+
       ev[target].reasons.push('湖中仙女：' + (state.playerNames[target] || '') + '为坏 +20');
+
     }
+
   }
+
+
+
 
 
   // Step 2B: 王者之剑声明类证据
+
   var exHistory = state.excaliburHistory || [];
+
   for (var exi = 0; exi < exHistory.length; exi++) {
+
     var ex = exHistory[exi];
+
     if (!ex || ex.used !== true || ex.holder === undefined || ex.holder < 0) continue;
+
     var holder = ex.holder;
+
     var target = ex.target;
+
     var dir = ex.claimedDirection || '';
+
     if (ev[holder] && !ev[holder].locked) {
+
       if (!ex.feedbackRecorded) {
+
         ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用，待反馈；该轮任务权重降低');
+
       } else if (dir === 'fail_to_success') {
+
         ev[holder].good_ev += 10;
+
         ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑声明：失败→成功，持剑者好人证据 +10');
+
       } else if (dir === 'success_to_fail') {
+
         ev[holder].evil_ev += 15;
+
         ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑声明：成功→失败，持剑者坏人证据 +15');
+
       } else if (dir === 'unknown') {
+
         ev[holder].evil_ev += 4;
+
         ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用但未说明方向 +4');
+
       } else if (dir === 'refused') {
+
         ev[holder].evil_ev += 5;
+
         ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用但拒绝说明 +5');
+
       }
+
     }
+
     if (target !== null && target !== undefined && ev[target] && !ev[target].locked && ex.feedbackRecorded) {
+
       if (dir === 'fail_to_success') {
+
         ev[target].evil_ev += 8;
+
         ev[target].reasons.push('R' + (ex.round + 1) + '王者之剑声明：目标原为失败牌 +8');
+
       } else if (dir === 'success_to_fail') {
+
         ev[target].good_ev += 6;
+
         ev[target].reasons.push('R' + (ex.round + 1) + '王者之剑声明：目标原为成功牌，好人也可能被改成失败 +6');
+
       }
+
     }
+
   }
+
+
 
   // Step 3: Task result hard constraints (with round recency decay & dual-fail detection)
+
   var missions = state.missions || [];
+
   var completed = [];
+
   for (var m = 0; m < missions.length; m++) {
+
     if (missions[m].result) completed.push(missions[m]);
+
   }
+
   var totalRounds = completed.length;
 
+
+
   // Collect known evils/goods for constraint propagation
+
   var knownEvils = [];
+
   var knownGoods = [];
+
   for (var i = 0; i < pc; i++) {
+
     if (i === selfIdx) continue;
+
     if (ev[i].locked) {
+
       if (ev[i].evil_ev === 100) knownEvils.push(i);
+
       if (ev[i].good_ev === 100) knownGoods.push(i);
+
     }
+
   }
+
+
 
   function roundRecency(r, total) {
+
     if (total <= 2) return r === 0 ? 0.95 : 1.0;
+
     return [0.7, 0.85, 1.0, 1.0, 1.0][Math.min(r, 4)] || 1.0;
+
   }
 
+
+
   for (var r = 0; r < completed.length; r++) {
+
     var m = completed[r];
+
     var team = m.team || [];
+
     var resultStr = m.result;
+
     var teamSize = team.length;
+
     var failCount = m.failCount || 0;
+
     var recency = roundRecency(r, totalRounds);
+
     var exRoundRec = getExcaliburRecord(m.round != null ? m.round : r);
+
     if (exRoundRec && exRoundRec.used === true) recency *= 0.7;
 
+
+
     var knownEvilInTeam = [];
+
     var unknownInTeam = [];
+
     for (var t = 0; t < team.length; t++) {
+
       var ti = team[t];
+
       if (ti === selfIdx) continue;
+
       if (ev[ti] && ev[ti].locked && ev[ti].evil_ev === 100) knownEvilInTeam.push(ti);
+
       else if (ev[ti] && !ev[ti].locked) unknownInTeam.push(ti);
+
     }
+
+
 
     if (resultStr === 'fail') {
+
       if (knownEvilInTeam.length > 0) {
+
         for (var u = 0; u < unknownInTeam.length; u++) {
+
           ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '失败(有已知坏人，不罚)');
+
         }
+
       } else if (unknownInTeam.length === 1) {
+
         ev[unknownInTeam[0]].evil_ev += Math.floor(40 * recency);
+
         ev[unknownInTeam[0]].reasons.push('R' + (r+1) + '失败，唯一未知者 +' + Math.floor(40 * recency));
+
       } else if (unknownInTeam.length > 1) {
+
         var share, note;
+
         if (teamSize >= 5 && failCount >= 2) {
+
           share = Math.floor(80 * recency / unknownInTeam.length);
+
           note = '至少2坏人';
+
         } else {
+
           share = Math.floor(60 * recency / unknownInTeam.length);
+
           note = '必有坏人';
+
         }
+
         for (var u = 0; u < unknownInTeam.length; u++) {
+
           ev[unknownInTeam[u]].evil_ev += share;
+
           ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '失败(' + note + ') +' + share);
+
         }
+
       }
+
     }
+
+
 
     if (resultStr === 'success') {
+
       var addGood = knownEvilInTeam.length > 0 ? Math.floor(4 * recency) : Math.floor(6 * recency);
+
       var suffix = knownEvilInTeam.length > 0 ? '(有坏人伪装)' : '';
+
       for (var u = 0; u < unknownInTeam.length; u++) {
+
         ev[unknownInTeam[u]].good_ev += addGood;
+
         ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '成功' + suffix + ' +' + addGood);
+
       }
+
     }
+
   }
+
+
 
   // Step 4: Multi-round cross analysis (adaptive threshold)
+
   var failCountMap = {};
+
   var successCountMap = {};
+
   for (var i = 0; i < pc; i++) { failCountMap[i] = 0; successCountMap[i] = 0; }
+
   for (var r = 0; r < completed.length; r++) {
+
     var m = completed[r];
+
     var team = m.team || [];
+
     if (m.result === 'fail') {
+
       for (var t = 0; t < team.length; t++) failCountMap[team[t]]++;
+
     } else {
+
       for (var t = 0; t < team.length; t++) successCountMap[team[t]]++;
+
     }
+
   }
+
+
 
   var failThreshold = totalRounds <= 2 ? 1 : 2;
+
   var successThreshold = totalRounds <= 2 ? 2 : 3;
 
+
+
   for (var i = 0; i < pc; i++) {
+
     if (i === selfIdx || ev[i].locked) continue;
+
     if (failCountMap[i] >= failThreshold) {
+
       var failRoundsWithKnownEvil = 0;
+
       for (var r = 0; r < completed.length; r++) {
+
         var m = completed[r];
+
         if (m.result !== 'fail') continue;
+
         var team = m.team || [];
+
         if (team.indexOf(i) === -1) continue;
+
         var hasKnownEvil = false;
+
         for (var t = 0; t < team.length; t++) {
+
           if (ev[team[t]] && ev[team[t]].locked && ev[team[t]].evil_ev === 100) { hasKnownEvil = true; break; }
+
         }
+
         if (hasKnownEvil) failRoundsWithKnownEvil++;
+
       }
+
       if (failRoundsWithKnownEvil < failCountMap[i]) {
+
         var weight = totalRounds >= 3 ? 12 : 8;
+
         ev[i].evil_ev += weight;
+
         ev[i].reasons.push(failCountMap[i] + '轮失败 +' + weight);
+
       }
+
     }
+
     if (successCountMap[i] >= successThreshold) {
+
       ev[i].good_ev += 8;
+
       ev[i].reasons.push(successCountMap[i] + '轮成功 +8');
+
     }
+
   }
+
+
 
   // Step 5: Launch failure analysis
+
   var leaderLaunchFails = {};
+
   for (var r = 0; r < completed.length; r++) {
+
     var m = completed[r];
+
     var leader = m.leader;
+
     var lf = m.launchFailures || 0;
+
     if (!leader || lf <= 0) continue;
+
     try {
+
       var leaderIdx = parseInt(leader.split('号')[0]) - 1;
+
       leaderLaunchFails[leaderIdx] = (leaderLaunchFails[leaderIdx] || 0) + lf;
+
     } catch(e) {}
+
   }
+
   for (var i in leaderLaunchFails) {
+
     i = parseInt(i);
+
     if (i === selfIdx || !ev[i] || ev[i].locked) continue;
+
     if (leaderLaunchFails[i] >= 3) {
+
       ev[i].evil_ev += 3;
+
       ev[i].reasons.push('累计' + leaderLaunchFails[i] + '次发车失败 +3');
+
     }
+
   }
+
+
 
   // Step 6: Voting analysis (skip unanimous rounds, adaptive min votes)
+
   for (var i = 0; i < pc; i++) {
+
     if (i === selfIdx || ev[i].locked) continue;
+
     var evilMatch = 0, evilTotal = 0;
+
     var goodMatch = 0, goodTotal = 0;
 
+
+
     for (var r = 0; r < completed.length; r++) {
+
       var m = completed[r];
+
       if (!m.votes) continue;
+
       var iVote = m.votes[i];
+
       if (!iVote) continue;
 
+
+
       // Skip unanimous rounds
+
       var allEvilVotes = [];
+
       for (var e = 0; e < knownEvils.length; e++) {
+
         var evv = m.votes[knownEvils[e]];
+
         if (evv) allEvilVotes.push(evv);
+
       }
+
       if (allEvilVotes.length >= 2 && allEvilVotes.every(function(v) { return v === allEvilVotes[0]; })) continue;
 
+
+
       var allGoodVotes = [];
+
       for (var g = 0; g < knownGoods.length; g++) {
+
         var gvv = m.votes[knownGoods[g]];
+
         if (gvv) allGoodVotes.push(gvv);
+
       }
+
       if (allGoodVotes.length >= 2 && allGoodVotes.every(function(v) { return v === allGoodVotes[0]; })) continue;
 
+
+
       for (var e = 0; e < knownEvils.length; e++) {
+
         var eVote = m.votes[knownEvils[e]];
+
         if (eVote) { evilTotal++; if (iVote === eVote) evilMatch++; }
+
       }
+
       for (var g = 0; g < knownGoods.length; g++) {
+
         var gVote = m.votes[knownGoods[g]];
+
         if (gVote) { goodTotal++; if (iVote === gVote) goodMatch++; }
+
       }
+
     }
+
+
 
     var totalKnown = knownEvils.length + knownGoods.length;
+
     var minVotes = totalRounds <= 2 ? Math.min(3, Math.floor(totalRounds * totalKnown / 2)) : 3;
+
     if (evilTotal >= minVotes) {
+
       var rate = evilMatch / evilTotal;
+
       if (rate > 0.75) {
+
         ev[i].evil_ev += 12;
+
         ev[i].reasons.push('投票与坏人一致' + Math.round(rate*100) + '% +12');
+
       }
+
     }
+
     if (goodTotal >= minVotes) {
+
       var rate = goodMatch / goodTotal;
+
       if (rate > 0.7) {
+
         ev[i].good_ev += 10;
+
         ev[i].reasons.push('投票与好人一致' + Math.round(rate*100) + '% +10');
+
       }
+
     }
+
   }
+
+
 
   // Step 7: Merlin hunting (evil perspective only)
+
   if (persp === 'evil' && knownEvils.length > 0 && totalRounds >= 2) {
+
     for (var i = 0; i < pc; i++) {
+
       if (i === selfIdx || ev[i].locked) continue;
+
       var evilInReject = 0, evilInTotal = 0;
+
       var noEvilReject = 0, noEvilTotal = 0;
+
       for (var r = 0; r < completed.length; r++) {
+
         var m = completed[r];
+
         if (!m.votes || !m.team) continue;
+
         var team = m.team || [];
+
         var hasEvil = false;
+
         for (var t = 0; t < team.length; t++) {
+
           if (knownEvils.indexOf(team[t]) !== -1) { hasEvil = true; break; }
+
         }
+
         var iVote = m.votes[i];
+
         if (!iVote) continue;
+
         if (hasEvil) {
+
           evilInTotal++;
+
           if (iVote === 'reject') evilInReject++;
+
         } else {
+
           noEvilTotal++;
+
           if (iVote === 'reject') noEvilReject++;
+
         }
+
       }
+
       if (evilInTotal >= 2) {
+
         var rateWhen = evilInReject / evilInTotal;
+
         var rateNo = noEvilTotal > 0 ? noEvilReject / noEvilTotal : 0;
+
         ev[i].merlin = Math.max(0, Math.min(95, (rateWhen - rateNo) * 100 + 10));
+
       }
+
     }
+
   }
+
+
 
   // Step 8: Lancelot flip awareness
+
   var lancelotFlipped = state.lancelotFlipped;
+
   if (lancelotFlipped) {
+
     for (var i = 0; i < pc; i++) {
+
       if (i === selfIdx || !ev[i] || ev[i].locked) continue;
+
       var label = knownIdentities[i] || '';
+
       if (label === '兰斯洛特' || label === '兰斯洛特(蓝)' || label === '兰斯洛特(红)' || label === '蓝兰斯洛特' || label === '红兰斯洛特') {
+
         ev[i].good_ev = Math.floor((ev[i].good_ev - 10) * 0.5 + 10);
+
         ev[i].evil_ev = Math.floor((ev[i].evil_ev - 10) * 0.5 + 10);
+
         ev[i].reasons.push('兰斯洛特已翻转，信号减半');
+
       }
+
     }
+
   }
+
+
 
   // Step 9: Convert to scores
+
   var list = [];
+
   for (var i = 0; i < pc; i++) {
+
     var e = ev[i];
+
     var score;
+
     if (e.locked) {
+
       if (persp === 'evil') {
+
         // Evil perspective: locked evil = 0, locked good = 0 (not Merlin target), locked Merlin = 100
+
         score = (e.merlin === 100) ? 100 : 0;
+
       } else {
+
         score = e.evil_ev; // 0 or 100
+
       }
+
     } else {
+
       if (persp === 'evil') {
+
         // Evil perspective: use merlin hunting score, fall back to good probability
+
         if (e.merlin > 0) {
+
           score = e.merlin;
+
         } else {
+
           var total = e.good_ev + e.evil_ev;
+
           score = total > 0 ? Math.round(e.good_ev / total * 100) : 50;
+
         }
+
       } else {
+
         var total = e.good_ev + e.evil_ev;
+
         score = total > 0 ? Math.round(e.evil_ev / total * 100) : 50;
+
       }
+
     }
 
+
+
     list.push({
+
       idx: i,
+
       score: score,
+
       evidence: e.reasons
+
     });
+
   }
+
+
 
   list.sort(function(a, b) { return b.score - a.score; });
 
+
+
   // Attach data quality metadata for progressive rendering
+
   list._dataQuality = totalRounds <= 1 ? 'low' : (totalRounds === 2 ? 'medium' : 'high');
+
   list._totalRounds = totalRounds;
 
+
+
   _tendScoreCacheKey = cacheKey;
+
   _tendScoreCacheValue = cloneTendScoreList(list);
+
   return cloneTendScoreList(list);
+
 }
 
+
+
 /* ------- v7 Historical Record Analysis ------- */
+
 var _v7DetailRec = null;
+
 var _v7DetailHistIdx = -1;
 
+
+
 function computeRecordSuspectScores(rec, perspIdx) {
+
   var pc = rec.playerCount;
+
   if (perspIdx < 0 || perspIdx >= pc) return null;
+
   if (!rec.missions || rec.missions.length === 0) return null;
 
+
+
   // Build name-to-index lookup
+
   var nameToIdx = {};
+
   for (var i = 0; i < rec.identities.length; i++) {
+
     var id = rec.identities[i];
+
     nameToIdx[id.name] = id.index;
+
     nameToIdx[(id.index + 1) + '号'] = id.index;
+
   }
+
+
 
   function labelToIdx(label) {
+
     if (typeof label === 'number') return label;
+
     if (nameToIdx[label] !== undefined) return nameToIdx[label];
+
     var m = String(label).match(/^(\d+)号$/);
+
     return m ? parseInt(m[1]) - 1 : -1;
+
   }
 
+
+
   function convertVotes(nameVotes) {
+
     var idxVotes = {};
+
     for (var key in nameVotes) {
+
       if (nameVotes.hasOwnProperty(key)) {
+
         var idx = labelToIdx(key);
+
         if (idx >= 0 && idx < pc) idxVotes[idx] = nameVotes[key];
+
       }
+
     }
+
     return idxVotes;
+
   }
+
+
 
   var savedState = window.state;
 
+
+
   var tmpState = {
+
     playerCount: pc,
+
     selfIndex: perspIdx,
+
     myRole: rec.identities[perspIdx].role,
+
     playerNames: rec.identities.map(function(id) { return id.name; }),
+
     knownIdentities: {},
+
     ladyLakeChecks: (rec.ladyCheckHistory || []).map(function(h) {
+
       return { holder: h.holder, target: h.target, result: h.result };
+
     }),
+
     excaliburHistory: (rec.excaliburHistory || []).map(function(e) {
+
       return {
+
         round: e.round, leader: e.leader, holder: e.holder,
+
         used: e.used, target: e.target, feedbackRecorded: e.feedbackRecorded,
+
         claimedDirection: e.claimedDirection || ''
+
       };
+
     }),
+
     missions: (rec.missions || []).map(function(m) {
+
       return {
+
         round: m.round, size: m.size,
+
         leader: labelToIdx(m.leader),
+
         team: (m.team || []).map(function(t) { return labelToIdx(t); }),
+
         result: m.result, failCount: m.failCount || 0,
+
         launchFailures: m.launchFailures || 0,
+
         votes: convertVotes(m.votes || {}),
+
         launchAttempts: (m.launchAttempts || []).map(function(att) {
+
           return {
+
             team: (att.team || []).map(function(t) { return labelToIdx(t); }),
+
             votes: convertVotes(att.votes || {}),
+
             leader: labelToIdx(att.leader)
+
           };
+
         })
+
       };
+
     }),
+
     lancelotFlipped: false,
+
     lancelotFlipCount: 0
+
   };
 
+
+
   // Only the perspective player knows their own role
+
   tmpState.knownIdentities[perspIdx] = rec.identities[perspIdx].role;
 
+
+
   // Handle Lancelot flip for perspective player
+
   var perspRole = rec.identities[perspIdx].role;
+
   if (perspRole.indexOf('兰斯洛特') >= 0 && rec.lancelotFlips) {
+
     var name = rec.identities[perspIdx].name;
+
     tmpState.lancelotFlipCount = rec.lancelotFlips[name] || 0;
+
     tmpState.lancelotFlipped = tmpState.lancelotFlipCount % 2 === 1;
+
   }
+
+
 
   // Clear cache so we get fresh computation
+
   _tendScoreCacheKey = '';
+
   _tendScoreCacheValue = null;
 
+
+
   window.state = tmpState;
+
   try {
+
     return computeSuspectScores();
+
   } finally {
+
     window.state = savedState;
+
   }
+
 }
 
+
+
 function refreshV7DetailAnalysis() {
+
   if (!_v7DetailRec) return;
+
   var selEl = document.getElementById('v7-detail-persp');
+
   if (!selEl) return;
+
   var sel = parseInt(selEl.value);
 
+
+
   // Use stored scores if available
+
   var scores = null;
+
   if (_v7DetailRec.v7Scores && _v7DetailRec.v7Scores[sel]) {
+
     scores = _v7DetailRec.v7Scores[sel].scores;
+
     scores._dataQuality = _v7DetailRec.v7Scores[sel].quality;
+
     scores._totalRounds = _v7DetailRec.v7Scores[sel].totalRounds || 0;
+
   } else {
+
     scores = computeRecordSuspectScores(_v7DetailRec, sel);
+
   }
+
+
 
   var t = document.getElementById('v7-detail-table');
+
   if (!t) return;
 
+
+
   if (!scores || scores.length === 0) {
+
     t.innerHTML = '<p style="color:var(--text-dim);font-size:11px;padding:8px">该视角下暂无足够数据进行分析</p>';
+
     return;
+
   }
+
+
 
   var perspRole = _v7DetailRec.identities[sel].role;
+
   var isGoodPersp = (perspRole.indexOf('梅林') >= 0 || perspRole === '派西维尔' || perspRole === '忠臣' || perspRole === '兰斯洛特(蓝)');
 
+
+
   var quality = scores._dataQuality || 'unknown';
+
   var totalRounds = scores._totalRounds || 0;
+
   var qualityNote = '';
+
   if (quality === 'low') qualityNote = ' <span style="font-size:10px;color:#ff9800">（数据不足，谨慎参考）</span>';
+
   else if (quality === 'medium') qualityNote = ' <span style="font-size:10px;color:#ffc107">（中等置信度）</span>';
+
   else if (quality === 'high') qualityNote = ' <span style="font-size:10px;color:#4caf50">（高置信度）</span>';
 
+
+
   var h = '<p style="font-size:10px;color:var(--text-dim);margin-bottom:4px">';
+
   if (isGoodPersp) {
+
     h += '好人视角 · 分数越高 = 反方嫌疑越大' + qualityNote;
+
   } else {
+
     h += '反方视角 · 分数越高 = 梅林概率越大' + qualityNote;
+
   }
+
   h += '</p>';
 
+
+
   h += '<table style="font-size:11px;width:100%;border-collapse:collapse">';
+
   h += '<tr style="border-bottom:1px solid var(--border)"><th style="padding:2px 4px;text-align:left">玩家</th><th style="padding:2px 4px;text-align:center;width:60px">v7评分</th><th style="padding:2px 4px;text-align:left">证据链</th></tr>';
+
   for (var i = 0; i < scores.length; i++) {
+
     var item = scores[i];
+
     var realRole = _v7DetailRec.identities[item.idx].role;
+
     var isGoodReal = (realRole.indexOf('梅林') >= 0 || realRole === '派西维尔' || realRole === '忠臣' || realRole === '兰斯洛特(蓝)');
+
     var isEvilReal = (realRole === '莫甘娜' || realRole === '刺客' || realRole === '莫德雷德' || realRole === '奥伯伦' || realRole === '爪牙' || realRole === '兰斯洛特(红)');
 
+
+
     var isAccurate = false;
+
     if (isGoodPersp) {
+
       isAccurate = (isGoodReal && item.score < 50) || (isEvilReal && item.score >= 50);
+
     } else {
+
       isAccurate = (realRole === '梅林' && item.score >= 50) || (realRole !== '梅林' && item.score < 50);
+
     }
+
     var badge = isAccurate ? '<span style="color:#4caf50" title="判断正确">✓</span>' : '<span style="color:#f44336" title="判断偏差">✗</span>';
 
+
+
     var scoreColor = item.score >= 65 ? 'var(--red-bright)' : item.score < 40 ? 'var(--green-bright)' : 'var(--gold-light)';
+
     var isSelf = item.idx === sel;
+
     var selfTag = isSelf ? ' <span style="font-size:9px;color:var(--gold-light)">☆</span>' : '';
+
+
 
     var evidenceHtml = item.evidence.length > 0 ? item.evidence.map(function(ev) { return escapeHtml(ev); }).join('<br>') : '<span style="color:var(--text-dim)">（无证据，默认中性）</span>';
 
+
+
     h += '<tr style="border-bottom:1px solid var(--border)">';
+
     h += '<td style="padding:2px 4px;font-weight:600;white-space:nowrap">' + (item.idx + 1) + '号 ' + _v7DetailRec.identities[item.idx].name + selfTag + ' ' + badge + ' <span style="font-size:10px;color:var(--text-dim)">(' + realRole + ')</span></td>';
+
     h += '<td style="padding:2px 4px;text-align:center;font-weight:700;color:' + scoreColor + '">' + item.score + '</td>';
+
     h += '<td style="padding:2px 4px;font-size:10px;color:var(--text-dim)">' + evidenceHtml + '</td>';
+
     h += '</tr>';
+
   }
+
   h += '</table>';
 
+
+
   var accCount = 0;
+
   for (var i = 0; i < scores.length; i++) {
+
     var item = scores[i];
+
     if (item.idx === sel) continue;
+
     var rRole = _v7DetailRec.identities[item.idx].role;
+
     var rGood = (rRole.indexOf('梅林') >= 0 || rRole === '派西维尔' || rRole === '忠臣' || rRole === '兰斯洛特(蓝)');
+
     var rEvil = (rRole === '莫甘娜' || rRole === '刺客' || rRole === '莫德雷德' || rRole === '奥伯伦' || rRole === '爪牙' || rRole === '兰斯洛特(红)');
+
     if (isGoodPersp) {
+
       if ((rGood && item.score < 50) || (rEvil && item.score >= 50)) accCount++;
+
     } else {
+
       if ((rRole === '梅林' && item.score >= 50) || (rRole !== '梅林' && item.score < 50)) accCount++;
+
     }
+
   }
+
   var totalJudged = pc - 1;
+
   var accPct = totalJudged > 0 ? Math.round(accCount / totalJudged * 100) : 0;
+
   h += '<p style="font-size:10px;color:var(--text-dim);margin-top:4px">准确率：' + accCount + '/' + totalJudged + '（' + accPct + '%）</p>';
 
+
+
   t.innerHTML = h;
+
 }
+
+
 
 function saveV7AnalysisToHistory() {
+
   if (!_v7DetailRec || _v7DetailHistIdx < 0) return;
+
   var history = loadHistory();
+
   var v2 = history[_v7DetailHistIdx];
+
   if (!v2) return;
+
   var rec = normalizeRecord(v2);
 
+
+
   var v7Scores = {};
+
   var totalPersp = rec.playerCount;
+
   for (var p = 0; p < totalPersp; p++) {
+
     var scores = computeRecordSuspectScores(rec, p);
+
     if (!scores || scores.length === 0) continue;
+
     v7Scores[p] = {
+
       scores: scores.map(function(s) { return { idx: s.idx, score: s.score, evidence: s.evidence }; }),
+
       quality: scores._dataQuality || 'unknown',
+
       totalRounds: scores._totalRounds || 0,
+
       savedAt: _bjTimestamp()
+
     };
+
   }
+
+
 
   v2.v7s = v7Scores;
+
   // Persist
+
   var raw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
+
   raw[_v7DetailHistIdx].v7s = v7Scores;
+
   localStorage.setItem('avalon_history_v2', JSON.stringify(raw));
+
   _historyRawCache = null;
+
   _normalizedHistoryRawCache = null;
+
   _normalizedHistoryCache = null;
 
+
+
   _v7DetailRec.v7Scores = v7Scores;
+
   toast('v7分析已保存到历史记录（' + totalPersp + '个视角）', 'ok');
+
   refreshV7DetailAnalysis();
+
 }
+
+
 
 /* ------- v7 Engine Info Panel (v102: 9-step visualizer) ------- */
+
 function renderV7EngineInfo() {
+
   var statusEl = document.getElementById('v7-engine-status');
+
   var stepsEl = document.getElementById('v7-engine-steps');
+
   if (!statusEl || !stepsEl) return;
 
+
+
   var pc = state.playerCount;
+
   var persp = getPerspective();
+
   var selfIdx = state.selfIndex;
+
   var missions = state.missions || [];
+
   var completed = [];
+
   for (var m = 0; m < missions.length; m++) {
+
     if (missions[m].result) completed.push(missions[m]);
+
   }
+
   var totalRounds = completed.length;
+
   var knownIdentities = state.knownIdentities || {};
+
   var knownCount = Object.keys(knownIdentities).length;
 
+
+
   // === 全局状态 ===
+
   var perspText = persp === 'good'
+
     ? '<span style="color:#4caf50">好人视角</span>（找反方）'
+
     : (persp === 'evil' ? '<span style="color:#f44336">反方视角</span>（找梅林）' : '<span style="color:var(--text-dim)">未设置</span>');
+
   var quality = totalRounds <= 1 ? '<span class="warn">低（仅' + totalRounds + '轮）</span>'
+
               : (totalRounds === 2 ? '<span class="warn">中（2轮）</span>'
+
               : '<span class="ok">高（' + totalRounds + '轮）</span>');
 
+
+
   statusEl.innerHTML =
+
     '<span class="v7-stat">视角：<strong>' + perspText + '</strong></span>' +
+
     '<span class="v7-stat">已完成：<strong>' + totalRounds + ' / ' + (missions.length || 5) + ' 轮</strong></span>' +
+
     '<span class="v7-stat">数据置信度：<strong>' + quality + '</strong></span>' +
+
     '<span class="v7-stat">已知身份锚点：<strong>' + knownCount + ' 人</strong></span>';
 
+
+
   // === 计算各步骤激活情况 ===
+
   // Step 1: 已知身份锁定
+
   var lockedGood = 0, lockedEvil = 0;
+
   for (var k in knownIdentities) {
+
     var lab = knownIdentities[k];
+
     if (isGoodRole(lab) || lab === '正方' || lab === '好人') lockedGood++;
+
     else if (isEvilRole(lab) || lab === '反方' || lab === '坏人') lockedEvil++;
+
   }
+
+
 
   // Step 2: 声明类信息（湖中女神 / 王者之剑）
+
   var ladyChecks = (state.ladyLakeChecks || []).filter(function(c){ return c && c.target !== undefined && c.target !== selfIdx; });
+
   var exTotal = (state.excaliburHistory || []).length;
+
   var exUsed = (state.excaliburHistory || []).filter(function(e){ return e && e.used === true; }).length;
+
   var exPending = (state.excaliburHistory || []).filter(function(e){ return e && e.used === true && !e.feedbackRecorded; }).length;
 
+
+
   // Step 3: 任务结果硬约束
+
   var failRounds = 0, succRounds = 0, dualFail = 0;
+
   for (var r = 0; r < completed.length; r++) {
+
     if (completed[r].result === 'fail') {
+
       failRounds++;
+
       if ((completed[r].team || []).length >= 5 && (completed[r].failCount || 0) >= 2) dualFail++;
+
     } else if (completed[r].result === 'success') succRounds++;
+
   }
+
   var recencyText = totalRounds <= 2 ? 'R1×0.95' : 'R1×0.7 / R2×0.85 / R3+×1.0';
 
+
+
   // Step 4: 多轮交叉分析
+
   var failThreshold = totalRounds <= 2 ? 1 : 2;
+
   var successThreshold = totalRounds <= 2 ? 2 : 3;
+
   var crossActive = totalRounds >= 1;
 
+
+
   // Step 5: 发车失败
+
   var leaderLF = {};
+
   for (var r = 0; r < completed.length; r++) {
+
     var lf = completed[r].launchFailures || 0;
+
     var ld = completed[r].leader;
+
     if (!ld || lf <= 0) continue;
+
     try {
+
       var li = parseInt(ld.split('号')[0]) - 1;
+
       leaderLF[li] = (leaderLF[li] || 0) + lf;
+
     } catch(e) {}
+
   }
+
   var lfTriggered = 0;
+
   for (var li in leaderLF) if (leaderLF[li] >= 3) lfTriggered++;
+
   var lfTotal = 0;
+
   for (var li in leaderLF) lfTotal += leaderLF[li];
 
+
+
   // Step 6: 投票分析
+
   var voteRoundsHasData = 0;
+
   for (var r = 0; r < completed.length; r++) {
+
     if (completed[r].votes && Object.keys(completed[r].votes).length >= 2) voteRoundsHasData++;
+
   }
+
   var voteAnchorTotal = lockedGood + lockedEvil;
+
   var voteActive = voteRoundsHasData >= 1 && voteAnchorTotal >= 1;
 
+
+
   // Step 7: 梅林猎杀
+
   var merlinActive = persp === 'evil' && lockedEvil > 0 && totalRounds >= 2;
 
+
+
   // Step 8: 兰斯洛特翻转
+
   var lancFlipped = !!state.lancelotFlipped;
+
   var lancInGame = (state.activeRoles || []).some(function(r){ return r && r.indexOf('兰斯洛特') !== -1; });
 
+
+
   // Step 9: 始终运行
+
   // === 渲染 9 步 ===
+
   function step(num, name, active, meta) {
+
     var cls = active ? 'active' : (totalRounds === 0 ? 'idle' : 'idle');
+
     return '<div class="v7-step ' + cls + '">' +
+
       '<div class="v7-step-num">' + num + '</div>' +
+
       '<div class="v7-step-body">' +
+
       '<div class="v7-step-name">' + name + '</div>' +
+
       '<div class="v7-step-meta">' + meta + '</div>' +
+
       '</div></div>';
+
   }
+
+
 
   var s1Meta = knownCount > 0
+
     ? '<span class="ok">已锁定 ' + knownCount + ' 人</span>（好' + lockedGood + ' / 坏' + lockedEvil + '）硬锚点 0 或 100'
+
     : '<span>暂无标注</span>，可在下方「已知身份」标记';
 
+
+
   var s2Meta = '湖中女神声明 <span class="hl">' + ladyChecks.length + '</span> 次（±20）';
+
   s2Meta += '；王者之剑 <span class="hl">' + exTotal + '</span> 轮，已使用 <span class="hl">' + exUsed + '</span> 次';
+
   if (exPending > 0) s2Meta += '，<span class="warn">待反馈 ' + exPending + ' 次</span>';
+
   s2Meta += '；声明不等于事实';
 
+
+
   var s3Meta;
+
   if (totalRounds === 0) {
+
     s3Meta = '等待首轮任务，' + recencyText;
+
   } else {
+
     s3Meta = '失败 <span class="hl">' + failRounds + '</span> 轮 / 成功 <span class="hl">' + succRounds + '</span> 轮';
+
     if (dualFail > 0) s3Meta += '，<span class="warn">双失败 ' + dualFail + ' 轮</span>';
+
     s3Meta += '；衰减：' + recencyText;
+
   }
+
+
 
   var s4Meta = totalRounds === 0
+
     ? '待数据，门槛：失败≥' + failThreshold + ' / 成功≥' + successThreshold
+
     : '失败门槛 <span class="hl">≥' + failThreshold + '</span>，成功门槛 <span class="hl">≥' + successThreshold + '</span>（R1-2 自适应放宽）';
 
+
+
   var s5Meta = lfTotal === 0
+
     ? '<span>暂无发车失败</span>，触发门槛 ≥3 次'
+
     : (lfTriggered > 0
+
       ? '<span class="warn">已触发 ' + lfTriggered + ' 名队长</span>（累计 ' + lfTotal + ' 次） +3'
+
       : '累计 <span class="hl">' + lfTotal + '</span> 次未达门槛 (<3)');
 
+
+
   var s6Meta;
+
   if (!voteActive) {
+
     s6Meta = voteAnchorTotal === 0 ? '需先标注已知身份才能比对' : '等待投票数据';
+
   } else {
+
     s6Meta = '<span class="ok">' + voteRoundsHasData + ' 轮投票</span>，跳过全票一致；与坏人 >75%→+12，与好人 >70%→+10';
+
   }
+
+
 
   var s7Meta;
+
   if (persp !== 'evil') {
+
     s7Meta = '仅<span class="hl">反方视角</span>启用';
+
   } else if (lockedEvil === 0) {
+
     s7Meta = '需标注 ≥1 名已知坏人';
+
   } else if (totalRounds < 2) {
+
     s7Meta = '需 ≥2 轮数据';
+
   } else {
+
     s7Meta = '<span class="ok">运行中</span>：条件拒绝率差 = P(拒|含坏)-P(拒|无坏)';
+
   }
+
+
 
   var s8Meta;
+
   if (!lancInGame) {
+
     s8Meta = '本局未启用兰斯洛特';
+
   } else if (lancFlipped) {
+
     s8Meta = '<span class="warn">已翻转</span>，兰斯洛特玩家信号 <span class="hl">×0.5</span>';
+
   } else {
+
     s8Meta = '兰斯洛特<span>未翻转</span>，正常计分';
+
   }
+
+
 
   var s9Meta;
+
   if (totalRounds === 0) {
+
     s9Meta = '所有未知玩家分数：50（先验 10:10）';
+
   } else {
+
     s9Meta = '<span class="ok">分数 = 好人证据 / (好人+坏人证据) × 100</span>';
+
   }
 
+
+
   stepsEl.innerHTML =
+
     step(1, '已知身份锁定（硬锚点）', knownCount > 0, s1Meta) +
+
     step(2, '声明类信息（湖中女神 / 王者之剑）', ladyChecks.length > 0 || exTotal > 0, s2Meta) +
+
     step(3, '任务结果硬约束（轮次衰减+双失败）', totalRounds > 0, s3Meta) +
+
     step(4, '多轮交叉分析（自适应门槛）', crossActive && totalRounds > 0, s4Meta) +
+
     step(5, '发车失败分析（≥3 次）', lfTriggered > 0, s5Meta) +
+
     step(6, '投票行为分析（跳过全票一致）', voteActive, s6Meta) +
+
     step(7, '梅林猎杀（条件拒绝率差）', merlinActive, s7Meta) +
+
     step(8, '兰斯洛特翻转感知（信号减半）', lancInGame, s8Meta) +
+
     step(9, '证据累积 → 分数转换', true, s9Meta);
+
 }
+
+
+
 
 
 /* ------- Result rendering ------- */
+
 function renderTendResult() {
+
   var persp = getPerspective();
+
   var titleEl = document.getElementById('tend-result-title');
+
   var descEl = document.getElementById('tend-result-desc');
+
   var listEl = document.getElementById('tend-result-list');
 
+
+
   if (!state.myRole) {
+
     titleEl.textContent = '分析结果';
+
     descEl.textContent = '';
+
     listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">请在上方「我的身份」卡片中选择你的角色</p>';
+
     return;
+
   }
 
+
+
   if (persp === 'good') {
+
     titleEl.textContent = '反方嫌疑排行';
+
     descEl.textContent = '分数越高，是反方的概率越大。绿色=低嫌疑 黄色=中等 红色=高嫌疑';
+
   } else {
+
     titleEl.textContent = '梅林概率排行';
+
     descEl.textContent = '分数越高，是梅林的概率越大。绿色=低概率 黄色=中等 红色=高概率';
+
   }
+
+
 
   var list = computeSuspectScores();
 
+
+
   // v7 Progressive Data Quality Badge
+
   var quality = list._dataQuality || 'unknown';
+
   var totalRounds = list._totalRounds || 0;
+
   var qualityLabel = '';
+
   var qualityColor = '';
+
   var qualityBg = '';
+
   if (quality === 'low') {
+
     qualityLabel = '&#9888; 数据不足（仅' + totalRounds + '轮），谨慎参考';
+
     qualityColor = '#ff9800';
+
     qualityBg = 'rgba(255,152,0,0.1)';
+
   } else if (quality === 'medium') {
+
     qualityLabel = '&#9889; 中等置信度（' + totalRounds + '轮数据）';
+
     qualityColor = '#ffc107';
+
     qualityBg = 'rgba(255,193,7,0.1)';
+
   } else if (quality === 'high') {
+
     qualityLabel = '&#10004; 高置信度（' + totalRounds + '轮数据）';
+
     qualityColor = '#4caf50';
+
     qualityBg = 'rgba(76,175,80,0.1)';
+
   }
+
   if (qualityLabel) {
+
     descEl.innerHTML = '<div style="display:inline-block;font-size:11px;color:' + qualityColor + ';background:' + qualityBg + ';padding:3px 10px;border-radius:4px;border:1px solid ' + qualityColor + ';margin-left:8px;vertical-align:middle">' + qualityLabel + '</div>';
+
   } else {
+
     descEl.innerHTML = '';
+
   }
+
+
 
   if (list.length === 0) {
+
     listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">暂无数据</p>';
+
     renderEvidencePanel(list);
+
     return;
+
   }
 
+
+
   var h = '';
+
   for (var i = 0; i < list.length; i++) {
+
     var item = list[i];
+
     var cls = 'suspect';
+
     if (item.score < 40) cls = 'trust';
+
     else if (item.score < 65) cls = 'neutral';
 
+
+
     var label = getKnownLabel(item.idx);
+
     var labeled = label ? ' <span style="font-size:11px;color:var(--accent);background:rgba(201,168,76,0.15);padding:1px 6px;border-radius:3px">' + escapeHtml(label) + '</span>' : '';
 
+
+
     h += '<div class="tend-result-item">';
+
     var selfTag = (item.idx === state.selfIndex) ? ' <span style="color:var(--gold-light);font-size:10px">&#9733;&#25105;</span>' : '';
+
     h += '<span class="tend-result-name">' + escapeHtml(state.playerNames[item.idx]) + labeled + selfTag + '</span>';
+
     h += '<div class="tend-bar-wrap">';
+
     h += '<div class="tend-bar-fill ' + cls + '" style="width:' + item.score + '%"></div>';
+
     h += '</div>';
+
     h += '<span class="tend-score ' + cls + '">' + item.score + '</span>';
+
     h += '<button class="btn tiny" onclick="toggleEvidence(' + item.idx + ')" style="font-size:11px;margin-left:8px;min-width:24px">▼</button>';
+
     h += '</div>';
+
     h += '<div id="ev-' + item.idx + '" class="evidence-panel" style="display:none">';
+
     if (item.evidence.length === 0) {
+
       h += '<p style="font-size:11px;color:var(--text-dim);padding:4px 20px">暂无具体证据</p>';
+
     } else {
+
       for (var e = 0; e < item.evidence.length; e++) {
+
         h += '<p style="font-size:11px;color:var(--text-dim);margin:0;padding:2px 20px">• ' + escapeHtml(item.evidence[e]) + '</p>';
+
       }
+
     }
+
     h += '</div>';
+
   }
+
+
 
   listEl.innerHTML = h;
+
   renderEvidencePanel(list);
+
 }
+
+
 
 function renderEvidencePanel(list) {
+
   var panel = document.getElementById('tend-evidence-list');
+
   if (!panel) return;
 
+
+
   var allEvidence = [];
+
   for (var i = 0; i < list.length; i++) {
+
     if (list[i].evidence.length > 0) {
+
       allEvidence.push({
+
         player: state.playerNames[list[i].idx],
+
         idx: list[i].idx,
+
         score: list[i].score,
+
         evidence: list[i].evidence
+
       });
+
     }
+
   }
+
+
 
   if (allEvidence.length === 0) {
+
     panel.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:12px">随游戏推进，关键证据将在此汇总</p>';
+
     return;
+
   }
+
+
 
   var h = '';
+
   for (var i = 0; i < allEvidence.length; i++) {
+
     var e = allEvidence[i];
+
     h += '<div class="evidence-item">';
+
     h += '<strong style="color:var(--text-bright)">' + escapeHtml(e.player) + '（分数：' + e.score + '）</strong>';
+
     h += '<ul style="margin:4px 0 0 16px;padding:0">';
+
     for (var j = 0; j < e.evidence.length; j++) {
+
       h += '<li style="font-size:12px;color:var(--text-dim)">' + escapeHtml(e.evidence[j]) + '</li>';
+
     }
+
     h += '</ul></div>';
+
   }
+
   panel.innerHTML = h;
+
 }
+
+
 
 function toggleEvidence(idx) {
+
   var el = document.getElementById('ev-' + idx);
+
   if (!el) return;
+
   el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+
 }
+
+
 
 /* ==================== FEATURE 4: NIGHT MODE ==================== */
+
 function initNightMode() {
+
   var saved = localStorage.getItem('avalon_theme');
+
   if (saved === 'night') {
+
     document.documentElement.setAttribute('data-theme', 'night');
+
     updateThemeToggleIcon(true);
+
   } else {
+
     document.documentElement.removeAttribute('data-theme');
+
     updateThemeToggleIcon(false);
+
   }
+
 }
+
+
 
 function toggleNightMode() {
+
   var isNight = document.documentElement.getAttribute('data-theme') === 'night';
+
   if (isNight) {
+
     document.documentElement.removeAttribute('data-theme');
+
     localStorage.setItem('avalon_theme', 'light');
+
     updateThemeToggleIcon(false);
+
     toast('已切换到日间模式');
+
   } else {
+
     document.documentElement.setAttribute('data-theme', 'night');
+
     localStorage.setItem('avalon_theme', 'night');
+
     updateThemeToggleIcon(true);
+
     toast('已切换到夜间模式');
+
   }
+
 }
 
+
+
 function updateThemeToggleIcon(isNight) {
+
   var btn = document.getElementById('theme-toggle-btn');
+
   if (!btn) return;
+
   btn.innerHTML = isNight ? '&#9789;' : '&#9790;';
+
 }
+
+
 
 initNightMode();
 
+
+
 /* ==================== FEATURE 3: REPLAY ==================== */
+
 function showReplay() {
+
   var overlay = document.getElementById('replay-modal-overlay');
+
   if (!overlay) return;
+
   overlay.style.display = 'flex';
+
   buildReplayTimeline();
+
   setTimeout(function() { drawReplayChart(); }, 100);
+
 }
+
 function closeReplayModal(event) {
+
   var overlay = document.getElementById('replay-modal-overlay');
+
   if (!overlay) return;
+
   if (event && event.target !== overlay) return;
+
   overlay.style.display = 'none';
+
 }
+
+
 
 function buildReplayTimeline() {
+
   var container = document.getElementById('replay-timeline');
+
   if (!container) return;
 
+
+
   var pc = state.playerCount;
+
   var h = '';
+
+
 
   // 遍历所有轮次和事件
+
   for (var r = 0; r <= state.currentRound; r++) {
+
     var m = state.missions[r];
+
     if (!m) continue;
 
+
+
     // 组队尝试
+
     var attempts = m.launchAttempts || [];
+
     for (var a = 0; a < attempts.length; a++) {
+
       var att = attempts[a];
+
       var attApproves = 0;
+
       for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
+
       var launched = attApproves > Math.floor(pc / 2);
+
       var approveList = [], rejectList = [];
+
       for (var k = 0; k < pc; k++) {
+
         if (att.votes[k] === 'approve') approveList.push(playerLabel(k));
+
         else rejectList.push(playerLabel(k));
+
       }
 
+
+
       h += '<div class="replay-event-card round-event">';
+
       h += '<div class="replay-event-header">';
+
       h += '<span class="replay-event-title">第' + (r + 1) + '轮 · 第' + (a + 1) + '次组队</span>';
+
       h += '<span class="replay-event-time">队长：' + playerLabel(att.leader) + '</span>';
+
       h += '</div>';
+
       h += '<div class="replay-event-body">';
+
       h += '<p>队伍成员：' + att.team.map(function(i) { return playerLabel(i); }).join('、') + '</p>';
+
       h += '<p>投票结果：' + (launched ? '<span style="color:var(--green-bright)">组队成功</span>' : '<span style="color:var(--red-bright)">组队未通过</span>') + '（赞成 ' + attApproves + ' / 反对 ' + (pc - attApproves) + '）</p>';
 
+
+
       h += '<div class="replay-event-votes">';
+
       h += '<div class="replay-vote-col approve-col"><div class="replay-vote-col-title">赞成</div>';
+
       h += approveList.map(function(n) { return '<span class="replay-vote-name">' + n + '</span>'; }).join('');
+
       h += '</div>';
+
       h += '<div class="replay-vote-col reject-col"><div class="replay-vote-col-title">反对</div>';
+
       h += rejectList.map(function(n) { return '<span class="replay-vote-name">' + n + '</span>'; }).join('');
+
       h += '</div></div>';
+
       h += '</div></div>';
+
     }
+
+
 
     // 任务结果
+
     if (m.result) {
+
       h += '<div class="replay-event-card round-event">';
+
       h += '<div class="replay-event-header">';
+
       h += '<span class="replay-event-title">第' + (r + 1) + '轮任务结果</span>';
+
       h += '<span class="replay-event-time">队长：' + playerLabel(m.leader) + '</span>';
+
       h += '</div>';
+
       h += '<div class="replay-event-body">';
+
       h += '<p>队伍：' + (m.team || []).map(function(i) { return playerLabel(i); }).join('、') + '</p>';
+
       var resultColor = m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)';
+
       var resultText = m.result === 'success' ? '成功' : '失败';
+
       h += '<p>结果：<strong style="color:' + resultColor + '">' + resultText + '</strong>';
+
       if (m.result === 'fail' && m.failCount) h += '（' + m.failCount + '张失败票）';
+
       if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
+
       if (m.result === 'success' && !m.shieldedFails && !m.failCount) h += '（全票通过）';
+
       h += '</p>';
+
       h += '</div></div>';
+
     }
+
+
 
     // 湖中女神事件
+
     var ladyRecords = (state.ladyCheckHistory || []).filter(function(rec) {
+
       return rec && rec.round === r;
+
     });
+
     if (ladyRecords.length > 0) {
+
       for (var li = 0; li < ladyRecords.length; li++) {
+
         var lr = ladyRecords[li];
+
         h += '<div class="replay-event-card lady-event">';
+
         h += '<div class="replay-event-header">';
+
         h += '<span class="replay-event-title">湖中女神验人</span>';
+
         h += '<span class="replay-event-time">第' + (r + 1) + '轮</span>';
+
         h += '</div>';
+
         h += '<div class="replay-event-body">';
+
         h += '<p>' + playerLabel(lr.holder) + ' 查看了 ' + playerLabel(lr.target) + ' 的身份牌</p>';
+
         h += '<p>结果声明：<strong>' + ladyClaimLabel(lr.result) + '</strong></p>';
+
         if (lr.note) h += '<p style="color:var(--text-dim);font-size:12px">备注：' + escapeHtml(lr.note) + '</p>';
+
         h += '</div></div>';
+
       }
+
     }
+
+
 
     // 王者之剑事件
+
     var exRec = getExcaliburRecord(r);
+
     if (exRec && (exRec.used === true || exRec.used === false)) {
+
       h += '<div class="replay-event-card excalibur-event">';
+
       h += '<div class="replay-event-header">';
+
       h += '<span class="replay-event-title">王者之剑</span>';
+
       h += '<span class="replay-event-time">第' + (r + 1) + '轮</span>';
+
       h += '</div>';
+
       h += '<div class="replay-event-body">';
+
       h += '<p>持剑者：' + playerLabel(exRec.holder) + '</p>';
+
       if (exRec.used) {
+
         h += '<p>对 <strong>' + playerLabel(exRec.target) + '</strong> 使用</p>';
+
         if (exRec.claimedDirection) h += '<p>声称改变方向：' + excaliburDirectionLabel(exRec.claimedDirection) + '</p>';
+
       } else {
+
         h += '<p>未使用</p>';
+
       }
+
       h += '</div></div>';
+
     }
+
+
 
     // 兰斯洛特翻转
+
     if (r > 0 && r < (state.lancelotDrawResults || []).length) {
+
       var drew = state.lancelotDrawResults[r];
+
       if (drew !== null && drew !== undefined) {
+
         h += '<div class="replay-event-card flip-event">';
+
         h += '<div class="replay-event-header">';
+
         h += '<span class="replay-event-title">兰斯洛特翻转</span>';
+
         h += '<span class="replay-event-time">第' + (r) + '轮后抽取</span>';
+
         h += '</div>';
+
         h += '<div class="replay-event-body">';
+
         h += '<p>结果：<strong style="color:' + (drew ? 'var(--orange)' : 'var(--text-dim)') + '">' + (drew ? '反转' : '未反转') + '</strong></p>';
+
         h += '</div></div>';
+
       }
+
     }
+
   }
+
+
 
   // 刺客刺杀
+
   if (state.assassinTarget !== null) {
+
     h += '<div class="replay-event-card assassin-event">';
+
     h += '<div class="replay-event-header">';
+
     h += '<span class="replay-event-title">刺客刺杀</span>';
+
     h += '</div>';
+
     h += '<div class="replay-event-body">';
+
     h += '<p>刺杀目标：<strong>' + playerLabel(state.assassinTarget) + '</strong></p>';
+
     if (state.winner === 'evil') {
+
       h += '<p style="color:var(--red-bright)">刺杀成功，反方获胜</p>';
+
     } else if (state.winner === 'good') {
+
       h += '<p style="color:var(--green-bright)">刺杀失败，好人方获胜</p>';
+
     }
+
     h += '</div></div>';
+
   }
+
+
 
   container.innerHTML = h || '<p style="color:var(--text-dim);text-align:center;padding:20px">暂无复盘数据</p>';
+
 }
+
+
 
 // 尝试获取玩家阵容，优先从结束页 DOM 读取，其次从 knownIdentities
+
 function getPlayerFaction(idx) {
+
   // 方法1：从结束页身份选择下拉框读取
+
   var sel = document.getElementById('end-role-' + idx);
+
   if (sel && sel.value) {
+
     var role = sel.value;
+
     if (ROLE_CATEGORY[role] === 'good') return 'good';
+
     if (ROLE_CATEGORY[role] === 'evil') return 'evil';
+
     return 'neutral';
+
   }
+
   // 方法2：从 knownIdentities 读取
+
   var known = state.knownIdentities && state.knownIdentities[idx];
+
   if (known) {
+
     if (ROLE_CATEGORY[known] === 'good') return 'good';
+
     if (ROLE_CATEGORY[known] === 'evil') return 'evil';
+
     return 'neutral';
+
   }
+
   return 'unknown';
+
 }
+
+
 
 function getFactionColor(faction) {
+
   if (faction === 'good')  return { fill: '#4a90d9', bg: 'rgba(74,144,217,0.15)', text: '#2d6eb0' };
+
   if (faction === 'evil')  return { fill: '#c44a4a', bg: 'rgba(196,74,74,0.15)', text: '#9e2e2e' };
+
   if (faction === 'neutral') return { fill: '#8a8070', bg: 'rgba(138,128,112,0.12)', text: '#5a5246' };
+
   return { fill: '#8a8070', bg: 'rgba(138,128,112,0.08)', text: '#5a5246' };
+
 }
+
+
 
 function drawReplayChart() {
+
   var canvas = document.getElementById('replay-chart-canvas');
+
   if (!canvas) return;
 
+
+
   var rt = state.roundTendencies || [];
+
   if (rt.length === 0) {
+
     document.getElementById('replay-chart-container').style.display = 'none';
+
     return;
+
   }
+
+
 
   document.getElementById('replay-chart-container').style.display = 'block';
+
   var pc = state.playerCount;
 
+
+
   // 构建轮次标签（去重合并）
+
   var rounds = [];
+
   var seenLabels = {};
+
   for (var i = 0; i < rt.length; i++) {
+
     var snap = rt[i];
+
     var r = (snap.r !== undefined) ? snap.r : i;
+
     var a = (snap.a !== undefined && snap.a > 0) ? snap.a : 0;
+
     var label = a > 0 ? 'R' + (r + 1) + '-' + a : 'R' + (r + 1);
+
     var key = 'r' + r + 'a' + a;
+
     if (!seenLabels[key]) {
+
       seenLabels[key] = true;
+
       rounds.push({ label: label, r: r, a: a, idx: i });
+
     }
+
   }
+
   var numRounds = rounds.length;
 
+
+
   // 大尺寸 Canvas
+
   var ROW_H = 62;
+
   var LEFT_MARGIN = 100;
+
   var RIGHT_MARGIN = 24;
+
   var TOP_MARGIN = 44;
+
   var BOTTOM_MARGIN = 36;
+
   var COL_GAP = 12;
 
+
+
   var chartW = Math.max(700, numRounds * 100);
+
   var chartH = TOP_MARGIN + pc * ROW_H + BOTTOM_MARGIN;
 
+
+
   canvas.width = (LEFT_MARGIN + chartW + RIGHT_MARGIN) * 2;
+
   canvas.height = chartH * 2;
+
   canvas.style.width = (LEFT_MARGIN + chartW + RIGHT_MARGIN) + 'px';
+
   canvas.style.height = chartH + 'px';
 
+
+
   var ctx = canvas.getContext('2d');
+
   ctx.scale(2, 2);
 
+
+
   // 白色背景
+
   ctx.fillStyle = '#faf8f2';
+
   ctx.fillRect(0, 0, LEFT_MARGIN + chartW + RIGHT_MARGIN, chartH);
 
+
+
   // 标题
+
   ctx.fillStyle = '#333';
+
   ctx.font = 'bold 15px system-ui';
+
   ctx.textAlign = 'center';
+
   ctx.fillText('玩家倾向值变化', (LEFT_MARGIN + chartW) / 2, 28);
 
+
+
   // 辅助：每列中心 X
+
   var colW = (chartW - COL_GAP * (numRounds - 1)) / numRounds;
+
   function colX(ci) { return LEFT_MARGIN + ci * (colW + COL_GAP) + colW / 2; }
 
+
+
   // 列头（轮次标签）
+
   ctx.fillStyle = '#666';
+
   ctx.font = '12px system-ui';
+
   ctx.textAlign = 'center';
+
   for (var ci = 0; ci < numRounds; ci++) {
+
     ctx.fillText(rounds[ci].label, colX(ci), TOP_MARGIN - 8);
+
   }
+
+
 
   // 每行玩家
+
   for (var p = 0; p < pc; p++) {
+
     var rowY = TOP_MARGIN + p * ROW_H;
+
     var faction = getPlayerFaction(p);
+
     var fc = getFactionColor(faction);
 
+
+
     // 行背景（交替浅色条纹）
+
     if (p % 2 === 0) {
+
       ctx.fillStyle = 'rgba(0,0,0,0.02)';
+
       ctx.fillRect(LEFT_MARGIN, rowY, chartW, ROW_H);
+
     }
+
+
 
     // 玩家名（左标签）
+
     ctx.fillStyle = fc.text;
+
     ctx.font = 'bold 13px system-ui';
+
     ctx.textAlign = 'right';
+
     var name = state.playerNames[p] || ('P' + (p + 1));
+
     // 截断过长名字
+
     if (name.length > 6) name = name.substring(0, 5) + '..';
+
     ctx.fillText(name, LEFT_MARGIN - 10, rowY + ROW_H / 2 + 4);
 
+
+
     // 每列绘制条形 + 数值
+
     for (var ci = 0; ci < numRounds; ci++) {
+
       var rIdx = rounds[ci].idx;
+
       var snap = rt[rIdx];
+
       var v = snap.v || snap;
+
       var score = (typeof v === 'object' && v[p] !== undefined) ? v[p] : 50;
+
       var cx = colX(ci);
 
+
+
       // 背景条（浅灰底）
+
       var barMaxW = colW - 8;
+
       var barH = 18;
+
       var barY = rowY + ROW_H / 2 - barH / 2;
+
       var barX = cx - barMaxW / 2;
 
+
+
       ctx.fillStyle = '#e8e4da';
+
       ctx.beginPath();
+
       roundRect(ctx, barX, barY, barMaxW, barH, 4);
+
       ctx.fill();
+
+
 
       // 倾向值填充条
+
       var fillW = Math.max(4, (score / 100) * barMaxW);
+
       ctx.fillStyle = fc.fill;
+
       ctx.beginPath();
+
       roundRect(ctx, barX, barY, fillW, barH, 4);
+
       ctx.fill();
 
+
+
       // 数值标注
+
       ctx.fillStyle = fc.text;
+
       ctx.font = 'bold 11px system-ui';
+
       ctx.textAlign = 'center';
+
       var numX = barX + fillW + 4;
+
       if (fillW > barMaxW * 0.6) {
+
         // 数值显示在条内右侧
+
         ctx.fillStyle = '#fff';
+
         ctx.textAlign = 'right';
+
         numX = barX + fillW - 5;
+
       }
+
       ctx.fillText(String(score), numX, barY + barH / 2 + 4);
 
+
+
       // 如果是有多次尝试的轮次（连续拒绝），在条上方加小圆点标记区别
+
       if (rounds[ci].a > 1) {
+
         ctx.fillStyle = '#999';
+
         ctx.beginPath();
+
         ctx.arc(cx, barY - 6, 3, 0, Math.PI * 2);
+
         ctx.fill();
+
       }
+
     }
+
+
 
     // 行底部分隔线
+
     ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+
     ctx.lineWidth = 0.5;
+
     ctx.beginPath();
+
     ctx.moveTo(LEFT_MARGIN, rowY + ROW_H);
+
     ctx.lineTo(LEFT_MARGIN + chartW, rowY + ROW_H);
+
     ctx.stroke();
+
   }
+
+
 
   // 底部图例
+
   var legendY = TOP_MARGIN + pc * ROW_H + 16;
+
   var legends = [
+
     { label: '好人方', color: '#4a90d9' },
+
     { label: '反派方', color: '#c44a4a' },
+
     { label: '中立/未知', color: '#8a8070' }
+
   ];
+
   ctx.font = '11px system-ui';
+
   var legendX = LEFT_MARGIN;
+
   for (var li = 0; li < legends.length; li++) {
+
     ctx.fillStyle = legends[li].color;
+
     ctx.beginPath();
+
     ctx.arc(legendX + 5, legendY - 3, 5, 0, Math.PI * 2);
+
     ctx.fill();
+
     ctx.fillStyle = '#666';
+
     ctx.textAlign = 'left';
+
     ctx.fillText(legends[li].label, legendX + 16, legendY);
+
     legendX += 90;
+
   }
+
 }
+
+
 
 // 圆角矩形辅助函数
+
 function roundRect(ctx, x, y, w, h, r) {
+
   ctx.moveTo(x + r, y);
+
   ctx.lineTo(x + w - r, y);
+
   ctx.arcTo(x + w, y, x + w, y + r, r);
+
   ctx.lineTo(x + w, y + h - r);
+
   ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+
   ctx.lineTo(x + r, y + h);
+
   ctx.arcTo(x, y + h, x, y + h - r, r);
+
   ctx.lineTo(x, y + r);
+
   ctx.arcTo(x, y, x + r, y, r);
+
   ctx.closePath();
+
 }
+
+
 
 /* ==================== HISTORY DETAIL MODAL ==================== */
+
 function getPlayerFaction(role) {
+
   if (GOOD_ROLES.indexOf(role) !== -1) return 'good';
+
   if (EVIL_ROLES.indexOf(role) !== -1) return 'evil';
+
   if (NEUTRAL_ROLES.indexOf(role) !== -1) return 'neutral';
+
   return 'neutral';
+
 }
+
+
 
 function closeHistoryModal() {
+
   var overlay = document.getElementById('hci-modal-overlay');
+
   if (overlay) overlay.remove();
+
 }
 
+
+
 function openHistoryModal(idx) {
+
   var history = loadHistory();
+
   if (idx < 0 || idx >= history.length) return;
+
   var recRaw = history[idx];
+
   var rec = normalizeRecord(recRaw);
+
   if (!rec) return;
 
+
+
   var overlay = document.createElement('div');
+
   overlay.className = 'hci-modal-overlay';
+
   overlay.id = 'hci-modal-overlay';
+
   overlay.addEventListener('click', function(e) {
+
     if (e.target === overlay) closeHistoryModal();
+
   });
 
+
+
   var winnerColor = rec.winner === 'good' ? 'good' : 'evil';
+
   var winnerLabel = rec.winner === 'good' ? '好人方胜' : '反方胜';
 
+
+
   // Build duration
+
   var durStr = '';
+
   if (rec.startTime && rec.endTime) {
+
     var durMin = Math.round((new Date(rec.endTime.replace(' ', 'T')) - new Date(rec.startTime.replace(' ', 'T'))) / 60000);
+
     if (durMin > 0) durStr = durMin + '分钟';
+
   }
+
+
 
   var h = '';
+
   h += '<div class="hci-modal">';
 
+
+
   // --- Header ---
+
   h += '<div class="hci-modal-header">';
+
   h += '<span class="hci-modal-date">' + (rec.date || '--') + (rec.startTime ? ' ' + rec.startTime.slice(11, 16) : '') + '</span>';
+
   h += '<span class="hci-modal-result ' + winnerColor + '">' + winnerLabel + '</span>';
+
   h += '<div style="margin-left:auto;display:flex;align-items:center;gap:4px">';
+
   h += '<button class="hci-modal-del-btn" onclick="deleteGameRecord(' + idx + ');closeHistoryModal()" title="删除">删除</button>';
+
   h += '<button class="hci-modal-close" onclick="closeHistoryModal()">&times;</button>';
+
   h += '</div>';
+
   h += '</div>';
+
+
 
   // --- Body ---
+
   h += '<div class="hci-modal-body">';
 
+
+
   // a) Basic info
+
   h += '<div class="hci-modal-meta">';
+
   h += '<span>' + (rec.playerCount || '?') + ' 人</span>';
+
   if (durStr) h += '<span>' + durStr + '</span>';
+
   h += '</div>';
 
+
+
   // b) Identity panel
+
   if (rec.identities && rec.identities.length > 0) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">身份</div>';
+
     h += '<div class="hci-player-grid">';
+
     for (var j = 0; j < rec.identities.length; j++) {
+
       var id = rec.identities[j];
+
       var faction = getPlayerFaction(id.role || '');
+
       var flipped = rec.lancelotFlips && rec.lancelotFlips[id.index != null ? id.index : j];
+
       var roleText = id.role || '--';
+
       if (flipped) roleText += ' <span style="color:var(--orange);font-size:10px">&#8617;变节</span>';
+
       h += '<div class="hci-player-card ' + faction + '">';
+
       h += '<div class="hci-pc-name">' + (id.index != null ? (id.index + 1) + '号 ' : '') + id.name + '</div>';
+
       h += '<div class="hci-pc-role">' + roleText + '</div>';
+
       h += '</div>';
+
     }
+
     h += '</div></div>';
+
   }
+
+
 
   // c) Mission review
+
   if (rec.missions && rec.missions.length > 0) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">任务回顾</div>';
+
     h += '<div class="hci-mission-list">';
+
     for (var mi = 0; mi < rec.missions.length; mi++) {
+
       var m = rec.missions[mi];
+
       if (!m.result && (!m.launchAttempts || m.launchAttempts.length === 0)) continue;
+
       h += '<div class="hci-mission-card">';
+
       h += '<div class="hci-mission-round">';
+
       h += '第' + (mi + 1) + '轮';
+
       if (m.result) {
+
         if (m.result === 'success' && m.shieldedFails) {
+
           h += ' <span style="color:var(--green-bright)">&#10003; 成功（含' + m.shieldedFails + '张失败票）</span>';
+
         } else if (m.result === 'success' && !m.failCount) {
+
           h += ' <span style="color:var(--green-bright)">&#10003; 成功（全票通过）</span>';
+
         } else if (m.result === 'success') {
+
           h += ' <span style="color:var(--green-bright)">&#10003; 成功</span>';
+
         } else {
+
           h += ' <span style="color:var(--red-bright)">&#10007; 失败</span>';
+
         }
+
       }
+
       h += '</div>';
+
       if (m.launchAttempts && m.launchAttempts.length > 0) {
+
         for (var la = 0; la < m.launchAttempts.length; la++) {
+
           var att = m.launchAttempts[la];
+
           var isLast = (la === m.launchAttempts.length - 1);
+
           var appCnt = 0, rejCnt = 0;
+
           var approveVoters = [], rejectVoters = [];
+
           for (var vk in att.votes) {
+
             var voterIdx = parseInt(vk);
+
             if (att.votes[vk] === 'approve') { appCnt++; approveVoters.push(voterIdx); }
+
             else { rejCnt++; rejectVoters.push(voterIdx); }
+
           }
+
           // Build voter name lists
+
           var approveNames = approveVoters.map(function(vi) {
+
             for (var vti = 0; vti < rec.identities.length; vti++) {
+
               if (rec.identities[vti].index === vi) return (vi + 1) + '号';
+
             }
+
             return (vi + 1) + '号';
+
           });
+
           var rejectNames = rejectVoters.map(function(vi) {
+
             for (var vti = 0; vti < rec.identities.length; vti++) {
+
               if (rec.identities[vti].index === vi) return (vi + 1) + '号';
+
             }
+
             return (vi + 1) + '号';
+
           });
+
           var resIcon = '';
+
           if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
+
           else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
+
           var teamItems = (att.team || []).map(function(tmName) {
+
             for (var ti = 0; ti < rec.identities.length; ti++) {
+
               if (rec.identities[ti].name === tmName) {
+
                 var tf = getPlayerFaction(rec.identities[ti].role || '');
+
                 if (tf === 'evil') return '<span style="color:var(--red-bright);font-weight:600">' + tmName + '</span>';
+
                 break;
+
               }
+
             }
+
             return tmName;
+
           });
+
           var teamHtml = teamItems.join(', ');
+
           h += '<div class="hci-mission-attempt">';
+
           h += '组队' + (la + 1) + '：<span class="leader">' + (att.leader || '') + '</span>';
+
           if (teamHtml) h += ' <span class="team-members">[' + teamHtml + ']</span>';
+
           var toggleId = 'vote-detail-' + mi + '-' + la;
+
           h += ' <span class="vote-count hci-vote-toggle" onclick="var el=document.getElementById(\'' + toggleId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">投票 ' + appCnt + '<span class="hci-vote-approve">赞成</span>:' + rejCnt + '<span class="hci-vote-reject">反对</span>' + resIcon + '</span>';
+
           h += '<div id="' + toggleId + '" class="hci-vote-detail" style="display:none">';
+
           h += '赞成：' + (approveNames.join('、') || '无');
+
           h += '&nbsp;|&nbsp;';
+
           h += '反对：' + (rejectNames.join('、') || '无');
+
           h += '</div>';
+
           h += '</div>';
+
         }
+
       } else {
+
         h += '<div class="hci-mission-attempt">';
+
         h += '结果：' + (m.result === 'success' ? '<span style="color:var(--green-bright)">&#10003;</span>' : '<span style="color:var(--red-bright)">&#10007;</span>');
+
         h += '</div>';
+
       }
+
       if (m.result === 'success' && m.shieldedFails) {
+
         var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
+
         var evilNames = [];
+
         if (lastAtt && lastAtt.team && rec.identities) {
+
           var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+
           for (var ei = 0; ei < tArr.length; ei++) {
+
             if (getPlayerFaction(rec.identities[tArr[ei]].role) === 'evil') evilNames.push(rec.identities[tArr[ei]].name);
+
           }
+
         }
+
         if (evilNames.length > 0) {
+
           h += '<div style="color:var(--red-bright);font-weight:600;margin-top:4px">失败卡：' + m.shieldedFails + '张（' + evilNames.join('、') + '）</div>';
+
         }
+
       }
+
       h += '</div>';
+
     }
+
     h += '</div></div>';
+
   }
+
+
 
   // d) Lady check
+
   if (rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">湖中女神验人</div>';
+
     for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+
       var lc = rec.ladyCheckHistory[li];
+
       var holderNum = (lc.holder != null) ? (lc.holder + 1) + '号 ' : '';
+
       var targetNum = (lc.target != null) ? (lc.target + 1) + '号 ' : '';
+
       var roundLabel = lc.round ? '第' + lc.round + '轮：' : '';
+
       var resultLabel = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '坏人' : (lc.result || '?');
+
       h += '<div class="hci-detail-row">' + roundLabel + holderNum + lc.holderName + ' 查验 ' + targetNum + lc.targetName + ' &#8594; <strong>' + resultLabel + '</strong></div>';
+
     }
+
     h += '</div>';
+
   }
+
+
 
   // e) Identity marks
+
   if (rec.identityMarks && rec.identityMarks.length > 0) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">身份标记</div>';
+
     for (var mkIdx = 0; mkIdx < rec.identityMarks.length; mkIdx++) {
+
       var mk = rec.identityMarks[mkIdx];
+
       var lvlLabel = mk.level === 'high' ? '高' : mk.level === 'mid' ? '中' : '低';
+
       h += '<div class="hci-detail-row">' + (mk.targetName || mk.target) + ' [' + lvlLabel + ']</div>';
+
     }
+
     h += '</div>';
+
   }
+
+
 
   // f) Excalibur
+
   if (rec.excaliburHistory && rec.excaliburHistory.length > 0) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">王者之剑</div>';
+
     for (var exIdx = 0; exIdx < rec.excaliburHistory.length; exIdx++) {
+
       var ex = rec.excaliburHistory[exIdx];
+
       h += '<div class="hci-detail-row">' + (ex.holderName || ex.holder) + ' &#8594; ' + (ex.targetName || ex.target) + (ex.used ? '（已使用）' : '（未使用）') + '</div>';
+
     }
+
     h += '</div>';
+
   }
+
+
 
   // g) Lancelot flips
+
   if (rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">兰斯洛特变节</div>';
+
     for (var lfIdx in rec.lancelotFlips) {
+
       if (rec.identities && rec.identities[lfIdx]) {
+
         var player = rec.identities[lfIdx];
+
         var playerNum = (player.index != null ? player.index : parseInt(lfIdx)) + 1;
+
         var origRole = player.role || '';
+
         var origFaction = ROLE_CATEGORY[origRole] || '';
+
         var shortRole = origRole === '兰斯洛特(蓝)' ? '蓝兰斯洛特' : origRole === '兰斯洛特(红)' ? '红兰斯洛特' : origRole;
+
         var afterLabel = (origFaction === 'good') ? '红方（坏人）' : (origFaction === 'evil') ? '蓝方（好人）' : '?';
+
         h += '<div class="hci-detail-row" style="color:var(--orange)">' + playerNum + '号 ' + shortRole + ' &#8594; ' + afterLabel + '</div>';
+
       }
+
     }
+
     h += '</div>';
+
   }
+
+
 
   // h) Assassin
+
   if (rec.assassinTarget) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">刺杀</div>';
+
     h += '<div class="hci-detail-row">';
+
     if (rec.assassinAfterRound !== null && rec.assassinAfterRound !== undefined) {
+
       h += '（第' + (rec.assassinAfterRound + 1) + '轮任务后）';
+
     }
+
     h += '目标：' + rec.assassinTarget + ' &#8594; ';
+
     h += rec.assassinSuccess ? '<span style="color:var(--red-bright);font-weight:700">命中</span>' : '<span style="color:var(--green-bright);font-weight:700">未命中</span>';
+
     h += '</div></div>';
+
   }
 
+
+
   // Force ended info
+
   if (rec.forceEnded) {
+
     h += '<div>';
+
     h += '<div class="hci-modal-section-title">强制结束</div>';
+
     h += '<div class="hci-detail-row" style="color:var(--orange)">' + (rec.forceEndReason || '未知原因') + '</div>';
+
     h += '</div>';
+
   }
+
+
 
   h += '</div>'; // body
 
+
+
   // --- Footer ---
+
   h += '<div class="hci-modal-footer">';
+
   h += '<button class="btn small" id="hci-screenshot-btn">生成截图</button>';
+
   h += '<button class="btn small" onclick="openHistoryEdit(' + idx + ')">编辑记录</button>';
+
   h += '</div>';
+
+
 
   h += '</div>'; // modal
 
+
+
   overlay.innerHTML = h;
+
   document.body.appendChild(overlay);
 
+
+
   // 截图按钮使用程序化事件绑定，避免内联 onclick 作用域问题
+
   var ssBtn = document.getElementById('hci-screenshot-btn');
+
   if (ssBtn) {
+
     ssBtn.addEventListener('click', function() {
+
       generateGameScreenshot(idx);
+
     });
+
   }
+
 }
+
+
 
 /* ==================== SCREENSHOT GENERATION ==================== */
+
 function generateGameScreenshot(idx) {
+
   try {
+
   var history = loadHistory();
+
   if (idx < 0 || idx >= history.length) { alert('\u65e0\u6548\u8bb0\u5f55'); return; }
+
   var recRaw = history[idx];
+
   var rec = normalizeRecord(recRaw);
+
   if (!rec) { alert('\u8bb0\u5f55\u89e3\u6790\u5931\u8d25'); return; }
+
   console.log('[Screenshot] rec:', rec);
 
+
+
   // 防御：检查 identities 并尝试修复
+
   if (!rec.identities || !Array.isArray(rec.identities) || rec.identities.length === 0) {
+
     console.error('[Screenshot] rec.identities missing or empty for idx=' + idx + ', raw keys:', Object.keys(recRaw), 'raw v2 ids:', recRaw.ids);
+
     // 从 raw v2 格式直接提取 ids
+
     var rebuilt = null;
+
     if (recRaw.ids && Array.isArray(recRaw.ids) && recRaw.ids.length > 0) {
+
       rebuilt = recRaw.ids.map(function(id, ri) {
+
         return { name: id.n || '\u73a9\u5bb6' + (ri + 1), role: id.r || '', index: id.i != null ? id.i : ri };
+
       });
+
       console.log('[Screenshot] rebuilt identities from recRaw.ids, count=' + rebuilt.length);
+
     } else if (rec.missions && rec.missions.length > 0 && rec.playerCount) {
+
       rebuilt = [];
+
       for (var ri = 0; ri < rec.playerCount; ri++) {
+
         rebuilt.push({ name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri });
+
       }
+
       console.log('[Screenshot] rebuilt identities from playerCount=' + rec.playerCount);
+
     } else if (recRaw.pc) {
+
       rebuilt = [];
+
       for (var ri = 0; ri < recRaw.pc; ri++) {
+
         rebuilt.push({ name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri });
+
       }
+
       console.log('[Screenshot] rebuilt identities from recRaw.pc=' + recRaw.pc);
+
     }
+
     if (rebuilt) {
+
       rec.identities = rebuilt;
+
     } else {
+
       toast('\u622a\u56fe\u5931\u8d25\uff1aidentities \u4e3a\u7a7a', 'error');
+
       return;
+
     }
+
   }
+
   // 防御：每个 identity 必须有 name 和 role，缺少 index 则用数组下标
+
   for (var ri = 0; ri < rec.identities.length; ri++) {
+
     var id = rec.identities[ri];
+
     if (!id) {
+
       console.warn('[Screenshot] identity[' + ri + '] is null/undefined, replacing');
+
       rec.identities[ri] = { name: '\u73a9\u5bb6' + (ri + 1), role: '', index: ri };
+
       continue;
+
     }
+
     if (!id.name) id.name = '\u73a9\u5bb6' + (ri + 1);
+
     if (!id.role) id.role = '';
+
     if (id.index == null) id.index = ri;
+
     if (!id.name || !id.role) {
+
       console.warn('[Screenshot] identity[' + ri + '] missing fields:', JSON.stringify(id));
+
     }
+
   }
+
+
 
   var W = 750;
+
   var SCALE = 6;
+
   var PAD = 28;
+
   var contentW = W - PAD * 2;
 
+
+
   var canvas = document.createElement('canvas');
+
   canvas.width = W * SCALE;
+
   var ctx = canvas.getContext('2d');
+
   if (!ctx) {
+
     toast('\u622a\u56fe\u5931\u8d25\uff1aCanvas \u6e32\u67d3\u5f02\u5e38', 'error');
+
     return;
+
   }
+
+
 
   var ids = rec.identities || [];
+
   var pc = ids.length;
+
   function pn(idx) { var p = ids[idx]; return (idx + 1) + '\u53f7 ' + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+
   function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
+
   function isEvil(idx) { var p = ids[idx]; return p && getFinalFaction(p.role, rec.lancelotFlips && rec.lancelotFlips[idx]) === 'evil'; }
+
   function evilColor(idx) { return isEvil(idx) ? '#e74c3c' : '#e8dcc8'; }
+
   // 投票值查找：从 votes 对象中按多种 key 格式匹配玩家 vi 的投票
+
   function getVoteValue(votes, vi) {
+
     if (!votes) return null;
+
     if (votes[vi] !== undefined) return votes[vi];
+
     if (votes[String(vi)] !== undefined) return votes[String(vi)];
+
     var label = pn(vi);
+
     if (votes[label] !== undefined) return votes[label];
+
     // 兜底：按 "N号" 前缀扫描所有 key，应对记录时名字与 identities 不一致的边界情况
+
     var prefix = (vi + 1) + '\u53f7 ';
+
     for (var k in votes) {
+
       if (k.indexOf(prefix) === 0) return votes[k];
+
     }
+
     return null;
+
   }
+
+
 
   function dtSegments(x, y, segs, sz) {
+
     ctx.font = sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     ctx.textBaseline = 'top';
+
     var cx = x;
+
     for (var si = 0; si < segs.length; si++) {
+
       ctx.fillStyle = segs[si].color || TXT;
+
       ctx.textAlign = 'left';
+
       ctx.fillText(segs[si].text, cx, y);
+
       cx += tw(segs[si].text, sz);
+
     }
+
     return cx;
+
   }
+
+
 
   var GOLD = '#f4d03f';
+
   var GREEN = '#27ae60';
+
   var GREEN_BRIGHT = '#2ecc71';
+
   var RED = '#e74c3c';
+
   var BLUE = '#5dade2';
+
   var TXT = '#e8dcc8';
+
   var TXT_SEC = '#a89070';
+
   var TXT_DIM = '#7a6e5e';
 
+
+
   function tw(text, size) {
+
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     return ctx.measureText(text).width;
+
   }
+
   function dt(text, x, y, size, color, align) {
+
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     ctx.fillStyle = color || TXT;
+
     ctx.textAlign = align || 'left';
+
     ctx.textBaseline = 'top';
+
     ctx.fillText(text, x, y);
+
   }
+
   function rr(x, y, w, h, r) {
+
     ctx.beginPath();
+
     ctx.moveTo(x + r, y);
+
     ctx.lineTo(x + w - r, y);
+
     ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+
     ctx.lineTo(x + w, y + h - r);
+
     ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+
     ctx.lineTo(x + r, y + h);
+
     ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+
     ctx.lineTo(x, y + r);
+
     ctx.quadraticCurveTo(x, y, x + r, y);
+
     ctx.closePath();
+
   }
+
+
 
   var hasLady = rec.ladyCheckHistory && rec.ladyCheckHistory.length > 0;
+
   var hasExcalibur = rec.excaliburHistory && rec.excaliburHistory.length > 0;
+
   var hasLancelot = rec.lancelotFlips && Object.keys(rec.lancelotFlips).length > 0;
+
   var hasAssassin = !!rec.assassinTarget;
+
   var hasForceEnd = !!rec.forceEnded;
+
   var hasIdentityMarks = rec.identityMarks && rec.identityMarks.length > 0;
+
   var hasAnyRule = hasLady || hasExcalibur || hasLancelot || hasAssassin || hasForceEnd || hasIdentityMarks;
 
+
+
   var goodPlayers = [], evilPlayers = [];
+
   for (var pi = 0; pi < ids.length; pi++) {
+
     var f = getFinalFaction(ids[pi].role, rec.lancelotFlips && rec.lancelotFlips[pi]);
+
     if (f === 'good') goodPlayers.push(pn(pi));
+
     else if (f === 'evil') evilPlayers.push(pn(pi));
+
   }
+
   var doneMissions = 0, failMissions = 0;
+
   for (var mi2 = 0; mi2 < (rec.missions || []).length; mi2++) {
+
     if (rec.missions[mi2].result === 'success') doneMissions++;
+
     else if (rec.missions[mi2].result === 'fail') failMissions++;
+
   }
+
+
 
   function calcMissionCardH(m) {
+
     var attempts = m.launchAttempts || [];
+
     if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
+
     var h = 10 + 18 + 6;
+
     for (var a = 0; a < attempts.length; a++) {
+
       var att = attempts[a];
+
       h += 18;
+
       var voteLine = '\u6295\u7968\uff1a';
+
       for (var vi = 0; vi < pc; vi++) {
+
         var vv = getVoteValue(att.votes, vi);
+
         voteLine += pnShort(vi) + (vv === 'approve' ? '\u2713' : vv === 'reject' ? '\u2717' : '?') + ' ';
+
       }
+
       var approves = 0, rejects = 0;
+
       for (var vi2 = 0; vi2 < pc; vi2++) {
+
         var vv2 = getVoteValue(att.votes, vi2);
+
         if (vv2 === 'approve') approves++; else if (vv2 === 'reject') rejects++;
+
       }
+
       voteLine += ' \u2014 ' + approves + ':' + rejects;
+
       h += (tw(voteLine, 10) > contentW - 28) ? 34 : 16;
+
       h += 2;
+
     }
+
     if (m.result) {
+
       h += 18 + 10;
+
       if (m.result === 'success' && m.shieldedFails) h += 18;
+
     }
+
     return h;
+
   }
+
+
 
   var secH = [];
+
   secH.push(28 + 8 + 26 + 4 + 16 + 16);
+
   secH.push(16);
+
   secH.push(20 + Math.ceil(pc / 2) * 28 + 4);
+
   secH.push(16);
+
   var questH = 20 + 12;
+
   if (rec.missions) {
+
     for (var qi = 0; qi < rec.missions.length; qi++) {
+
       if (!rec.missions[qi].result) continue;
+
       questH += calcMissionCardH(rec.missions[qi]) + 8;
+
     }
+
     questH -= 8;
+
   }
+
   secH.push(questH + 8);
+
   var rulesH = 0;
+
   if (hasAnyRule) {
+
     rulesH += 20 + 8;
+
     if (hasLady) rulesH += 18 * rec.ladyCheckHistory.length + 4;
+
     if (hasExcalibur) rulesH += 18 * rec.excaliburHistory.length + 4;
+
     if (hasLancelot) { var lfc = 0; for (var k in rec.lancelotFlips) lfc++; rulesH += 18 * lfc + 4; }
+
     if (hasAssassin) rulesH += 18 + 18 + 18 + 10 + 4;
+
     if (hasForceEnd) rulesH += 18 + 4;
+
     if (hasIdentityMarks) rulesH += 18 * rec.identityMarks.length + 4;
+
     secH.push(rulesH + 8);
+
   }
+
   secH.push(12);
+
   secH.push(18 + 6 + 36 + 16 + 20);
 
+
+
   var totalH = PAD * 2;
+
   for (var si = 0; si < secH.length; si++) totalH += secH[si];
+
   canvas.height = Math.ceil(totalH * SCALE);
+
   ctx.scale(SCALE, SCALE);
 
+
+
   var grad = ctx.createLinearGradient(0, 0, 0, totalH);
+
   grad.addColorStop(0, '#1a0e30');
+
   grad.addColorStop(0.4, '#120926');
+
   grad.addColorStop(1, '#0d0617');
+
   ctx.fillStyle = grad;
+
   ctx.fillRect(0, 0, W, totalH);
 
+
+
   var y = PAD;
+
   var si = 0;
 
+
+
   // === Header ===
+
   (function() {
+
     var badgeText = rec.winner === 'good' ? '\u597d\u4eba\u9635\u8425\u83b7\u80dc' : '\u574f\u4eba\u9635\u8425\u83b7\u80dc';
+
     var badgeW = tw(badgeText, 15) + 36;
+
     var bx = (W - badgeW) / 2;
+
     rr(bx, y, badgeW, 28, 14);
+
     if (rec.winner === 'good') {
+
       var g = ctx.createLinearGradient(bx, 0, bx + badgeW, 0);
+
       g.addColorStop(0, '#1a6b3c'); g.addColorStop(1, '#27ae60');
+
       ctx.fillStyle = g;
+
     } else {
+
       var g = ctx.createLinearGradient(bx, 0, bx + badgeW, 0);
+
       g.addColorStop(0, '#8e1a1a'); g.addColorStop(1, '#c0392b');
+
       ctx.fillStyle = g;
+
     }
+
     ctx.fill();
+
     dt(badgeText, W/2, y + 6, 15, '#fff', 'center');
+
     var ty = y + 28 + 8;
+
     dt('\u7b2c' + (idx + 1) + '\u5c40 \u00b7 \u963f\u74e6\u9686', W/2, ty, 20, GOLD, 'center');
+
     var iy = ty + 26 + 4;
+
     dt((rec.date || '--') + ' \u00b7 ' + (rec.playerCount || '?') + '\u4eba\u5c40', W/2, iy, 11, TXT_DIM, 'center');
+
   })();
+
   y += secH[si++];
+
+
 
   // === Divider ===
+
   (function() {
+
     var dy = y + 8;
+
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+
     g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
+
   })();
+
   y += secH[si++];
+
+
 
   // === Identity Reveal ===
+
   (function() {
+
     ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+
     dt('\u8eab\u4efd\u63ed\u6653', PAD + 12, y + 1, 13, TXT_SEC, 'left');
+
     var gridY = y + 20;
+
     var colW = (contentW - 12) / 2;
+
     for (var pi = 0; pi < pc; pi++) {
+
       var col = pi % 2, row = Math.floor(pi / 2);
+
       var px = PAD + col * (colW + 12), py = gridY + row * 28;
+
       var id = ids[pi], flippedS = rec.lancelotFlips && rec.lancelotFlips[pi], evil = getFinalFaction(id.role, flippedS) === 'evil';
+
       ctx.fillStyle = evil ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)';
+
       rr(px, py, colW, 24, 6); ctx.fill();
+
       dt(evil ? '\u25b2' : '\u2b22', px + 8, py + 5, 10, evil ? RED : BLUE, 'left');
+
       dt(pn(pi), px + 22, py + 4, 13, TXT, 'left');
+
       dt(id.role || '', px + colW - 8 - tw(id.role || '', 11), py + 5, 11, evil ? RED : BLUE, 'left');
+
     }
+
   })();
+
   y += secH[si++];
+
+
 
   // === Divider === (same as before)
+
   (function() {
+
     var dy = y + 8;
+
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+
     g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
+
   })();
+
   y += secH[si++];
+
+
 
   // === Missions ===
+
   (function() {
+
     ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+
     dt('\u4efb\u52a1\u5386\u7a0b', PAD + 12, y + 1, 13, TXT_SEC, 'left');
+
     var qy = y + 20 + 12;
+
     for (var qi = 0; qi < rec.missions.length; qi++) {
+
       var m = rec.missions[qi];
+
       if (!m.result) { qy += 8; continue; }
+
       var isSuc = m.result === 'success', isShielded = m.result === 'success' && m.shieldedFails, isPureSuc = m.result === 'success' && !m.failCount && !m.shieldedFails;
+
       var attempts = m.launchAttempts || [];
+
       if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
+
       var cardH = calcMissionCardH(m);
+
       var cx = PAD + 16;
+
       ctx.fillStyle = 'rgba(255,255,255,0.04)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
+
       // \u6210\u529f\u8f6e\u6b21\u7528\u91d1\u8272\u5de6\u8fb9\u6761+\u91d1\u8272\u8fb9\u6846\u9ad8\u4eae
+
       ctx.fillStyle = isSuc ? GOLD : RED; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
+
       if (isSuc) { ctx.strokeStyle = 'rgba(201,168,76,0.35)'; ctx.lineWidth = 1; rr(PAD, qy, contentW, cardH, 8); ctx.stroke(); }
+
       dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba\u51fa\u6218', cx, qy + 10, 13, TXT_SEC, 'left');
+
       var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
+
       var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
+
       ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
+
       dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
+
       var ay = qy + 10 + 18 + 8;
+
       for (var a = 0; a < attempts.length; a++) {
+
         var att = attempts[a], isLast = (a === attempts.length - 1);
+
         var approves = 0, rejects = 0;
+
         for (var vk = 0; vk < pc; vk++) {
+
           var vv = getVoteValue(att.votes, vk);
+
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
+
         }
+
         var passed = approves > pc / 2;
+
         var leader = parseLeaderIndex(att.leader);
+
         var teamIndices = att.team || [];
+
         if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
+
         // Draw attempt header: "第N次组队 ★X号NAME提议：A、B、C"
+
         var hSegs = [{ text: '\u7b2c' + (a + 1) + '\u6b21\u7ec4\u961f ', color: TXT_DIM }, { text: '\u2605' + pnShort(leader), color: GOLD }, { text: '\u63d0\u8bae\uff1a', color: TXT_DIM }];
+
         for (var ti = 0; ti < teamIndices.length; ti++) {
+
           var tiVal = (typeof teamIndices[ti] === 'number') ? teamIndices[ti] : parseInt(teamIndices[ti]);
+
           if (ti > 0) hSegs.push({ text: '\u3001', color: TXT_DIM });
+
           hSegs.push({ text: pnShort(tiVal), color: evilColor(tiVal) });
+
         }
+
         dtSegments(cx, ay, hSegs, 11);
+
         ay += 18;
+
         // Draw vote line
+
         var vSegs = [{ text: '\u6295\u7968\uff1a', color: TXT_DIM }];
+
         for (var vi = 0; vi < pc; vi++) {
+
           var vvv = getVoteValue(att.votes, vi);
+
           vSegs.push({ text: pnShort(vi), color: evilColor(vi) });
+
           vSegs.push({ text: (vvv === 'approve' ? '\u2713' : vvv === 'reject' ? '\u2717' : '?') + ' ', color: vvv === 'approve' ? GREEN_BRIGHT : vvv === 'reject' ? RED : TXT_DIM });
+
         }
+
         vSegs.push({ text: ' \u2014 ' + approves + ':' + rejects + ' ' + (passed ? '\u901a\u8fc7' : '\u5426\u51b3') + ' ' + (passed ? '\u2713' : '\u2717'), color: passed ? GREEN_BRIGHT : RED });
+
         var voteFull = ''; for (var vsi = 0; vsi < vSegs.length; vsi++) voteFull += vSegs[vsi].text;
+
         if (tw(voteFull, 10) > contentW - 28) {
+
           var v1Segs = [vSegs[0]];
+
           for (var vi = 0; vi < pc; vi++) { v1Segs.push(vSegs[vi * 2 + 1]); v1Segs.push(vSegs[vi * 2 + 2]); }
+
           dtSegments(cx, ay, v1Segs, 10); ay += 16;
+
           dtSegments(cx, ay, [vSegs[vSegs.length - 1]], 10); ay += 18 + 2;
+
         } else { dtSegments(cx, ay, vSegs, 10); ay += 16 + 2; }
+
       }
+
       // Mission result line
+
       if (m.result) {
+
         if (m.result === 'fail') {
+
           var fs = '\u4efb\u52a1\u7ed3\u679c\uff1a\u2717 \u5931\u8d25'; if (m.failCount) fs += '\uff08' + m.failCount + '\u5f20\u5931\u8d25\u5361\uff09';
+
           dt(fs, cx, ay, 12, RED, 'left');
+
         } else if (isShielded) {
+
           dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff0c\u4fdd\u62a4\u8f6e\u62b5\u6d88\uff09', cx, ay, 12, '#e65100', 'left');
+
           ay += 18;
+
           // fail card details
+
           var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
+
           var evilNames = [];
+
           if (lastAtt && lastAtt.team) {
+
             var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+
             for (var ei = 0; ei < tArr.length; ei++) {
+
               if (isEvil(tArr[ei])) evilNames.push(pnShort(tArr[ei]));
+
             }
+
           }
+
           if (evilNames.length > 0) {
+
             dt('\u5931\u8d25\u5361\uff1a' + m.shieldedFails + '\u5f20\uff08' + evilNames.join('\u3001') + '\uff09', cx, ay, 12, RED, 'left');
+
           }
+
         }
+
         else if (isPureSuc) { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09', cx, ay, 12, GREEN_BRIGHT, 'left'); }
+
         else { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f', cx, ay, 12, GREEN_BRIGHT, 'left'); }
+
         ay += 18 + 10;
+
       }
+
       qy += cardH + 8;
+
     }
+
   })();
+
   y += secH[si++];
+
+
 
   // === Optional Rules ===
+
   if (hasAnyRule) {
+
     (function() {
+
       ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(PAD + 3, y + 7, 3, 0, Math.PI * 2); ctx.fill();
+
       dt(hasAssassin ? '\u523a\u6740\u9636\u6bb5' : '\u53ef\u9009\u89c4\u5219', PAD + 12, y + 1, 13, TXT_SEC, 'left');
+
       var ry = y + 20 + 8;
+
       if (hasLady) {
+
         for (var li = 0; li < rec.ladyCheckHistory.length; li++) {
+
           var lc = rec.ladyCheckHistory[li];
+
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
+
           var rl = lc.round ? '\u7b2c' + lc.round + '\u8f6e\u540e\uff1a' : '';
+
           var resultLabel2 = lc.result === 'good' ? '\u597d\u4eba' : lc.result === 'evil' ? '\u574f\u4eba' : (lc.result || '?');
+
           dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ' + resultLabel2, PAD + 12, ry, 12, TXT_SEC, 'left');
+
           ry += 18;
+
         }
+
         ry += 4;
+
       }
+
       if (hasExcalibur) {
+
         for (var exi = 0; exi < rec.excaliburHistory.length; exi++) {
+
           var ex = rec.excaliburHistory[exi];
+
           var desc = '\u738b\u8005\u4e4b\u5251\uff1a' + (ex.holderName || '') + ' \u6388\u4e88 ' + (ex.targetName || '') + (ex.used ? '\uff08\u5df2\u4f7f\u7528\uff09' : '\uff08\u672a\u4f7f\u7528\uff09');
+
           dt(desc, PAD + 12, ry, 12, TXT_SEC, 'left'); ry += 18;
+
         }
+
         ry += 4;
+
       }
+
       if (hasLancelot) {
+
         for (var lfKey in rec.lancelotFlips) {
+
           if (ids[lfKey]) {
+
             var pIdx = (ids[lfKey].index != null ? ids[lfKey].index : parseInt(lfKey));
+
             var origF = getPlayerFaction(ids[lfKey].role);
+
             var afterL = (origF === 'good') ? '\u7ea2\u65b9(\u574f\u4eba)' : (origF === 'evil') ? '\u84dd\u65b9(\u597d\u4eba)' : '?';
+
             dt('\u5170\u65af\u6d1b\u7279\u53d8\u8282: ' + pn(pIdx) + ' ' + ids[lfKey].role + ' \u2192 ' + afterL, PAD + 12, ry, 12, '#e65100', 'left');
+
             ry += 18;
+
           }
+
         }
+
         ry += 4;
+
       }
+
       if (hasAssassin) {
+
         var aboxY = ry - 4, aboxH = 18 + 18 + 18 + 10;
+
         ctx.fillStyle = 'rgba(192,57,43,0.08)'; rr(PAD, aboxY, contentW, aboxH, 8); ctx.fill();
+
         ctx.strokeStyle = 'rgba(192,57,43,0.25)'; ctx.lineWidth = 1; rr(PAD, aboxY, contentW, aboxH, 8); ctx.stroke();
+
         dt('\u597d\u4eba\u5b8c\u6210' + doneMissions + '\u6b21\u4efb\u52a1 \u2192 \u8fdb\u5165\u523a\u6740\u9636\u6bb5', PAD + 12, aboxY + 6, 12, RED, 'left');
+
         dt('\u523a\u5ba2\u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), PAD + 12, aboxY + 6 + 18, 12, TXT, 'left');
+
         var hitT = rec.assassinSuccess ? '\u731c\u5bf9\u4e86!' : '\u731c\u9519\u4e86!';
+
         dt(hitT, PAD + 12 + tw('\u523a\u5ba2\u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), 12), aboxY + 6 + 18, 12, rec.assassinSuccess ? RED : GREEN_BRIGHT, 'left');
+
         dt(rec.assassinSuccess ? '\u574f\u4eba\u901a\u8fc7\u523a\u6740\u6885\u6797\u9006\u8f6c\u83b7\u80dc' : '\u597d\u4eba\u62b5\u5fa1\u523a\u6740\u83b7\u80dc', PAD + 12, aboxY + 6 + 36, 11, TXT_DIM, 'left');
+
         ry = aboxY + aboxH + 4;
+
       }
+
       if (hasForceEnd) { dt('\u5f3a\u5236\u7ed3\u675f: ' + (rec.forceEndReason || '\u672a\u77e5\u539f\u56e0'), PAD + 12, ry, 12, '#e65100', 'left'); ry += 18 + 4; }
+
       if (hasIdentityMarks) {
+
         for (var mi3 = 0; mi3 < rec.identityMarks.length; mi3++) {
+
           var mk = rec.identityMarks[mi3];
+
           dt((mk.targetName || mk.target) + ' [' + (mk.level === 'high' ? '\u9ad8' : mk.level === 'mid' ? '\u4e2d' : '\u4f4e') + ']', PAD + 12, ry, 12, TXT_SEC, 'left');
+
           ry += 18;
+
         }
+
       }
+
     })();
+
     y += secH[si++];
+
   }
+
+
 
   // === Bottom Divider === (same)
+
   (function() {
+
     var dy = y + 6;
+
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+
     g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
+
   })();
+
   y += secH[si++];
 
+
+
   // === Footer ===
+
   (function() {
+
     dt('\u4efb\u52a1\uff1a' + doneMissions + '\u2713 ' + failMissions + '\u2717', PAD, y, 12, TXT_DIM, 'left');
+
     dt('\u597d\u4eba\u9635\u7ebf\uff1a' + goodPlayers.join('\u3001'), PAD, y + 18, 12, TXT_DIM, 'left');
+
     dt('\u574f\u4eba\u9635\u7ebf\uff1a' + evilPlayers.join('\u3001'), PAD, y + 36, 12, TXT_DIM, 'left');
+
     ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+
     ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, totalH - PAD);
+
   })();
 
+
+
   canvas.toBlob(function(blob) {
+
     if (!blob) {
+
       console.error('[Screenshot] generateGameScreenshot canvas.toBlob returned null');
+
       toast('\u622a\u56fe\u5931\u8d25\uff1ablob \u4e3a\u7a7a', 'error');
+
       return;
+
     }
+
     var dateStr = (rec.date || 'unknown').replace(/[\/\s:]/g, '-');
+
     var fileName = '\u963f\u74e6\u9686\u7b2c' + (idx + 1) + '\u5c40_' + dateStr + '.png';
+
     var link = document.createElement('a');
+
     link.href = URL.createObjectURL(blob);
+
     link.download = fileName;
+
     document.body.appendChild(link);
+
     link.click();
+
     document.body.removeChild(link);
+
     setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
+
   }, 'image/png');
+
   console.log('[Screenshot] Game screenshot generated, idx=' + idx + ', canvas=' + (canvas ? canvas.width + 'x' + canvas.height : 'null'));
+
   // 调试：输出文字版任务和投票数据
+
   var debugText = '[Screenshot DEBUG] idx=' + idx + ' players=' + ids.length + '\n';
+
   for (var mi4 = 0; mi4 < rec.missions.length; mi4++) {
+
     var m2 = rec.missions[mi4];
+
     debugText += '  Mission ' + (mi4+1) + ' (size=' + m2.size + ', result=' + (m2.result||'?') + '):\n';
+
     var atts2 = m2.launchAttempts || [];
+
     if (atts2.length === 0) atts2 = [{ leader: m2.leader, team: m2.team, votes: m2.votes || {} }];
+
     for (var a2 = 0; a2 < atts2.length; a2++) {
+
       var att2 = atts2[a2];
+
       debugText += '    Attempt ' + (a2+1) + ' leader=' + att2.leader + ' team=[' + (att2.team||[]).join(',') + ']\n';
+
       var voteKeys = Object.keys(att2.votes || {});
+
       debugText += '    votes keys: [' + voteKeys.join(',') + ']\n';
+
       for (var vi3 = 0; vi3 < ids.length; vi3++) {
+
         var pnLabel = pn(vi3);
+
         var v1 = att2.votes[vi3];
+
         var vS = att2.votes[String(vi3)];
+
         var vPN = att2.votes[pnLabel];
+
         debugText += '      p' + vi3 + ' (' + pnLabel + '): n=' + v1 + ' s=' + vS + ' pn=' + vPN + '\n';
+
       }
+
     }
+
   }
+
   console.log(debugText);
+
 } catch(e) {
+
   console.error('[Screenshot] generateGameScreenshot error:', e);
+
   toast('\u622a\u56fe\u5931\u8d25\uff1a' + e.message, 'error');
+
 }
+
 }
+
 /* ==================== HISTORY EDIT ==================== */
+
 function openHistoryEdit(idx) {
+
   var history = loadHistory();
+
   if (idx < 0 || idx >= history.length) return;
+
   var recRaw = history[idx];
+
   var rec = normalizeRecord(recRaw);
+
   if (!rec) return;
+
+
 
   var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
 
+
+
   var h = '';
+
   h += '<div class="hci-modal" style="max-width:520px">';
+
   h += '<div class="hci-modal-header">';
+
   h += '<span class="hci-modal-date">编辑记录</span>';
+
   h += '<button class="hci-modal-close" onclick="closeHistoryModal()">&times;</button>';
+
   h += '</div>';
+
   h += '<div class="hci-modal-body">';
+
   h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">修改玩家名称和身份后点击保存</div>';
+
   for (var i = 0; i < rec.identities.length; i++) {
+
     var id = rec.identities[i];
+
     var num = id.index != null ? (id.index + 1) : (i + 1);
+
     h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+
     h += '<span style="font-size:13px;font-weight:600;color:var(--text-bright);min-width:30px">' + num + '号</span>';
+
     h += '<input id="edit-name-' + i + '" value="' + (id.name || '').replace(/"/g, '&quot;') + '" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px">';
+
     h += '<select id="edit-role-' + i + '" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px">';
+
     for (var ri = 0; ri < ALL_ROLES.length; ri++) {
+
       var sel = (ALL_ROLES[ri] === id.role) ? ' selected' : '';
+
       h += '<option value="' + ALL_ROLES[ri] + '"' + sel + '>' + ALL_ROLES[ri] + '</option>';
+
     }
+
     h += '</select>';
+
     h += '</div>';
+
   }
+
   h += '</div>'; // body
+
   h += '<div class="hci-modal-footer" style="gap:8px">';
+
   h += '<button class="btn" onclick="closeHistoryEdit(' + idx + ')">取消</button>';
+
   h += '<button class="btn primary" onclick="saveHistoryEdit(' + idx + ')">保存</button>';
+
   h += '</div>';
+
   h += '</div>';
+
+
 
   var overlay = document.getElementById('hci-modal-overlay');
+
   if (!overlay) return;
+
   overlay.innerHTML = h;
+
 }
+
+
 
 function closeHistoryEdit(idx) {
+
   closeHistoryModal();
+
   openHistoryModal(idx);
+
 }
+
+
 
 function saveHistoryEdit(idx) {
+
   var history = loadHistory();
+
   if (idx < 0 || idx >= history.length) return;
+
   var recRaw = history[idx];
+
   var rec = normalizeRecord(recRaw);
+
   if (!rec) return;
 
+
+
   var newIdentities = [];
+
   for (var i = 0; i < rec.identities.length; i++) {
+
     var nameInput = document.getElementById('edit-name-' + i);
+
     var roleSelect = document.getElementById('edit-role-' + i);
+
     if (!nameInput || !roleSelect) { toast('编辑表单异常', 'error'); return; }
+
     var newName = nameInput.value.trim();
+
     if (!newName) { toast('玩家名称不能为空', 'warn'); return; }
+
     var newRole = roleSelect.value;
+
     if (!newRole) { toast('请为所有玩家选择身份', 'warn'); return; }
+
     newIdentities.push({ name: newName, role: newRole, index: rec.identities[i].index != null ? rec.identities[i].index : i });
+
   }
+
+
 
   // Check duplicate names
+
   var names = newIdentities.map(function(id) { return id.name; });
+
   for (var i = 0; i < names.length; i++) {
+
     if (names.indexOf(names[i]) !== names.lastIndexOf(names[i])) {
+
       toast('名字「' + names[i] + '」重复', 'warn');
+
       return;
+
     }
+
   }
+
+
 
   // Clone raw record and update identities
+
   var updatedV2 = JSON.parse(JSON.stringify(recRaw));
+
   updatedV2.ids = newIdentities.map(function(id) { return { n: id.name, r: id.role, i: id.index }; });
 
+
+
   // Build name remapping: map old name -> new name by index
+
   var oldNames = rec.identities.map(function(id) { return id.name; });
+
   var newNames = newIdentities.map(function(id) { return id.name; });
+
   function remapName(oldName) {
+
     for (var ni = 0; ni < oldNames.length; ni++) {
+
       if (oldNames[ni] === oldName && oldNames[ni] !== newNames[ni]) {
+
         return newNames[ni];
+
       }
+
     }
+
     return oldName;
+
   }
+
+
 
   // Update missions
+
   if (updatedV2.ms) {
+
     for (var mi = 0; mi < updatedV2.ms.length; mi++) {
+
       var m = updatedV2.ms[mi];
+
       if (m.ld) m.ld = remapName(m.ld);
+
       if (m.t) m.t = m.t.map(function(tm) { return remapName(tm); });
+
       if (m.la) {
+
         for (var lai = 0; lai < m.la.length; lai++) {
+
           var att = m.la[lai];
+
           if (att.ld) att.ld = remapName(att.ld);
+
           if (att.t) att.t = att.t.map(function(tm) { return remapName(tm); });
+
           var newVotes = {};
+
           for (var vk in att.v) newVotes[remapName(vk)] = att.v[vk];
+
           att.v = newVotes;
+
         }
+
       }
+
       if (m.v) {
+
         var newVotes = {};
+
         for (var vk in m.v) newVotes[remapName(vk)] = m.v[vk];
+
         m.v = newVotes;
+
       }
+
     }
+
   }
+
+
 
   // Update lady check history
+
   if (updatedV2.lch) {
+
     for (var li = 0; li < updatedV2.lch.length; li++) {
+
       var lc = updatedV2.lch[li];
+
       if (lc.hn) lc.hn = remapName(lc.hn);
+
       if (lc.tn) lc.tn = remapName(lc.tn);
+
     }
+
   }
+
+
 
   // Update excalibur history
+
   if (updatedV2.ex) {
+
     for (var ei = 0; ei < updatedV2.ex.length; ei++) {
+
       var ex = updatedV2.ex[ei];
+
       if (ex.ldn) ex.ldn = remapName(ex.ldn);
+
       if (ex.hn) ex.hn = remapName(ex.hn);
+
       if (ex.tn) ex.tn = remapName(ex.tn);
+
     }
+
   }
+
+
 
   // Update assassin target
+
   if (updatedV2.at) updatedV2.at = remapName(updatedV2.at);
 
+
+
   // Update identity marks target names
+
   if (updatedV2.im) {
+
     for (var imi = 0; imi < updatedV2.im.length; imi++) {
+
       var im = updatedV2.im[imi];
+
       if (im.tn) im.tn = remapName(im.tn);
+
     }
+
   }
+
+
 
   // Preserve UUID
+
   updatedV2._uuid = recRaw._uuid || generateUUID();
 
+
+
   // Save locally
+
   history[idx] = updatedV2;
+
   saveHistory(history);
 
+
+
   // Try Supabase update
+
   var sb = getSupabase();
+
   if (sb) {
+
     var sid = recRaw._sid || rec._supabaseId;
+
     if (sid) {
+
       sb.from('game_records').update({ game_data_v2: updatedV2 }).eq('id', sid).then(function(res) {
+
         if (res.error) console.warn('[Supabase] update failed:', res.error);
+
       });
+
     }
+
   }
+
+
 
   toast('已保存');
+
   closeHistoryModal();
+
   openHistoryModal(idx);
+
 }
+
+
 
 /* ==================== 补录对局 ==================== */
+
 function openSupplementModal() {
+
   var overlay = document.getElementById('supplement-modal-overlay');
+
   if (!overlay) return;
+
   overlay.style.display = 'flex';
+
   var now = new Date();
+
   var dtLocal = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+
   document.getElementById('supplement-time').value = dtLocal;
+
   renderSuppIdentities();
+
   renderSuppMissions();
+
   renderSuppLancelot();
+
   renderSuppLady();
+
   renderSuppExcalibur();
+
   renderSuppAssassin();
+
 }
+
+
 
 function closeSupplementModal(e) {
+
   if (e && e.target !== document.getElementById('supplement-modal-overlay')) return;
+
   document.getElementById('supplement-modal-overlay').style.display = 'none';
+
 }
+
+
 
 function onSuppPcChange() {
+
   renderSuppIdentities();
+
   renderSuppMissions();
+
   renderSuppLancelot();
+
   renderSuppLady();
+
   renderSuppExcalibur();
+
   renderSuppAssassin();
+
 }
+
+
 
 function getSuppPc() { return parseInt(document.getElementById('supplement-pc').value) || 7; }
+
 function getSuppNames() {
+
   var pc = getSuppPc();
+
   var names = [];
+
   for (var i = 0; i < pc; i++) {
+
     var inp = document.getElementById('supp-name-' + i);
+
     names.push(inp ? (inp.value.trim() || ('玩家' + (i + 1))) : ('玩家' + (i + 1)));
+
   }
+
   return names;
+
 }
+
 function getSuppRoles() {
+
   var pc = getSuppPc();
+
   var roles = [];
+
   for (var i = 0; i < pc; i++) {
+
     var sel = document.getElementById('supp-role-' + i);
+
     roles.push(sel ? sel.value : '');
+
   }
+
   return roles;
+
 }
+
+
 
 function renderSuppIdentities() {
+
   var pc = getSuppPc();
+
   var container = document.getElementById('supplement-identities');
+
   if (!container) return;
+
   var h = '';
+
   for (var i = 0; i < pc; i++) {
+
     h += '<div style="display:flex;align-items:center;gap:4px">';
+
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">' + (i + 1) + '号</span>';
+
     h += '<input type="text" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名" oninput="onSuppNameInput()">';
+
     h += '<select id="supp-role-' + i + '" class="filter-select" style="width:110px;flex-shrink:0;box-sizing:border-box" onchange="onSuppRoleChange()"></select>';
+
     h += '</div>';
+
   }
+
   container.innerHTML = h;
+
   fillSuppRoleOptions(pc);
+
   // Restore prev values
+
   for (var j = 0; j < pc; j++) {
+
     var prevSel = document.getElementById('supp-role-' + j);
+
     if (prevSel && state._suppPrevRoles && state._suppPrevRoles[j]) prevSel.value = state._suppPrevRoles[j];
+
   }
+
 }
+
+
 
 function fillSuppRoleOptions(pc) {
+
   var defaultAssign = getDefaultRoleAssign(pc);
+
   for (var i = 0; i < pc; i++) {
+
     var sel = document.getElementById('supp-role-' + i);
+
     if (!sel) continue;
+
     var prevVal = sel.value;
+
     sel.innerHTML = '<option value="">-- 选身份 --</option>';
+
     for (var r = 0; r < ALL_ROLES.length; r++) {
+
       var role = ALL_ROLES[r];
+
       var selAttr = '';
+
       if (prevVal && prevVal === role) selAttr = ' selected';
+
       else if (!prevVal && role === defaultAssign[i]) selAttr = ' selected';
+
       sel.innerHTML += '<option value="' + escAttr(role) + '"' + selAttr + '>' + role + '</option>';
+
     }
+
   }
+
 }
+
+
 
 function getDefaultRoleAssign(pc) {
+
   if (pc === 5) return ['梅林','派西维尔','忠臣','莫甘娜','刺客'];
+
   if (pc === 6) return ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客'];
+
   if (pc === 7) return ['梅林','派西维尔','忠臣','忠臣','莫甘娜','刺客','奥伯伦'];
+
   if (pc === 8) return ['梅林','派西维尔','忠臣','忠臣','忠臣','莫甘娜','刺客','爪牙'];
+
   if (pc === 9) return ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德'];
+
   return ['梅林','派西维尔','忠臣','忠臣','忠臣','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦'];
+
 }
+
+
 
 function onSuppNameInput() {
+
   // Re-render missions/lancelot/lady/excalibur/assassin with updated names
+
   renderSuppMissions();
+
   renderSuppLancelot();
+
   renderSuppLady();
+
   renderSuppExcalibur();
+
   renderSuppAssassin();
+
 }
+
+
 
 function onSuppRoleChange() {
+
   // Save current role selections
+
   var pc = getSuppPc();
+
   state._suppPrevRoles = [];
+
   for (var i = 0; i < pc; i++) {
+
     var sel = document.getElementById('supp-role-' + i);
+
     state._suppPrevRoles[i] = sel ? sel.value : '';
+
   }
+
 }
+
+
 
 function getSuppMissionCount() {
+
   var pc = getSuppPc();
+
   return (pc === 7) ? 4 : 5;
+
 }
+
+
 
 function getSuppMissionSizes() {
+
   var pc = getSuppPc();
+
   if (pc === 5) return [2,3,2,3,3];
+
   if (pc === 6) return [2,3,4,3,4];
+
   if (pc === 7) return [2,3,3,4];
+
   if (pc === 8) return [3,4,4,5,5];
+
   return [3,4,4,5,5]; // 9-10人
+
 }
+
+
 
 function getSuppShieldRound() {
+
   var pc = getSuppPc();
+
   return (pc >= 7) ? 4 : -1; // 7+人第4轮需要2票失败
+
 }
+
+
 
 function onSuppWinnerChange() {
+
   renderSuppAssassin();
+
 }
+
+
 
 function renderSuppMissions() {
+
   var container = document.getElementById('supplement-missions');
+
   if (!container) return;
+
   var pc = getSuppPc();
+
   var names = getSuppNames();
+
   var missionCount = getSuppMissionCount();
+
   var sizes = getSuppMissionSizes();
+
   var shieldRound = getSuppShieldRound();
+
   var h = '';
+
   for (var r = 0; r < missionCount; r++) {
+
     var size = sizes[r];
+
     var shielded = (r + 1 === shieldRound);
+
     var prevData = state._suppMissionData && state._suppMissionData[r];
+
     var prevRes = prevData ? prevData.result : '';
+
     var prevFail = prevData ? prevData.failCount : 0;
+
     var prevLeader = prevData ? prevData.leader : '';
+
     var prevTeam = prevData ? prevData.team : [];
+
     h += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">';
+
     h += '<div style="font-size:13px;font-weight:600;margin-bottom:6px">任务' + (r + 1) + ' · ' + size + '人出战' + (shielded ? ' · 需2票失败' : '') + '</div>';
+
     // Leader
+
     h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:32px">队长</span>';
+
     h += '<select id="supp-m-leader-' + r + '" class="filter-select" style="flex:1;min-width:0">';
+
     h += '<option value="">-- 选队长 --</option>';
+
     for (var pi = 0; pi < pc; pi++) {
+
       h += '<option value="' + (pi + 1) + '号 ' + escAttr(names[pi]) + '"' + (prevLeader === (pi + 1) + '号 ' + names[pi] ? ' selected' : '') + '>' + names[pi] + '</option>';
+
     }
+
     h += '</select></div>';
+
     // Team
+
     h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">';
+
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:32px;line-height:28px">队伍</span>';
+
     for (var pi = 0; pi < pc; pi++) {
+
       var selKey = (pi + 1) + '号 ' + names[pi];
+
       var checked = prevTeam.indexOf(selKey) !== -1 ? ' checked' : '';
+
       h += '<label style="font-size:12px;padding:2px 6px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:3px">';
+
       h += '<input type="checkbox" id="supp-m-team-' + r + '-' + pi + '" value="' + escAttr(selKey) + '"' + checked + '> ' + names[pi];
+
       h += '</label>';
+
     }
+
     h += '</div>';
+
     // Result + fail count
+
     h += '<div style="display:flex;align-items:center;gap:8px">';
+
     h += '<span style="font-size:12px;color:var(--text-dim)">结果</span>';
+
     h += '<select id="supp-m-result-' + r + '" class="filter-select" style="width:90px" onchange="onSuppMissionResultChange()">';
+
     h += '<option value=""' + (prevRes === '' ? ' selected' : '') + '>--</option>';
+
     h += '<option value="success"' + (prevRes === 'success' ? ' selected' : '') + '>成功</option>';
+
     h += '<option value="fail"' + (prevRes === 'fail' ? ' selected' : '') + '>失败</option>';
+
     h += '</select>';
+
     h += '<span style="font-size:12px;color:var(--text-dim)">失败票</span>';
+
     h += '<select id="supp-m-failcount-' + r + '" class="filter-select" style="width:50px">';
+
     for (var fc = 0; fc <= size; fc++) {
+
       h += '<option value="' + fc + '"' + (fc === prevFail ? ' selected' : '') + '>' + fc + '</option>';
+
     }
+
     h += '</select>';
+
     h += '</div>';
+
     h += '</div>';
+
   }
+
   container.innerHTML = h;
+
 }
+
+
 
 function onSuppMissionResultChange() {
+
   // Save current mission data so it survives re-renders
+
   saveSuppMissionData();
+
 }
+
+
 
 function saveSuppMissionData() {
+
   var pc = getSuppPc();
+
   var names = getSuppNames();
+
   var missionCount = getSuppMissionCount();
+
   state._suppMissionData = [];
+
   for (var r = 0; r < missionCount; r++) {
+
     var team = [];
+
     for (var pi = 0; pi < pc; pi++) {
+
       var cb = document.getElementById('supp-m-team-' + r + '-' + pi);
+
       if (cb && cb.checked) team.push(cb.value);
+
     }
+
     var resultEl = document.getElementById('supp-m-result-' + r);
+
     var failEl = document.getElementById('supp-m-failcount-' + r);
+
     var leaderEl = document.getElementById('supp-m-leader-' + r);
+
     state._suppMissionData.push({
+
       result: resultEl ? resultEl.value : '',
+
       failCount: failEl ? parseInt(failEl.value) || 0 : 0,
+
       leader: leaderEl ? leaderEl.value : '',
+
       team: team
+
     });
+
   }
+
 }
+
+
 
 function onSuppLancelotToggle() {
+
   var cb = document.getElementById('supp-has-lancelot');
+
   var div = document.getElementById('supplement-lancelot');
+
   if (div) div.style.display = cb && cb.checked ? 'block' : 'none';
+
   if (cb && cb.checked) renderSuppLancelot();
+
 }
+
+
 
 function renderSuppLancelot() {
+
   var container = document.getElementById('supplement-lancelot');
+
   if (!container || container.style.display === 'none') return;
+
   var pc = getSuppPc();
+
   var names = getSuppNames();
+
   var prevFlipped = state._suppLancelotFlipped;
+
   var prevTarget = state._suppLancelotTarget;
+
   var h = '';
+
   h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">第4轮开始后是否翻转？</div>';
+
   h += '<select id="supp-lancelot-flipped" class="filter-select" style="width:120px;margin-bottom:6px" onchange="onSuppLancelotFlippedChange()">';
+
   h += '<option value="no"' + (!prevFlipped ? ' selected' : '') + '>否</option>';
+
   h += '<option value="yes"' + (prevFlipped ? ' selected' : '') + '>是</option>';
+
   h += '</select>';
+
   h += '<div id="supp-lancelot-target-area" style="' + (prevFlipped ? '' : 'display:none') + '">';
+
   h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">翻转了谁？（可多选）</div>';
+
   for (var pi = 0; pi < pc; pi++) {
+
     var checked = prevTarget && prevTarget.indexOf(pi) !== -1 ? ' checked' : '';
+
     h += '<label style="font-size:12px;padding:2px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;margin-right:4px">';
+
     h += '<input type="checkbox" id="supp-lancelot-' + pi + '" value="' + pi + '"' + checked + '> ' + names[pi];
+
     h += '</label>';
+
   }
+
   h += '</div>';
+
   container.innerHTML = h;
+
 }
+
+
 
 function onSuppLancelotFlippedChange() {
+
   var sel = document.getElementById('supp-lancelot-flipped');
+
   var area = document.getElementById('supp-lancelot-target-area');
+
   if (area) area.style.display = (sel && sel.value === 'yes') ? 'block' : 'none';
+
 }
+
+
 
 function onSuppLadyToggle() {
+
   var cb = document.getElementById('supp-has-lady');
+
   var div = document.getElementById('supplement-lady');
+
   if (div) div.style.display = cb && cb.checked ? 'block' : 'none';
+
   if (cb && cb.checked) renderSuppLady();
+
 }
+
+
 
 function renderSuppLady() {
+
   var container = document.getElementById('supplement-lady');
+
   if (!container || container.style.display === 'none') return;
+
   var pc = getSuppPc();
+
   var names = getSuppNames();
+
   var missionCount = getSuppMissionCount();
+
   var prevEntries = state._suppLadyEntries || [];
+
   var h = '<div style="margin-bottom:6px">';
+
   h += '<button class="btn small" onclick="addSuppLadyEntry()" style="font-size:11px">+ 添加湖中仙女</button>';
+
   h += '</div>';
+
   for (var ei = 0; ei < prevEntries.length; ei++) {
+
     var ent = prevEntries[ei];
+
     h += renderSuppLadyEntry(ei, ent, pc, names, missionCount);
+
   }
+
   container.innerHTML = h;
+
 }
+
+
 
 function renderSuppLadyEntry(ei, ent, pc, names, missionCount) {
+
   var h = '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:4px">';
+
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim)">第</span>';
+
   h += '<select id="supp-lady-round-' + ei + '" class="filter-select" style="width:60px">';
+
   for (var r = 0; r < missionCount; r++) {
+
     h += '<option value="' + r + '"' + (ent.round === r ? ' selected' : '') + '>' + (r + 1) + '轮</option>';
+
   }
+
   h += '</select>';
+
   h += '<span style="font-size:12px;color:var(--text-dim)">后</span>';
+
   h += '</div>';
+
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">持有</span>';
+
   h += '<select id="supp-lady-holder-' + ei + '" class="filter-select" style="flex:1">';
+
   for (var pi = 0; pi < pc; pi++) {
+
     h += '<option value="' + pi + '"' + (ent.holder === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+
   }
+
   h += '</select></div>';
+
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">查验</span>';
+
   h += '<select id="supp-lady-target-' + ei + '" class="filter-select" style="flex:1">';
+
   for (var pi = 0; pi < pc; pi++) {
+
     h += '<option value="' + pi + '"' + (ent.target === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+
   }
+
   h += '</select></div>';
+
   h += '<div style="display:flex;align-items:center;gap:6px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">结果</span>';
+
   h += '<select id="supp-lady-result-' + ei + '" class="filter-select" style="flex:1">';
+
   h += '<option value="正义"' + (ent.result === '正义' ? ' selected' : '') + '>正义</option>';
+
   h += '<option value="邪恶"' + (ent.result === '邪恶' ? ' selected' : '') + '>邪恶</option>';
+
   h += '</select>';
+
   h += '<button class="btn small" onclick="removeSuppLadyEntry(' + ei + ')" style="font-size:11px;color:#ff6666">删除</button>';
+
   h += '</div>';
+
   h += '</div>';
+
   return h;
+
 }
+
+
 
 function addSuppLadyEntry() {
+
   if (!state._suppLadyEntries) state._suppLadyEntries = [];
+
   state._suppLadyEntries.push({ round: 0, holder: 0, target: 1, result: '正义' });
+
   renderSuppLady();
+
 }
+
+
 
 function removeSuppLadyEntry(idx) {
+
   if (!state._suppLadyEntries) return;
+
   state._suppLadyEntries.splice(idx, 1);
+
   renderSuppLady();
+
 }
+
+
 
 function onSuppExcaliburToggle() {
+
   var cb = document.getElementById('supp-has-excalibur');
+
   var div = document.getElementById('supplement-excalibur');
+
   if (div) div.style.display = cb && cb.checked ? 'block' : 'none';
+
   if (cb && cb.checked) renderSuppExcalibur();
+
 }
+
+
 
 function renderSuppExcalibur() {
+
   var container = document.getElementById('supplement-excalibur');
+
   if (!container || container.style.display === 'none') return;
+
   var pc = getSuppPc();
+
   var names = getSuppNames();
+
   var missionCount = getSuppMissionCount();
+
   var prevEntries = state._suppExcaliburEntries || [];
+
   var h = '<div style="margin-bottom:6px">';
+
   h += '<button class="btn small" onclick="addSuppExcaliburEntry()" style="font-size:11px">+ 添加王者之剑</button>';
+
   h += '</div>';
+
   for (var ei = 0; ei < prevEntries.length; ei++) {
+
     var ent = prevEntries[ei];
+
     h += renderSuppExcaliburEntry(ei, ent, pc, names, missionCount);
+
   }
+
   container.innerHTML = h;
+
 }
+
+
 
 function renderSuppExcaliburEntry(ei, ent, pc, names, missionCount) {
+
   var h = '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:4px">';
+
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim)">第</span>';
+
   h += '<select id="supp-ex-round-' + ei + '" class="filter-select" style="width:60px">';
+
   for (var r = 0; r < missionCount; r++) {
+
     h += '<option value="' + r + '"' + (ent.round === r ? ' selected' : '') + '>' + (r + 1) + '轮</option>';
+
   }
+
   h += '</select></div>';
+
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">使用者</span>';
+
   h += '<select id="supp-ex-user-' + ei + '" class="filter-select" style="flex:1">';
+
   for (var pi = 0; pi < pc; pi++) {
+
     h += '<option value="' + pi + '"' + (ent.user === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+
   }
+
   h += '</select></div>';
+
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">对象</span>';
+
   h += '<select id="supp-ex-target-' + ei + '" class="filter-select" style="flex:1">';
+
   for (var pi = 0; pi < pc; pi++) {
+
     h += '<option value="' + pi + '"' + (ent.target === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+
   }
+
   h += '</select></div>';
+
   h += '<div style="display:flex;align-items:center;gap:6px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">结果</span>';
+
   h += '<select id="supp-ex-result-' + ei + '" class="filter-select" style="flex:1">';
+
   h += '<option value="success"' + (ent.result !== 'fail' ? ' selected' : '') + '>成功（抵消失败票）</option>';
+
   h += '<option value="fail"' + (ent.result === 'fail' ? ' selected' : '') + '>失败</option>';
+
   h += '</select>';
+
   h += '<button class="btn small" onclick="removeSuppExcaliburEntry(' + ei + ')" style="font-size:11px;color:#ff6666">删除</button>';
+
   h += '</div>';
+
   h += '</div>';
+
   return h;
+
 }
+
+
 
 function addSuppExcaliburEntry() {
+
   if (!state._suppExcaliburEntries) state._suppExcaliburEntries = [];
+
   state._suppExcaliburEntries.push({ round: 0, user: 0, target: 1, result: 'success' });
+
   renderSuppExcalibur();
+
 }
+
+
 
 function removeSuppExcaliburEntry(idx) {
+
   if (!state._suppExcaliburEntries) return;
+
   state._suppExcaliburEntries.splice(idx, 1);
+
   renderSuppExcalibur();
+
 }
+
+
 
 function onSuppAssassinToggle() {
+
   renderSuppAssassin();
+
 }
+
+
 
 function renderSuppAssassin() {
+
   var container = document.getElementById('supplement-assassin');
+
   if (!container) return;
+
   var cb = document.getElementById('supp-has-assassin');
+
   if (!cb || !cb.checked) { container.innerHTML = ''; return; }
+
   var pc = getSuppPc();
+
   var names = getSuppNames();
+
   var roles = getSuppRoles();
+
   var winner = document.getElementById('supplement-winner').value;
+
   // 反方胜+有刺杀 → 刺杀成功；好人胜+有刺杀 → 可选命中
+
   var prevData = state._suppAssassinData || {};
+
   var h = '';
+
   h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+
   h += '<span style="font-size:12px;color:var(--text-dim)">刺客</span>';
+
   h += '<select id="supp-assassin-who" class="filter-select" style="width:100px">';
+
   for (var pi = 0; pi < pc; pi++) {
+
     h += '<option value="' + pi + '"' + (prevData.who === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+
   }
+
   h += '</select>';
+
   h += '<span style="font-size:12px;color:var(--text-dim)">刺杀目标</span>';
+
   h += '<select id="supp-assassin-target" class="filter-select" style="width:100px">';
+
   for (var pi = 0; pi < pc; pi++) {
+
     h += '<option value="' + (pi + 1) + '号 ' + escAttr(names[pi]) + '"' + (prevData.targetIdx === pi ? ' selected' : '') + '>' + names[pi] + '</option>';
+
   }
+
   h += '</select>';
+
   h += '</div>';
+
   h += '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">';
+
   h += '<span style="font-size:12px;color:var(--text-dim)">是否命中梅林</span>';
+
   h += '<select id="supp-assassin-success" class="filter-select" style="width:80px">';
+
   var defaultSuccess = (winner === 'evil');
+
   h += '<option value="yes"' + (prevData.success === true ? ' selected' : (!prevData.hasOwnProperty('success') && defaultSuccess ? ' selected' : '')) + '>是</option>';
+
   h += '<option value="no"' + (prevData.success === false ? ' selected' : (!prevData.hasOwnProperty('success') && !defaultSuccess ? ' selected' : '')) + '>否</option>';
+
   h += '</select>';
+
   h += '</div>';
+
   container.innerHTML = h;
+
 }
+
+
 
 function submitSupplement() {
+
   var dt = document.getElementById('supplement-time').value;
+
   if (!dt) { toast('请选择对局时间', 'warn'); return; }
 
+
+
   var pc = getSuppPc();
+
   var winner = document.getElementById('supplement-winner').value;
+
   var note = document.getElementById('supplement-note').value.trim();
+
   var names = getSuppNames();
+
   var roles = getSuppRoles();
 
+
+
   // Verify all identities have roles
+
   for (var i = 0; i < pc; i++) {
+
     if (!roles[i]) { toast(names[i] + '未选择身份', 'warn'); return; }
+
   }
+
+
 
   // Build identities
+
   var identities = [];
+
   for (var i = 0; i < pc; i++) {
+
     identities.push({ index: i, name: names[i], role: roles[i] });
+
   }
+
+
 
   // Build activeRoles from identities
+
   var activeRoles = [];
+
   for (var i = 0; i < identities.length; i++) {
+
     if (activeRoles.indexOf(identities[i].role) === -1) {
+
       activeRoles.push(identities[i].role);
+
     }
+
   }
+
+
 
   var parts = dt.split('T');
+
   var dateStr = parts[0];
+
   var timeStr = (parts[1] || '00:00') + ':00';
+
   var startTime = dateStr + ' ' + timeStr;
+
   var endTime = startTime;
 
+
+
   // Build missions
+
   saveSuppMissionData();
+
   var missionData = state._suppMissionData || [];
+
   var missionCount = getSuppMissionCount();
+
   var sizes = getSuppMissionSizes();
+
   var votedMissions = 0;
+
   var failMissions = 0;
+
   var missions = [];
+
   for (var r = 0; r < missionCount; r++) {
+
     var md = (r < missionData.length) ? missionData[r] : { result: '', failCount: 0, leader: '', team: [] };
+
     if (!md.result) continue;
+
     missions.push({
+
       round: r + 1,
+
       size: sizes[r],
+
       leader: md.leader || '',
+
       team: md.team || [],
+
       result: md.result,
+
       failCount: md.failCount || 0,
+
       shieldedFails: 0,
+
       launchFailures: 0,
+
       launchAttempts: [{
+
         team: md.team || [],
+
         votes: buildAllApproveVotes(names),
+
         leader: md.leader || ''
+
       }],
+
       votes: buildAllApproveVotes(names)
+
     });
+
     votedMissions++;
+
     if (md.result === 'fail') failMissions++;
+
   }
+
+
 
   // Lancelot flips
+
   var lancelotFlips = {};
+
   var hasLancelot = document.getElementById('supp-has-lancelot');
+
   if (hasLancelot && hasLancelot.checked) {
+
     for (var pi = 0; pi < pc; pi++) {
+
       var cb = document.getElementById('supp-lancelot-' + pi);
+
       if (cb && cb.checked) lancelotFlips[pi] = true;
+
     }
+
   }
+
+
 
   // Lady of lake
+
   var ladyCheckHistory = [];
+
   var hasLady = document.getElementById('supp-has-lady');
+
   if (hasLady && hasLady.checked && state._suppLadyEntries) {
+
     for (var ei = 0; ei < state._suppLadyEntries.length; ei++) {
+
       var ent = state._suppLadyEntries[ei];
+
       ladyCheckHistory.push({
+
         round: ent.round,
+
         holder: ent.holder,
+
         holderName: names[ent.holder],
+
         target: ent.target,
+
         targetName: names[ent.target],
+
         result: ent.result,
+
         note: '',
+
         recordedAtRound: ent.round,
+
         recordedAtSpeaker: 0
+
       });
+
     }
+
   }
+
+
 
   // Excalibur
+
   var excaliburHistory = [];
+
   var hasExcalibur = document.getElementById('supp-has-excalibur');
+
   if (hasExcalibur && hasExcalibur.checked && state._suppExcaliburEntries) {
+
     for (var ei = 0; ei < state._suppExcaliburEntries.length; ei++) {
+
       var ent = state._suppExcaliburEntries[ei];
+
       excaliburHistory.push({
+
         round: ent.round,
+
         user: ent.user,
+
         userName: names[ent.user],
+
         target: ent.target,
+
         targetName: names[ent.target],
+
         result: ent.result,
+
         recordedAtRound: ent.round
+
       });
+
       // Apply excalibur effect to mission
+
       if (ent.result === 'success' && ent.round < missions.length) {
+
         var mission = missions[ent.round];
+
         if (mission && mission.failCount > 0) {
+
           mission.failCount = Math.max(0, mission.failCount - 1);
+
           mission.shieldedFails = (mission.shieldedFails || 0) + 1;
+
         }
+
       }
+
     }
+
   }
+
+
 
   // Assassination
+
   var assassinTarget = '';
+
   var assassinSuccess = false;
+
   var hasAssassin = document.getElementById('supp-has-assassin');
+
   if (hasAssassin && hasAssassin.checked) {
+
     var targetEl = document.getElementById('supp-assassin-target');
+
     var successEl = document.getElementById('supp-assassin-success');
+
     assassinTarget = targetEl ? targetEl.value : '';
+
     assassinSuccess = successEl ? successEl.value === 'yes' : false;
+
   }
+
+
 
   // If assassin killed Merlin, evil wins regardless of missions
+
   if (assassinSuccess) winner = 'evil';
 
+
+
   // Save names to pool
+
   var dirty = false;
+
   for (var i3 = 0; i3 < Math.min(pc, 10); i3++) {
+
     if (names[i3] && names[i3] !== ('玩家' + (i3 + 1))) {
+
       namePool[i3] = names[i3];
+
       dirty = true;
+
     }
+
   }
+
   if (dirty) saveNamePool();
 
+
+
   var record = {
+
     _uuid: generateUUID(),
+
     date: dateStr,
+
     startTime: startTime,
+
     endTime: endTime,
+
     playerCount: pc,
+
     winner: winner,
+
     identities: identities,
+
     activeRoles: activeRoles,
+
     missions: missions,
+
     lancelotFlips: lancelotFlips,
+
     ladyCheckHistory: ladyCheckHistory,
+
     excaliburEnabled: (excaliburHistory.length > 0),
+
     excaliburHistory: excaliburHistory,
+
     assassinTarget: assassinTarget,
+
     assassinSuccess: assassinSuccess,
+
     roundTendencies: [],
+
     currentRound: missionCount,
+
     identityMarks: [],
+
     _isSupplement: true,
+
     _note: note || ''
+
   };
 
+
+
   var history = loadRawHistoryForSupplement();
+
   history.push(record);
+
   localStorage.setItem('avalon_history_v2', JSON.stringify(history));
+
   invalidateHistoryCache();
 
+
+
   var sb = getSupabase();
+
   if (sb) {
+
     var v2 = toRecordV2(record);
+
     if (!v2._uuid) v2._uuid = record._uuid;
+
     v2._note = note || '';
+
     v2._isSupplement = true;
+
     try {
+
       var xhr = new XMLHttpRequest();
+
       xhr.open('POST', SUPABASE_URL + '/rest/v1/game_records', false);
+
       xhr.setRequestHeader('apikey', SUPABASE_KEY);
+
       xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
+
       xhr.setRequestHeader('Content-Type', 'application/json');
+
       xhr.setRequestHeader('Prefer', 'return=representation');
+
       xhr.send(JSON.stringify({ game_data_v2: v2 }));
+
     } catch(e) {
+
       console.warn('[Supplement] Supabase sync failed:', e);
+
     }
+
   }
+
+
 
   toast('补录成功！');
+
   closeSupplementModal();
+
   renderStats();
+
 }
+
+
 
 function buildAllApproveVotes(names) {
+
   var votes = {};
+
   for (var i = 0; i < names.length; i++) {
+
     votes[(i + 1) + '号 ' + names[i]] = 'approve';
+
   }
+
   return votes;
+
 }
+
+
 
 function loadRawHistoryForSupplement() {
+
   try {
+
     return JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
+
   } catch(e) {
+
     return [];
+
   }
+
 }
+
+
 
 function escAttr(s) {
+
   return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 }
 
+
+
 function pad2(n) {
+
   return n < 10 ? '0' + n : '' + n;
+
 }
+
+
+
+
 
 
 
