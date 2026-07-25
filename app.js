@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v160';
+var SW_VERSION = 'v161';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -604,6 +604,7 @@ function migrateUtcToBeijingV2(rec) {
     // 如果转换后与原始一致，说明已是北京时间，仅标记跳过
     if (newSt === rec.st && newD === rec.d) {
       rec._tzMigrated = true;
+      rec._tm = true;
       return false;
     }
 
@@ -614,6 +615,7 @@ function migrateUtcToBeijingV2(rec) {
       if (newD !== rec.d) {
         // 转换导致日期变化 → 原已是北京时间，不要转换
         rec._tzMigrated = true;
+        rec._tm = true;
         return false;
       }
       // newD === rec.d 且时间不同 → 旧UTC记录，需要转换
@@ -647,6 +649,7 @@ function migrateUtcToBeijingV2(rec) {
       }
     }
     rec._tzMigrated = true;
+    rec._tm = true;
     console.log('[migrateUtcToBeijing] converted record, st=' + rec.st);
     return true;
   } catch(e) {
