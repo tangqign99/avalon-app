@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v167">
+<link rel="stylesheet" href="./style.css?v=v168">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v167"></script>
+<script defer src="./app.js?v=v168"></script>
 </head>
 <body>
 
@@ -93,7 +93,7 @@
     </div>
     <p style="font-size:12px;color:var(--text-dim);margin-top:6px">清理后已删除的对局记录将恢复正常显示</p>
   </div>
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v167</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v168</div>
 </section>
 
 <section class="page" id="page-game">
@@ -302,7 +302,7 @@
 </main>
 
 <div class="toast" id="toast"></div>
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v167</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v168</div>
 
 <!-- 夜间模式切换按钮 -->
 <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="切换夜间模式">&#9790;</button>
@@ -413,34 +413,15 @@
 </div>
 
 <script>
-// 强制注销所有旧 Service Worker，打破无限刷新循环
+// PWA Service Worker 注册 - v168
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
   }).then(function(){
-    var SW_VERSION = 'v166';
+    var SW_VERSION = 'v168';
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
   }).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
-    reg.addEventListener('updatefound', function(){
-      var newWorker = reg.installing;
-      if (!newWorker) return;
-      console.log('[SW] update found');
-      newWorker.addEventListener('statechange', function(){
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          console.log('[SW] new version installed');
-          var banner = document.createElement('div');
-          banner.id = 'sw-update-banner';
-          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#4CAF50;color:#fff;text-align:center;padding:10px;font-size:14px;cursor:pointer;';
-          banner.textContent = '新版本可用，点击刷新';
-          banner.onclick = function(){
-            newWorker.postMessage('skipWaiting');
-            window.location.reload();
-          };
-          document.body.appendChild(banner);
-        }
-      });
-    });
   }).catch(function(e){
     console.warn('[SW] operation failed:', e);
   });
