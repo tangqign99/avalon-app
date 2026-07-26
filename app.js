@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v169';
+var SW_VERSION = 'v170';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -5237,7 +5237,7 @@ function togglePlayerStat(name) {
     if (d.winner === finalFaction) roleStats[role].wins++;
   }
 
-  var total = data.length;
+  var total = gamesGood + gamesEvil;
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
@@ -5445,7 +5445,7 @@ function renderPlayerProfile() {
     }
   }
 
-  var total = data.length;
+  var total = gamesGood + gamesEvil;
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
@@ -9175,11 +9175,13 @@ function renderSuppIdentities() {
   var container = document.getElementById('supplement-identities');
   if (!container) return;
   var h = '';
-  // Build datalist for name combobox
-  var sortedNames = getSortedNamePool();
+  // Build datalist for name combobox from current namePool
   h += '<datalist id="supp-name-datalist">';
-  for (var ni = 0; ni < sortedNames.length; ni++) {
-    h += '<option value="' + escAttr(sortedNames[ni]) + '">';
+  for (var ni = 0; ni < namePool.length; ni++) {
+    var n = namePool[ni];
+    if (n && n.indexOf('玩家') !== 0) {
+      h += '<option value="' + escAttr(n) + '">';
+    }
   }
   h += '</datalist>';
   for (var i = 0; i < pc; i++) {
