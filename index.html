@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>阿瓦隆辅助</title>
 <link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./style.css?v=v168">
+<link rel="stylesheet" href="./style.css?v=v169">
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
-<script defer src="./app.js?v=v168"></script>
+<script defer src="./app.js?v=v169"></script>
 </head>
 <body>
 
@@ -36,11 +36,11 @@
     <div class="count-grid" id="count-grid"></div>
   </div>
   <div class="card">
-    <h2>玩家名称 <span style="font-size:12px;color:var(--text-dim)">（下拉选择）</span></h2>
+    <h2 style="text-align:center">玩家名称 <span style="font-size:12px;color:var(--text-dim);display:block;margin-top:2px">（下拉选择）</span></h2>
     <div id="player-names"></div>
   </div>
   <div class="card">
-    <h2>本局角色 <span style="font-size:12px;color:var(--text-dim);font-weight:400">（勾选的才会出现在结束面板身份选项中）</span></h2>
+    <h2 style="text-align:center">本局角色 <span style="font-size:12px;color:var(--text-dim);font-weight:400;display:block;margin-top:2px">（勾选的才会出现在结束面板身份选项中）</span></h2>
     <div class="role-checkbox-grid" id="role-checkbox-grid"></div>
   </div>
   <div class="card">
@@ -93,7 +93,7 @@
     </div>
     <p style="font-size:12px;color:var(--text-dim);margin-top:6px">清理后已删除的对局记录将恢复正常显示</p>
   </div>
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v168</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v169</div>
 </section>
 
 <section class="page" id="page-game">
@@ -302,7 +302,7 @@
 </main>
 
 <div class="toast" id="toast"></div>
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v168</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v169</div>
 
 <!-- 夜间模式切换按钮 -->
 <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="切换夜间模式">&#9790;</button>
@@ -413,12 +413,12 @@
 </div>
 
 <script>
-// PWA Service Worker 注册 - v168
+// PWA Service Worker 注册 - v169
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(function(regs){
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
   }).then(function(){
-    var SW_VERSION = 'v168';
+    var SW_VERSION = 'v169';
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
   }).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
