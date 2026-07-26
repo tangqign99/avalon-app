@@ -5,7 +5,7 @@ var ASSETS = [
   './',
   './index.html',
   './style.css?v=v170',
-  './app-v170.js',
+  './app-v170a.js',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
