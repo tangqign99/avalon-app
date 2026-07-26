@@ -5274,10 +5274,6 @@ function togglePlayerStat(name) {
     else if (factionFilter === 'evil') { effTotal = (rs.evil ? rs.evil.total : 0); effWins = (rs.evil ? rs.evil.wins : 0); }
     else { effTotal = (rs.good ? rs.good.total : 0) + (rs.evil ? rs.evil.total : 0); effWins = (rs.good ? rs.good.wins : 0) + (rs.evil ? rs.evil.wins : 0); }
     if (effTotal === 0) continue;
-    // \u9635\u8425\u8fc7\u6ee4\uff083a\uff09
-    var naturalFaction = getFinalFaction(r, false);
-    if (factionFilter === 'good' && naturalFaction !== 'good') continue;
-    if (factionFilter === 'evil' && naturalFaction !== 'evil') continue;
     h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + effWins + '/' + effTotal + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(effWins / effTotal * 100) + '%</td></tr>';
   }
   h += '</table>';
@@ -9190,7 +9186,7 @@ function renderSuppIdentities() {
     for (var ni = 0; ni < namePool.length; ni++) {
       var n = namePool[ni];
       if (n && n.indexOf('玩家') !== 0) {
-        h += '<option value="' + escAttr(n) + '"' + (n === (namePool[i] || ('玩家' + (i + 1))) ? ' selected' : '') + '>' + escHtml(n) + '</option>';
+        h += '<option value="' + escAttr(n) + '"' + (n === (namePool[i] || ('玩家' + (i + 1))) ? ' selected' : '') + '>' + escAttr(n) + '</option>';
       }
     }
     h += '</select>';
