@@ -1,11 +1,11 @@
-/* ==================== Service Worker v167 ==================== */
-// SW strategy: stale-while-revalidate
-var CACHE_NAME = 'avalon-pwa-v167';
+/* ==================== Service Worker v168 ==================== */
+// SW strategy: stale-while-revalidate, auto-update on new version
+var CACHE_NAME = 'avalon-pwa-v168';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v167',
-  './app.js?v=v167',
+  './style.css?v=v168',
+  './app.js?v=v168',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
@@ -18,26 +18,23 @@ self.addEventListener('install', function(e) {
           console.warn('[SW] Failed to cache:', url, err && (err.message || err));
         });
       }));
+    }).then(function() {
+      // 立即激活新 SW，避免等待旧 SW 释放造成更新循环
+      return self.skipWaiting();
     })
   );
-  // 不在此处 skipWaiting，等用户点击横幅后由 postMessage 触发
 });
 
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) {
-        // 只删除旧版本的缓存，保留当前版本
         if (k !== CACHE_NAME) return caches.delete(k);
       }));
     }).then(function() {
       return self.clients.claim();
     })
   );
-});
-
-self.addEventListener('message', function(e) {
-  if (e.data === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('fetch', function(e) {
