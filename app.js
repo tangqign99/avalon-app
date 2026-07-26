@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v171';
+var SW_VERSION = 'v172';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -9273,15 +9273,14 @@ function onSuppRoleChange() {
 }
 
 function getSuppMissionCount() {
-  var pc = getSuppPc();
-  return (pc === 7) ? 4 : 5;
+  return 5;
 }
 
 function getSuppMissionSizes() {
   var pc = getSuppPc();
   if (pc === 5) return [2,3,2,3,3];
   if (pc === 6) return [2,3,4,3,4];
-  if (pc === 7) return [2,3,3,4];
+  if (pc === 7) return [2,3,3,4,4];
   if (pc === 8) return [3,4,4,5,5];
   return [3,4,4,5,5]; // 9-10人
 }
