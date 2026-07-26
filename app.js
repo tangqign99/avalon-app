@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v168';
+var SW_VERSION = 'v169';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -1822,7 +1822,8 @@ function generateLiveScreenshot() {
           var lc = state.ladyCheckHistory[li];
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
           var rl = lc.round ? '第' + lc.round + '轮后：' : '';
-          dt(rl + pn(hldr) + ' 查验 ' + pn(tgt) + ' → ' + (lc.result || '?'), PAD + 12, ry, 12, TXT_SEC, 'left');
+          var lcLabel = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '反方' : (lc.result === 'skip' ? '不报' : (lc.result || '?'));
+          dt(rl + pn(hldr) + ' 查验 ' + pn(tgt) + ' → ' + lcLabel, PAD + 12, ry, 12, TXT_SEC, 'left');
           ry += 18;
         }
         ry += 4;
@@ -2300,7 +2301,7 @@ function renderLadyLakeHolderInfo() {
       var rec = history[hi];
       h += '<div style="font-size:14px;color:var(--text);margin-bottom:5px;line-height:1.5">';
       h += '<strong>第' + genNum + '任女神：</strong>' + (rec.holder + 1) + '号 ' + state.playerNames[rec.holder] + ' <span style="color:var(--gold-light)">→</span> 验 ' + (rec.target + 1) + '号 ' + state.playerNames[rec.target];
-      h += ' <span style="font-weight:700;font-size:15px;color:' + (rec.result === 'good' ? '#99bbff' : '#ff9999') + '">' + (rec.result === 'good' ? '好人' : '反方') + '</span>';
+      h += ' <span style="font-weight:700;font-size:15px;color:' + (rec.result === 'good' ? '#99bbff' : rec.result === 'skip' ? '#999' : '#ff9999') + '">' + (rec.result === 'good' ? '好人' : rec.result === 'evil' ? '反方' : '不报') + '</span>';
       h += '</div>';
       genNum++;
     }
@@ -2930,6 +2931,7 @@ function excaliburDirectionLabel(dir) {
 function ladyClaimLabel(res) {
   if (res === 'good') return '好人';
   if (res === 'evil') return '反方';
+  if (res === 'skip') return '不报';
   if (res === 'unknown') return '未说明';
   if (res === 'refused') return '拒绝说明';
   return '未记录';
@@ -8358,7 +8360,7 @@ function openHistoryModal(idx) {
       var holderNum = (lc.holder != null) ? (lc.holder + 1) + '号 ' : '';
       var targetNum = (lc.target != null) ? (lc.target + 1) + '号 ' : '';
       var roundLabel = lc.round ? '第' + lc.round + '轮：' : '';
-      var resultLabel = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '坏人' : (lc.result || '?');
+      var resultLabel = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '反方' : (lc.result === 'skip' ? '不报' : (lc.result || '?'));
       h += '<div class="hci-detail-row">' + roundLabel + holderNum + lc.holderName + ' 查验 ' + targetNum + lc.targetName + ' &#8594; <strong>' + resultLabel + '</strong></div>';
     }
     h += '</div>';
@@ -8837,7 +8839,7 @@ function generateGameScreenshot(idx) {
           var lc = rec.ladyCheckHistory[li];
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
           var rl = lc.round ? '\u7b2c' + lc.round + '\u8f6e\u540e\uff1a' : '';
-          var resultLabel2 = lc.result === 'good' ? '\u597d\u4eba' : lc.result === 'evil' ? '\u574f\u4eba' : (lc.result || '?');
+          var resultLabel2 = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '反方' : (lc.result === 'skip' ? '不报' : (lc.result || '?'));
           dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ' + resultLabel2, PAD + 12, ry, 12, TXT_SEC, 'left');
           ry += 18;
         }
@@ -9173,10 +9175,17 @@ function renderSuppIdentities() {
   var container = document.getElementById('supplement-identities');
   if (!container) return;
   var h = '';
+  // Build datalist for name combobox
+  var sortedNames = getSortedNamePool();
+  h += '<datalist id="supp-name-datalist">';
+  for (var ni = 0; ni < sortedNames.length; ni++) {
+    h += '<option value="' + escAttr(sortedNames[ni]) + '">';
+  }
+  h += '</datalist>';
   for (var i = 0; i < pc; i++) {
     h += '<div style="display:flex;align-items:center;gap:4px">';
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">' + (i + 1) + '号</span>';
-    h += '<input type="text" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名" oninput="onSuppNameInput()">';
+    h += '<input type="text" list="supp-name-datalist" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名" oninput="onSuppNameInput()">';
     h += '<select id="supp-role-' + i + '" class="filter-select" style="width:110px;flex-shrink:0;box-sizing:border-box" onchange="onSuppRoleChange()"></select>';
     h += '</div>';
   }
