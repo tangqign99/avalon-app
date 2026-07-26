@@ -1,11 +1,11 @@
-/* ==================== Service Worker v168 ==================== */
+/* ==================== Service Worker v169 ==================== */
 // SW strategy: stale-while-revalidate, auto-update on new version
-var CACHE_NAME = 'avalon-pwa-v168';
+var CACHE_NAME = 'avalon-pwa-v169';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v168',
-  './app.js?v=v168',
+  './style.css?v=v169',
+  './app.js?v=v169',
   './vendor/supabase.min.js',
   './manifest.json'
 ];
