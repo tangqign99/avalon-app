@@ -16,11 +16,11 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v170">
+<link rel="stylesheet" href="./style.css?v=v171">
 
 <script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
 
-<script defer src="./app-v170a.js"></script>
+<script defer src="./app-v171.js"></script>
 
 </head>
 
@@ -828,7 +828,7 @@
 
 <script>
 
-// PWA Service Worker 注册 - v170
+// PWA Service Worker 注册 - v171
 
 if('serviceWorker' in navigator){
 
@@ -838,7 +838,7 @@ if('serviceWorker' in navigator){
 
   }).then(function(){
 
-    var SW_VERSION = 'v170';
+    var SW_VERSION = 'v171';
 
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
 
