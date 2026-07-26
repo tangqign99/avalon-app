@@ -369,9 +369,6 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .filter-sep{color:var(--text-dim);font-size:12px}
 .filter-clear-btn{padding:6px 14px;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.2);background:var(--parchment);color:var(--text-dim);font-size:12px;cursor:pointer}
 .filter-clear-btn:hover{color:var(--red-bright);border-color:var(--red-bright)}
-.player-stat-expand{border:1px solid rgba(201,168,76,0.18);border-radius:var(--radius);padding:12px;margin-top:8px;background:var(--parchment)}
-.player-stat-expand table{width:100%;font-size:13px;border-collapse:collapse}
-.player-stat-expand td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.06)}
 .toast{
   position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:300;
   padding:10px 22px;border-radius:var(--radius);font-size:14px;font-weight:600;
