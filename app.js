@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v167';
+var SW_VERSION = 'v168';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -5235,7 +5235,7 @@ function togglePlayerStat(name) {
     if (d.winner === finalFaction) roleStats[role].wins++;
   }
 
-  var total = gamesGood + gamesEvil;
+  var total = data.length;
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
@@ -5443,7 +5443,7 @@ function renderPlayerProfile() {
     }
   }
 
-  var total = gamesGood + gamesEvil;
+  var total = data.length;
   var totalRate = total > 0 ? Math.round(totalWins / total * 100) : 0;
   var goodRate = gamesGood > 0 ? Math.round(winsGood / gamesGood * 100) : 0;
   var evilRate = gamesEvil > 0 ? Math.round(winsEvil / gamesEvil * 100) : 0;
@@ -5811,7 +5811,9 @@ function showGameDetail(idx) {
       var lh = rec.ladyCheckHistory[li];
       h += '<div style="margin-bottom:3px;font-size:13px">';
       h += '<strong>第' + (li + 1) + '任女神：</strong>' + lh.holderName + ' → 验 ' + lh.targetName;
-      h += ' <span style="font-weight:700;color:' + (lh.result === 'good' ? 'var(--blue-light)' : 'var(--red-bright)') + '">女神说' + (lh.result === 'good' ? '好人' : '反方') + '</span>';
+      var ladyResultLabel = lh.result === 'good' ? '好人' : (lh.result === 'evil' ? '反方' : (lh.result === 'skip' ? '不报' : (lh.result || '?')));
+      var ladyResultColor = lh.result === 'good' ? 'var(--blue-light)' : (lh.result === 'evil' ? 'var(--red-bright)' : 'var(--text-dim)');
+      h += ' <span style="font-weight:700;color:' + ladyResultColor + '">女神说' + ladyResultLabel + '</span>';
       h += ' <span style="font-size:11px;color:var(--text-dim)">（女神说的不一定准）</span>';
       h += '</div>';
     }
@@ -9188,20 +9190,41 @@ function renderSuppIdentities() {
 }
 
 function fillSuppRoleOptions(pc) {
+  // Count role appearances in history for sorting
+  var roleAppearance = {};
+  var history = loadNormalizedHistory();
+  for (var hi = 0; hi < history.length; hi++) {
+    var ids = history[hi].identities;
+    for (var ji = 0; ji < ids.length; ji++) {
+      roleAppearance[ids[ji].role] = (roleAppearance[ids[ji].role] || 0) + 1;
+    }
+  }
+  // Sort roles by appearance count (descending), new roles at end
+  var sortedRoles = ALL_ROLES.slice().sort(function(a, b) {
+    var ca = roleAppearance[a] || 0;
+    var cb = roleAppearance[b] || 0;
+    return cb - ca;
+  });
+
   var defaultAssign = getDefaultRoleAssign(pc);
   for (var i = 0; i < pc; i++) {
     var sel = document.getElementById('supp-role-' + i);
     if (!sel) continue;
     var prevVal = sel.value;
     sel.innerHTML = '<option value="">-- 选身份 --</option>';
-    for (var r = 0; r < ALL_ROLES.length; r++) {
-      var role = ALL_ROLES[r];
+    for (var r = 0; r < sortedRoles.length; r++) {
+      var role = sortedRoles[r];
       var selAttr = '';
       if (prevVal && prevVal === role) selAttr = ' selected';
       else if (!prevVal && role === defaultAssign[i]) selAttr = ' selected';
       sel.innerHTML += '<option value="' + escAttr(role) + '"' + selAttr + '>' + role + '</option>';
     }
   }
+  renderSuppMissions();
+  renderSuppLancelot();
+  renderSuppLady();
+  renderSuppExcalibur();
+  renderSuppAssassin();
 }
 
 function getDefaultRoleAssign(pc) {
@@ -9428,30 +9451,62 @@ function renderSuppLancelot() {
   if (!container || container.style.display === 'none') return;
   var pc = getSuppPc();
   var names = getSuppNames();
-  var prevFlipped = state._suppLancelotFlipped;
-  var prevTarget = state._suppLancelotTarget;
-  var h = '';
-  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">第4轮开始后是否翻转？</div>';
-  h += '<select id="supp-lancelot-flipped" class="filter-select" style="width:120px;margin-bottom:6px" onchange="onSuppLancelotFlippedChange()">';
-  h += '<option value="no"' + (!prevFlipped ? ' selected' : '') + '>否</option>';
-  h += '<option value="yes"' + (prevFlipped ? ' selected' : '') + '>是</option>';
-  h += '</select>';
-  h += '<div id="supp-lancelot-target-area" style="' + (prevFlipped ? '' : 'display:none') + '">';
-  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">翻转了谁？（可多选）</div>';
+  var roles = getSuppRoles();
+  var missionCount = getSuppMissionCount();
+
+  // Save current checkbox states before re-render
+  saveSuppLancelotState();
+
+  // Find Lancelot players
+  var lancelotIndices = [];
   for (var pi = 0; pi < pc; pi++) {
-    var checked = prevTarget && prevTarget.indexOf(pi) !== -1 ? ' checked' : '';
-    h += '<label style="font-size:12px;padding:2px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;margin-right:4px">';
-    h += '<input type="checkbox" id="supp-lancelot-' + pi + '" value="' + pi + '"' + checked + '> ' + names[pi];
-    h += '</label>';
+    var role = roles[pi];
+    if (role.indexOf('兰斯洛特') !== -1) lancelotIndices.push(pi);
   }
-  h += '</div>';
+  if (lancelotIndices.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:8px">没有兰斯洛特身份</div>';
+    return;
+  }
+
+  // Load previous state
+  var prevRounds = state._suppLancelotRounds;
+  if (!prevRounds) { prevRounds = {}; state._suppLancelotRounds = prevRounds; }
+
+  var h = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">每轮是否反转？（第3轮起有效）</div>';
+  // Per-round toggles: rounds 3, 4, 5 (or up to missionCount)
+  var maxRound = Math.min(missionCount, 5);
+  for (var r = 3; r <= maxRound; r++) {
+    h += '<div style="margin-bottom:4px;padding:4px 6px;background:rgba(255,255,255,0.03);border-radius:4px">';
+    h += '<span style="font-size:12px;color:var(--gold-light);font-weight:600">第' + r + '轮</span>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px">';
+    for (var li2 = 0; li2 < lancelotIndices.length; li2++) {
+      var pi = lancelotIndices[li2];
+      var key = 'supp-lf-r' + r + '-p' + pi;
+      var prevVal = prevRounds[key] || false;
+      h += '<label style="font-size:11px;padding:2px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px">';
+      h += '<input type="checkbox" id="' + key + '"' + (prevVal ? ' checked' : '') + '> ' + names[pi] + ' 翻转';
+      h += '</label>';
+    }
+    h += '</div></div>';
+  }
   container.innerHTML = h;
 }
 
+function saveSuppLancelotState() {
+  if (!state._suppLancelotRounds) state._suppLancelotRounds = {};
+  var missionCount = getSuppMissionCount();
+  var maxRound = Math.min(missionCount, 5);
+  for (var r = 3; r <= maxRound; r++) {
+    var keys = document.querySelectorAll('[id^="supp-lf-r' + r + '-p"]');
+    for (var k = 0; k < keys.length; k++) {
+      var el = keys[k];
+      state._suppLancelotRounds[el.id] = el.checked;
+    }
+  }
+}
+
 function onSuppLancelotFlippedChange() {
-  var sel = document.getElementById('supp-lancelot-flipped');
-  var area = document.getElementById('supp-lancelot-target-area');
-  if (area) area.style.display = (sel && sel.value === 'yes') ? 'block' : 'none';
+  // No-op kept for backward compatibility
 }
 
 function onSuppLadyToggle() {
@@ -9717,13 +9772,25 @@ function submitSupplement() {
     if (md.result === 'fail') failMissions++;
   }
 
-  // Lancelot flips
+  // Lancelot flips: collect from per-round toggles, odd total = flipped
   var lancelotFlips = {};
   var hasLancelot = document.getElementById('supp-has-lancelot');
   if (hasLancelot && hasLancelot.checked) {
+    var flipCounts = {};
+    var missionCount = getSuppMissionCount();
+    var maxRound = Math.min(missionCount, 5);
+    for (var r = 3; r <= maxRound; r++) {
+      for (var pi = 0; pi < pc; pi++) {
+        var cb = document.getElementById('supp-lf-r' + r + '-p' + pi);
+        if (cb && cb.checked) {
+          flipCounts[pi] = (flipCounts[pi] || 0) + 1;
+        }
+      }
+    }
     for (var pi = 0; pi < pc; pi++) {
-      var cb = document.getElementById('supp-lancelot-' + pi);
-      if (cb && cb.checked) lancelotFlips[pi] = true;
+      if (flipCounts[pi] && flipCounts[pi] % 2 !== 0) {
+        lancelotFlips[pi] = true;
+      }
     }
   }
 
