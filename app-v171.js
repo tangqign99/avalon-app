@@ -5189,6 +5189,8 @@ function togglePlayerStat(name) {
     existing.remove();
     state._lastStatPlayer = null;
     state._lastStatFaction = null;
+    var selEl = document.getElementById('player-stat-select');
+    if (selEl) selEl.value = '';
     return;
   }
   // 过滤切换：移除旧元素，重新渲染
@@ -5231,14 +5233,10 @@ function togglePlayerStat(name) {
 
     if (d.winner === finalFaction) totalWins++;
 
-    if (!roleStats[role]) roleStats[role] = { good: { total: 0, wins: 0 }, evil: { total: 0, wins: 0 } };
-    if (finalFaction === 'good') {
-      roleStats[role].good.total++;
-      if (d.winner === 'good') roleStats[role].good.wins++;
-    } else if (finalFaction === 'evil') {
-      roleStats[role].evil.total++;
-      if (d.winner === 'evil') roleStats[role].evil.wins++;
-    }
+    if (!roleStats[role]) roleStats[role] = { total: 0, wins: 0 };
+    roleStats[role].total++;
+    // 身份胜率使用最终阵营判定（考虑翻转），确保兰斯洛特变节后按实际阵营计算
+    if (d.winner === finalFaction) roleStats[role].wins++;
   }
 
   var total = gamesGood + gamesEvil;
@@ -5269,12 +5267,12 @@ function togglePlayerStat(name) {
     var r = roleList[j];
     var rs = roleStats[r];
     // \u8df3\u8fc7 0 \u573a\u6b21\u7684\u8eab\u4efd\uff083b\uff09
-    var effTotal, effWins;
-    if (factionFilter === 'good') { effTotal = (rs.good ? rs.good.total : 0); effWins = (rs.good ? rs.good.wins : 0); }
-    else if (factionFilter === 'evil') { effTotal = (rs.evil ? rs.evil.total : 0); effWins = (rs.evil ? rs.evil.wins : 0); }
-    else { effTotal = (rs.good ? rs.good.total : 0) + (rs.evil ? rs.evil.total : 0); effWins = (rs.good ? rs.good.wins : 0) + (rs.evil ? rs.evil.wins : 0); }
-    if (effTotal === 0) continue;
-    h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + effWins + '/' + effTotal + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(effWins / effTotal * 100) + '%</td></tr>';
+    if (!rs || rs.total === 0) continue;
+    // \u9635\u8425\u8fc7\u6ee4\uff083a\uff09
+    var naturalFaction = getFinalFaction(r, false);
+    if (factionFilter === 'good' && naturalFaction !== 'good') continue;
+    if (factionFilter === 'evil' && naturalFaction !== 'evil') continue;
+    h += '<tr><td style="padding:4px 8px">' + r + '</td><td style="padding:4px 8px;text-align:right;color:var(--gold-light)">' + rs.wins + '/' + rs.total + '</td><td style="padding:4px 8px;text-align:right">' + Math.round(rs.wins / rs.total * 100) + '%</td></tr>';
   }
   h += '</table>';
 
@@ -5313,6 +5311,8 @@ function togglePlayerStat(name) {
   div.className = 'player-stat-expand';
   div.innerHTML = h;
   detailEl.appendChild(div);
+  var selEl = document.getElementById('player-stat-select');
+  if (selEl) selEl.value = '';
 }
 
 function showPlayerProfilePopup() {
@@ -9132,6 +9132,8 @@ function openSupplementModal() {
   var now = new Date();
   var dtLocal = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
   document.getElementById('supplement-time').value = dtLocal;
+  var pcSel = document.getElementById('supplement-pc');
+  if (pcSel && state.playerCount) pcSel.value = state.playerCount;
   renderSuppIdentities();
   renderSuppMissions();
   renderSuppLancelot();
@@ -9179,17 +9181,19 @@ function renderSuppIdentities() {
   var container = document.getElementById('supplement-identities');
   if (!container) return;
   var h = '';
+  // Build datalist for name combobox from current namePool
+  h += '<datalist id="supp-name-datalist">';
+  for (var ni = 0; ni < namePool.length; ni++) {
+    var n = namePool[ni];
+    if (n && n.indexOf('玩家') !== 0) {
+      h += '<option value="' + escAttr(n) + '">';
+    }
+  }
+  h += '</datalist>';
   for (var i = 0; i < pc; i++) {
     h += '<div style="display:flex;align-items:center;gap:4px">';
     h += '<span style="font-size:12px;color:var(--text-dim);min-width:28px">' + (i + 1) + '号</span>';
-    h += '<select id="supp-name-' + i + '" class="filter-select" style="flex:1;min-width:0;box-sizing:border-box" onchange="onSuppNameInput()">';
-    for (var ni = 0; ni < namePool.length; ni++) {
-      var n = namePool[ni];
-      if (n && n.indexOf('玩家') !== 0) {
-        h += '<option value="' + escAttr(n) + '"' + (n === (namePool[i] || ('玩家' + (i + 1))) ? ' selected' : '') + '>' + escAttr(n) + '</option>';
-      }
-    }
-    h += '</select>';
+    h += '<input type="text" list="supp-name-datalist" id="supp-name-' + i + '" class="filter-input" style="flex:1;min-width:0;box-sizing:border-box" value="' + escAttr(namePool[i] || ('玩家' + (i + 1))) + '" placeholder="姓名" oninput="onSuppNameInput()">';
     h += '<select id="supp-role-' + i + '" class="filter-select" style="width:110px;flex-shrink:0;box-sizing:border-box" onchange="onSuppRoleChange()"></select>';
     h += '</div>';
   }
