@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v170';
+var SW_VERSION = 'v171';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -5189,6 +5189,8 @@ function togglePlayerStat(name) {
     existing.remove();
     state._lastStatPlayer = null;
     state._lastStatFaction = null;
+    var selEl = document.getElementById('player-stat-select');
+    if (selEl) selEl.value = '';
     return;
   }
   // 过滤切换：移除旧元素，重新渲染
@@ -5309,6 +5311,8 @@ function togglePlayerStat(name) {
   div.className = 'player-stat-expand';
   div.innerHTML = h;
   detailEl.appendChild(div);
+  var selEl = document.getElementById('player-stat-select');
+  if (selEl) selEl.value = '';
 }
 
 function showPlayerProfilePopup() {
@@ -9128,6 +9132,8 @@ function openSupplementModal() {
   var now = new Date();
   var dtLocal = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
   document.getElementById('supplement-time').value = dtLocal;
+  var pcSel = document.getElementById('supplement-pc');
+  if (pcSel && state.playerCount) pcSel.value = state.playerCount;
   renderSuppIdentities();
   renderSuppMissions();
   renderSuppLancelot();
