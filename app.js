@@ -313,6 +313,34 @@ function parseLeaderIndex(leader) {
   return 0;
 }
 
+// 通用玩家标识解析：数字/数字字符串按 0-based 下标（带边界校验）；
+// "N号 名字" 优先按名字匹配 identities，否则取 N-1 作下标；
+// 纯名字按名字匹配；解析不到返回 -1。
+function resolvePlayerIdx(tag, identities) {
+  if (typeof tag === 'number') return (tag >= 0 && tag < identities.length) ? tag : -1;
+  if (typeof tag !== 'string' || !identities) return -1;
+  var s = tag.trim();
+  var m = s.match(/^(\d+)号(?:\s+(.*))?$/);
+  if (m) {
+    var n = parseInt(m[1], 10);
+    var name = (m[2] || '').trim();
+    if (name) {
+      for (var i = 0; i < identities.length; i++) {
+        if (identities[i].name === name) return i;
+      }
+    }
+    return (n - 1 >= 0 && n - 1 < identities.length) ? n - 1 : -1;
+  }
+  if (/^\d+$/.test(s)) {
+    var idx = parseInt(s, 10);
+    return (idx >= 0 && idx < identities.length) ? idx : -1;
+  }
+  for (var j = 0; j < identities.length; j++) {
+    if (identities[j].name === s) return j;
+  }
+  return -1;
+}
+
 /* ==================== STORAGE ==================== */
 function loadNamePool() {
   try { var d = localStorage.getItem('avalon_name_pool'); if (d) namePool = JSON.parse(d); } catch(e) {}
@@ -1753,9 +1781,9 @@ function generateLiveScreenshot() {
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
-        var leader = parseLeaderIndex(att.leader);
+        var leader = resolvePlayerIdx(att.leader, state.identities); if (leader < 0) leader = 0;
         var teamIndices = att.team || [];
-        if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
+        teamIndices = teamIndices.map(function(x) { return resolvePlayerIdx(x, state.identities); }).filter(function(x) { return x >= 0; });
         var hSegs = [
           { text: '第' + (a + 1) + '次组队 ', color: TXT_DIM },
           { text: '★' + pnShort(leader), color: GOLD },
@@ -1794,7 +1822,7 @@ function generateLiveScreenshot() {
           var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
           var evilNames = [];
           if (lastAtt && lastAtt.team && state.identities) {
-            var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+            var tArr = lastAtt.team.map(function(x) { return resolvePlayerIdx(x, state.identities); }).filter(function(x) { return x >= 0; });
             for (var ei = 0; ei < tArr.length; ei++) {
               if (getPlayerFaction(state.identities[tArr[ei]].role) === 'evil') evilNames.push(pnShort(tArr[ei]));
             }
@@ -5565,9 +5593,10 @@ function showGameDetail(idx) {
           // Per-player vote details
           var approveNames = [], rejectNames = [];
           for (var vk in att.votes) {
-            var vidx = parseInt(vk) - 1;
-            var vn = nameByIndex[vidx];
-            if (!vn) vn = '玩家' + (parseInt(vk));
+            var vidx = resolvePlayerIdx(vk, rec.identities);
+            var vn = null;
+            if (vidx >= 0) vn = nameByIndex[rec.identities[vidx].index] || nameByIndex[vidx];
+            if (!vn) vn = (vidx >= 0) ? ('玩家' + (vidx + 1)) : ('' + vk);
             if (att.votes[vk] === 'approve') approveNames.push(vn);
             else rejectNames.push(vn);
           }
@@ -5597,9 +5626,10 @@ function showGameDetail(idx) {
             if (m.votes[lvk] === 'approve') lgc++; else lbc++;
           }
           for (var lvk in m.votes) {
-            var lidx = parseInt(lvk) - 1;
-            var ln = nameByIndex[lidx];
-            if (!ln) ln = '玩家' + (parseInt(lvk));
+            var lidx = resolvePlayerIdx(lvk, rec.identities);
+            var ln = null;
+            if (lidx >= 0) ln = nameByIndex[rec.identities[lidx].index] || nameByIndex[lidx];
+            if (!ln) ln = (lidx >= 0) ? ('玩家' + (lidx + 1)) : ('' + lvk);
             if (m.votes[lvk] === 'approve') lgn.push(ln); else lbn.push(ln);
           }
         }
@@ -8141,7 +8171,8 @@ function openHistoryModal(idx) {
           var appCnt = 0, rejCnt = 0;
           var approveVoters = [], rejectVoters = [];
           for (var vk in att.votes) {
-            var voterIdx = parseInt(vk);
+            var voterIdx = resolvePlayerIdx(vk, rec.identities);
+            if (voterIdx < 0) continue;
             if (att.votes[vk] === 'approve') { appCnt++; approveVoters.push(voterIdx); }
             else { rejCnt++; rejectVoters.push(voterIdx); }
           }
@@ -8162,18 +8193,18 @@ function openHistoryModal(idx) {
           if (isLast && m.result === 'success') resIcon = ' <span style="color:var(--green-bright)">&#10003;</span>';
           else if (isLast && m.result === 'fail') resIcon = ' <span style="color:var(--red-bright)">&#10007;</span>';
           var teamItems = (att.team || []).map(function(tmName) {
-            for (var ti = 0; ti < rec.identities.length; ti++) {
-              if (rec.identities[ti].name === tmName) {
-                var tf = getPlayerFaction(rec.identities[ti].role || '');
-                if (tf === 'evil') return '<span style="color:var(--red-bright);font-weight:600">' + tmName + '</span>';
-                break;
-              }
+            var tIdx = resolvePlayerIdx(tmName, rec.identities);
+            var tLabel = (tIdx >= 0) ? (((rec.identities[tIdx].index != null ? rec.identities[tIdx].index : tIdx) + 1) + '号 ' + rec.identities[tIdx].name) : tmName;
+            if (tIdx >= 0 && getPlayerFaction(rec.identities[tIdx].role || '') === 'evil') {
+              return '<span style="color:var(--red-bright);font-weight:600">' + tLabel + '</span>';
             }
-            return tmName;
+            return tLabel;
           });
           var teamHtml = teamItems.join(', ');
+          var leaderIdx = resolvePlayerIdx(att.leader, rec.identities);
+          var leaderLabel = (leaderIdx >= 0) ? (((rec.identities[leaderIdx].index != null ? rec.identities[leaderIdx].index : leaderIdx) + 1) + '号 ' + rec.identities[leaderIdx].name) : (att.leader || '');
           h += '<div class="hci-mission-attempt">';
-          h += '组队' + (la + 1) + '：<span class="leader">' + (att.leader || '') + '</span>';
+          h += '组队' + (la + 1) + '：<span class="leader">' + leaderLabel + '</span>';
           if (teamHtml) h += ' <span class="team-members">[' + teamHtml + ']</span>';
           var toggleId = 'vote-detail-' + mi + '-' + la;
           h += ' <span class="vote-count hci-vote-toggle" onclick="var el=document.getElementById(\'' + toggleId + '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">投票 ' + appCnt + '<span class="hci-vote-approve">赞成</span>:' + rejCnt + '<span class="hci-vote-reject">反对</span>' + resIcon + '</span>';
@@ -8193,7 +8224,7 @@ function openHistoryModal(idx) {
         var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
         var evilNames = [];
         if (lastAtt && lastAtt.team && rec.identities) {
-          var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+          var tArr = lastAtt.team.map(function(x) { return resolvePlayerIdx(x, rec.identities); }).filter(function(x) { return x >= 0; });
           for (var ei = 0; ei < tArr.length; ei++) {
             if (getPlayerFaction(rec.identities[tArr[ei]].role) === 'evil') evilNames.push(rec.identities[tArr[ei]].name);
           }
@@ -8626,9 +8657,9 @@ function generateGameScreenshot(idx) {
           if (vv === 'approve') approves++; else if (vv === 'reject') rejects++;
         }
         var passed = approves > pc / 2;
-        var leader = parseLeaderIndex(att.leader);
+        var leader = resolvePlayerIdx(att.leader, rec.identities); if (leader < 0) leader = 0;
         var teamIndices = att.team || [];
-        if (typeof teamIndices[0] === 'string') teamIndices = teamIndices.map(function(x) { return parseInt(x); });
+        teamIndices = teamIndices.map(function(x) { return resolvePlayerIdx(x, rec.identities); }).filter(function(x) { return x >= 0; });
         // Draw attempt header: "第N次组队 ★X号NAME提议：A、B、C"
         var hSegs = [{ text: '\u7b2c' + (a + 1) + '\u6b21\u7ec4\u961f ', color: TXT_DIM }, { text: '\u2605' + pnShort(leader), color: GOLD }, { text: '\u63d0\u8bae\uff1a', color: TXT_DIM }];
         for (var ti = 0; ti < teamIndices.length; ti++) {
@@ -8666,7 +8697,7 @@ function generateGameScreenshot(idx) {
           var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
           var evilNames = [];
           if (lastAtt && lastAtt.team) {
-            var tArr = lastAtt.team.map(function(x) { return typeof x === 'number' ? x : parseInt(x); });
+            var tArr = lastAtt.team.map(function(x) { return resolvePlayerIdx(x, rec.identities); }).filter(function(x) { return x >= 0; });
             for (var ei = 0; ei < tArr.length; ei++) {
               if (isEvil(tArr[ei])) evilNames.push(pnShort(tArr[ei]));
             }
