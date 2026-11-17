@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v183';
+var SW_VERSION = 'v184';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -6469,6 +6469,21 @@ function setupRealtimeSubscriptions() {
     }
   );
 
+  // v184：订阅逐句停顿设置（avalon_voice_gaps），其它设备保存后本机面板即时刷新
+  _supabaseChannel.on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'key_value', filter: 'key=eq.avalon_voice_gaps' },
+    function(payload) {
+      try {
+        var v = payload && (payload.new ? payload.new.value : null);
+        if (!v) return;
+        nvOnCloudGapsRealtime(v);
+      } catch(e) {
+        console.warn('[Realtime] failed to apply voice_gaps:', e);
+      }
+    }
+  );
+
   // 订阅 game_records 的 DELETE 事件
   _supabaseChannel.on(
     'postgres_changes',
@@ -9945,7 +9960,7 @@ var NV_GAP_STEP = 0.5;    // v179：步长 0.5 秒
 var NV_GAP_DEFAULT = 3;
 
 /* v183：播报倍速档位（只作用于语音 utterance.rate，不改音色、停顿与背景乐） */
-var NV_RATE_OPTS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+var NV_RATE_OPTS = [0.5, 0.75, 1, 1.25, 1.5];   // v184：删除 ×2，仅保留五档
 var NV_RATE_DEFAULT = 1;
 
 var NV = {
@@ -9996,8 +10011,13 @@ var NV_PENDING_ENTER = false;
     }
   } catch (e) {}
   // v183：播报倍速（持久化，非法值回退 1 倍）
+  // v184：删除 ×2 后，历史持久化的 2 读取时回落 ×1，并把规范值写回，避免残留非法档
   try {
-    NV.rate = nvClampRate(localStorage.getItem('avalon_voice_rate'));
+    var rawRate = localStorage.getItem('avalon_voice_rate');
+    NV.rate = nvClampRate(rawRate);
+    if (rawRate !== null && String(NV.rate) !== String(rawRate)) {
+      localStorage.setItem('avalon_voice_rate', String(NV.rate));
+    }
   } catch (e) {}
   // 语音列表在部分浏览器是异步加载的，提前预热一次
   if (NV.supported) {
@@ -10225,8 +10245,8 @@ function buildNightVoiceLines() {
     push('派西维尔请闭眼', '派西维尔请闭眼。');
   }
 
-  // 10) 天亮请睁眼（v178：队长与人数信息仅界面展示，不再朗读）
-  push('天亮请睁眼', '天亮请睁眼。');
+  // 10) 天亮了（v184：原「天亮请睁眼」改为「天亮了」；v178：队长与人数信息仅界面展示，不再朗读）
+  push('天亮了', '天亮了。');
   // 11) v179：天亮后再加一句，此句之后不再播报任何语音
   push('所有人整理表情', '所有人整理表情，睁开眼睛。');
 
@@ -10275,7 +10295,7 @@ function nvRenderPanel() {
       + '</div>';
   }
 
-  // v183：播报倍速按钮（6 档横向）
+  // v184：播报倍速按钮（5 档横向，已删除 ×2 档）
   var rateBtnsHTML = '';
   for (var ri = 0; ri < NV_RATE_OPTS.length; ri++) {
     var rev = NV_RATE_OPTS[ri];
@@ -10564,6 +10584,8 @@ function nvTogglePlay() {
 function nvStartFrom(i) {
   NV.lines = buildNightVoiceLines();
   if (!NV.lines.length) { toast('本场没有可播报的夜间流程', 'warn'); return; }
+  // v184：启动播报时再拉一次云端停顿（异步、不阻塞；拉到后按新值执行后续句）
+  if (!NV._cloudPullTs || (Date.now() - NV._cloudPullTs) > 8000) nvCloudPullGaps(null);
   NV.playing = true;
   NV.paused = false;
   NV.finished = false;
@@ -10711,7 +10733,12 @@ function nvSaveGaps() {
     }
     localStorage.setItem('avalon_voice_gaps', JSON.stringify(obj));
     localStorage.setItem('avalon_voice_gap', String(NV.gap));
-    toast('已保存逐句停顿设置，下次打开仍沿用', 'ok');
+    // v184：同时写云端，其它设备进入播报面板或启动播报即拉取到新值
+    var pushed = nvCloudPushGaps(function (ok) {
+      toast(ok ? '已保存停顿设置，云端已同步，其它设备打开播报即生效'
+               : '已保存到本机（云端同步失败，联网后再点保存即可）', ok ? 'ok' : 'warn');
+    });
+    if (!pushed) toast('已保存停顿设置（本机），云端同步暂不可用', 'warn');
   } catch (e) {
     toast('保存失败：浏览器本地存储不可用', 'warn');
   }
@@ -10729,7 +10756,145 @@ function nvResetGaps() {
     localStorage.setItem('avalon_voice_gaps', '{}');
     localStorage.setItem('avalon_voice_gap', String(NV_GAP_DEFAULT));
   } catch (e) {}
-  toast('已恢复默认停顿 3 秒', 'ok');
+  var rsPushed = nvCloudPushGaps(function (ok) {   // v184：恢复默认同样同步云端
+    toast(ok ? '已恢复默认停顿 3 秒，云端已同步' : '已恢复默认停顿 3 秒（本机，云端同步失败）', ok ? 'ok' : 'warn');
+  });
+  if (!rsPushed) toast('已恢复默认停顿 3 秒（本机）', 'ok');
+}
+
+/* ---------- v184：逐句停顿跨设备云端同步（复用 Supabase key_value 表，key = avalon_voice_gaps） ----------
+   云端结构：{ gap: 统一默认秒数, gaps: { 步骤名: 秒数 }, ts: 客户端写入时间戳 }
+   策略：以云端为准；localStorage 仅作缓存与离线兜底；拉取失败静默回落本地、不报错不打断播报；
+        写入为整条 upsert 覆盖，并发时最后写入者生效。 */
+var NV_GAPS_CLOUD_KEY = 'avalon_voice_gaps';
+var NV_GAPS_REST = '/rest/v1/key_value';
+
+function nvGapsSnapshot() {
+  var gaps = {};
+  for (var k in NV.gaps) {
+    if (Object.prototype.hasOwnProperty.call(NV.gaps, k)) gaps[k] = nvClampGap(NV.gaps[k]);
+  }
+  return { gap: nvClampGap(NV.gap), gaps: gaps, ts: Date.now() };
+}
+
+// 应用一份停顿配置（云端或实时推送），并同步刷新面板控件
+function nvApplyGapsPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  var changed = false;
+  if (payload.gaps && typeof payload.gaps === 'object') {
+    var ng = {};
+    for (var k in payload.gaps) {
+      if (!Object.prototype.hasOwnProperty.call(payload.gaps, k)) continue;
+      var gv = parseFloat(payload.gaps[k]);
+      if (!isNaN(gv)) ng[k] = nvClampGap(gv);
+    }
+    NV.gaps = ng;
+    changed = true;
+  }
+  if (payload.gap !== undefined && payload.gap !== null && payload.gap !== '') {
+    var g = parseFloat(payload.gap);
+    if (!isNaN(g)) { NV.gap = nvClampGap(g); changed = true; }
+  }
+  if (!changed) return false;
+  try {
+    localStorage.setItem('avalon_voice_gaps', JSON.stringify(NV.gaps));
+    localStorage.setItem('avalon_voice_gap', String(NV.gap));
+  } catch (e) {}
+  nvRefreshGapUI();
+  return true;
+}
+
+// 面板已渲染时把最新停顿值写回控件（不重绘面板，避免打断播放）
+function nvRefreshGapUI() {
+  try {
+    var rows = document.querySelectorAll('.nv-gap-input[data-step]');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].value = nvGapOf(rows[i].getAttribute('data-step'));
+    }
+    var all = document.getElementById('nv-gap-all');
+    if (all) all.value = NV.gap;
+    nvSyncBtnSafe();
+  } catch (e) {}
+}
+
+// 拉取云端停顿；失败/超时静默回落本地，回调最多触发一次
+function nvCloudPullGaps(done) {
+  var finished = false;
+  var finish = function (ok) {
+    if (finished) return;
+    finished = true;
+    if (typeof done === 'function') { try { done(ok); } catch (e) {} }
+  };
+  NV._cloudPullTs = Date.now();
+  var guard = setTimeout(function () { finish(false); }, 2500);
+  try {
+    if (typeof fetch !== 'function') { clearTimeout(guard); finish(false); return; }
+    fetch(SUPABASE_URL + NV_GAPS_REST + '?select=value&key=eq.' + encodeURIComponent(NV_GAPS_CLOUD_KEY), {
+      method: 'GET',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (rows) {
+      clearTimeout(guard);
+      var val = (rows && rows.length) ? rows[0].value : null;
+      if (!val) { finish(false); return; }
+      var ok = nvApplyGapsPayload(val);
+      console.log('[nvGaps] cloud pull ok:', JSON.stringify(val));
+      finish(ok);
+    }).catch(function (e) {
+      clearTimeout(guard);
+      console.warn('[nvGaps] cloud pull failed, fallback to local:', e && (e.message || e));
+      finish(false);
+    });
+  } catch (e) {
+    clearTimeout(guard);
+    finish(false);
+  }
+}
+
+// 写入云端（整条覆盖 upsert，最后写入者生效）；done(ok) 最多回调一次，用于给用户真实结果
+function nvCloudPushGaps(done) {
+  var settled = false;
+  var finish = function (ok, why) {
+    if (settled) return;
+    settled = true;
+    if (typeof done === 'function') { try { done(ok, why); } catch (e) {} }
+  };
+  try {
+    if (typeof fetch !== 'function') { finish(false, 'fetch unavailable'); return false; }
+    var snap = nvGapsSnapshot();
+    var guard = setTimeout(function () { finish(false, 'timeout'); }, 2500);
+    fetch(SUPABASE_URL + NV_GAPS_REST + '?on_conflict=key', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify([{ key: NV_GAPS_CLOUD_KEY, value: snap, updated_at: new Date().toISOString() }])
+    }).then(function (r) {
+      clearTimeout(guard);
+      if (!r.ok) { console.warn('[nvGaps] cloud save HTTP ' + r.status); finish(false, 'HTTP ' + r.status); }
+      else { console.log('[nvGaps] cloud saved:', JSON.stringify(snap)); finish(true); }
+    }).catch(function (e) {
+      clearTimeout(guard);
+      console.warn('[nvGaps] cloud save failed:', e && (e.message || e));
+      finish(false, e && (e.message || 'network error'));
+    });
+    return true;
+  } catch (e) {
+    console.warn('[nvGaps] cloud save exception:', e);
+    finish(false, 'exception');
+    return false;
+  }
+}
+
+// 其它设备保存后实时生效
+function nvOnCloudGapsRealtime(val) {
+  if (!val) return;
+  if (nvApplyGapsPayload(val)) console.log('[nvGaps] applied realtime update');
 }
 
 /* ---------- v183：播报倍速（只作用于语音 rate，句间停顿仍按真实秒数独立执行） ---------- */
@@ -11094,6 +11259,7 @@ function openNightVoice(autoStart) {
   NV.finished = false;
   NV._errCount = 0;
   nvRenderPanel();
+  nvCloudPullGaps(null);   // v184：进面板即拉取云端停顿（失败静默回落本地缓存）
   if (!NV.supported) {
     // 降级为纯文字：不报错，仍可手动逐句推进；v180：背景乐与 TTS 无关，照常播放
     NV.playing = false;
@@ -11102,11 +11268,18 @@ function openNightVoice(autoStart) {
     return;
   }
   if (autoStart) {
-    // 自动流程（骰子动画之后）稍作延迟再开口
-    NV.timer = setTimeout(function () {
-      if (!NV.open) return;
-      nvStartFrom(0);
-    }, 420);
+    // v184：自动流程先拉云端停顿（失败静默回落本地），再按原延迟开口
+    var _nvStarted = false;
+    var _nvGo = function () {
+      if (_nvStarted) return;
+      _nvStarted = true;
+      setTimeout(function () {
+        if (!NV.open) return;
+        nvStartFrom(0);
+      }, 420);
+    };
+    nvCloudPullGaps(_nvGo);
+    setTimeout(_nvGo, 2600);   // 兜底：网络异常时也不阻塞播报
   }
 }
 
@@ -11139,10 +11312,11 @@ function ldrBuildOverlay() {
   h += '<div class="nv-dice-sub" id="nv-dice-sub">号码停住后点「确认」才生效</div>';
   h += '<div class="ldr-numgrid" id="nv-dice-numgrid"></div>';
   h += '<div class="nv-dice-actions">';
+  // v184：确认键为主动作（整行放大），重掷与取消同尺寸同层级，手动选择为整行次级按钮
   h += '<button class="btn primary" id="nv-dice-roll" onclick="ldrPickDice()">&#127922; 掷色子选队长</button>';
-  h += '<button class="btn" id="nv-dice-manual" onclick="ldrPickManual()">&#9995; 手动选择队长</button>';
-  h += '<button class="btn" id="nv-dice-confirm" onclick="ldrPickConfirm()" style="display:none;background:linear-gradient(135deg,#e8d48b,#c9a84c);color:#1a1408;border:none;font-weight:700">确认</button>';
   h += '<button class="btn" id="nv-dice-cancel" onclick="ldrPickCancel()">取消</button>';
+  h += '<button class="btn primary" id="nv-dice-confirm" onclick="ldrPickConfirm()" style="display:none">确认</button>';
+  h += '<button class="btn" id="nv-dice-manual" onclick="ldrPickManual()">&#9995; 手动选择队长</button>';
   h += '</div></div>';
   ov.innerHTML = h;
   document.body.appendChild(ov);
@@ -11193,7 +11367,7 @@ function ldrPickDice() {
       LDR_PICK.preview = target;
       LDR_PICK.rolling = false;
       if (sub) sub.textContent = '可重掷，点「确认」后生效';
-      if (btnRoll) btnRoll.textContent = '🔁 重新掷色子';
+      if (btnRoll) { btnRoll.textContent = '🔁 重新掷色子'; btnRoll.className = 'btn'; }   // v184：重掷与取消同尺寸同层级
       btnOk.style.display = '';
     }
   }, 95);
@@ -11221,7 +11395,7 @@ function ldrPickManual() {
   if (face) face.textContent = '?';
   if (nameEl) nameEl.textContent = '请选择 1~' + pc + ' 号';
   if (sub) sub.textContent = '选中号码后点「确认」才生效';
-  if (btnRoll) { btnRoll.style.display = ''; btnRoll.textContent = '🎲 掷色子选队长'; }
+  if (btnRoll) { btnRoll.style.display = ''; btnRoll.textContent = '🎲 掷色子选队长'; btnRoll.className = 'btn'; }
   if (btnOk) btnOk.style.display = 'none';
   var gh = '';
   for (var i = 0; i < pc; i++) {
