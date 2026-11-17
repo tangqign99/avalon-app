@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v182';
+var SW_VERSION = 'v183';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -1331,6 +1331,8 @@ function doStartGame() {
   // v181：开局进入「选择队长」页，不自动掷色子；未确认前一概不写 leader
   NV_PROMPT = 'choose';
   NV_ASKED = false;
+  NV_PENDING_ENTER = false;
+  state._nvDecided = false;   // v183：是否已决定开局播报（播完 / 跳过 / 关闭面板后置 true）
   ldrResetPick();
   state.playerRoles = state.playerRoles || [];
   stopTimer();
@@ -2031,17 +2033,36 @@ function renderLeaderPickStage(c, m, reqSize, pc) {
   h += '<button class="btn primary" id="ldr-dice-btn" onclick="ldrPickDice()">&#127922; 掷色子选队长</button>';
   h += '<button class="btn" id="ldr-manual-btn" onclick="ldrPickManual()">&#9995; 手动选择队长</button>';
   h += '</div>';
-  h += '<div class="ldr-pick-tip">确认后进入组队页（首轮需 ' + reqSize + ' 人出任务）</div>';
+  h += '<div class="ldr-pick-tip">确认队长的页面上会再做开局播报（首轮需 ' + reqSize + ' 人出任务）</div>';
   h += '</div>';
-  if (!NV_ASKED) {
-    h += '<div style="text-align:center;padding:18px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
-    h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
-    h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报。</div>';
-    h += '<div class="ldr-pick-btns">';
-    h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
-    h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
-    h += '</div></div>';
-  }
+  if (!NV_ASKED) h += nvPromptCardHTML();
+  c.innerHTML = h;
+}
+
+/* v183：开局播报卡片（结构与样式沿用 v182，供队长选择页 / 已确认队长页 / 步骤A 复用） */
+function nvPromptCardHTML() {
+  var h = '';
+  h += '<div style="text-align:center;padding:18px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+  h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
+  h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报。</div>';
+  h += '<div class="ldr-pick-btns">';
+  h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
+  h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
+  h += '</div></div>';
+  return h;
+}
+
+/* v183：队长已确认、还没决定播报 —— 停在队长页，播报卡片保留原位、可点击 */
+function renderLeaderConfirmedStage(c, m, reqSize) {
+  var h = '';
+  h += '<div class="ldr-pick-module">';
+  h += '<div class="step-label" style="margin-bottom:8px">队长已确认</div>';
+  h += '<div style="margin-bottom:8px"><span class="leader-badge">&#9812; 已选队长：' + playerLabel(m.leader) + '</span>';
+  h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button></div>';
+  h += '<div class="ldr-pick-tip">点「开始语音播报」念完身份后进入组队页；点「跳过播报」直接组队（首轮需 ' + reqSize + ' 人出任务）</div>';
+  h += '</div>';
+  // v183：播报卡片始终保留为进入组队页的唯一出口，避免“已播报过又确认队长”后无路可走
+  h += nvPromptCardHTML();
   c.innerHTML = h;
 }
 
@@ -2097,8 +2118,15 @@ function renderStepPanel() {
   var votesConfirmed = Object.keys(m.votes).length > 0;
 
   // v181：开局选队长页 —— 上方「选择队长」模块，下方原「开始语音播报 / 跳过播报」
-  if (m.leader === null && NV_PROMPT === 'choose' && state.currentRound === 0) {
+  if (m.leader === null && (NV_PROMPT === 'choose' || NV_PROMPT === 'confirmed') && state.currentRound === 0) {
     renderLeaderPickStage(c, m, reqSize, pc);
+    return;
+  }
+
+  // v183：队长已确认但还没决定播报 —— 停在队长页，播报卡片保留可用，不跳组队页
+  if (m.leader !== null && !state._nvDecided && state.currentRound === 0 &&
+      m.team.length === 0 && !votesConfirmed && !state._teamConfirmedPending) {
+    renderLeaderConfirmedStage(c, m, reqSize);
     return;
   }
 
@@ -2114,6 +2142,8 @@ function renderStepPanel() {
     }
     h += '<button class="btn random-leader-btn" onclick="randomFirstLeader()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-weight:700">&#127922; 随机</button>';
     h += '</div></div>';
+    // v183：此页同样保留播报入口，避免出现没有播报入口的死路
+    if (state.currentRound === 0 && !NV_ASKED) h += nvPromptCardHTML();
     c.innerHTML = h;
     return;
   }
@@ -2163,6 +2193,10 @@ function renderStepPanel() {
   } else {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
     h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
+    // v183：首轮组队前始终保留开局播报入口，避免刷新/重进后没有播报入口的死路
+    if (state.currentRound === 0 && m.team.length === 0) {
+      h += ' <button class="btn small" onclick="openNightVoice(false)">&#127769; 开局播报</button>';
+    }
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
 
     h += '<div style="margin-bottom:10px"><div class="step-label">步骤B：选择队伍成员</div>';
@@ -9910,6 +9944,10 @@ var NV_GAP_MAX = 10;      // v179：逐句停顿支持 0~10 秒
 var NV_GAP_STEP = 0.5;    // v179：步长 0.5 秒
 var NV_GAP_DEFAULT = 3;
 
+/* v183：播报倍速档位（只作用于语音 utterance.rate，不改音色、停顿与背景乐） */
+var NV_RATE_OPTS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+var NV_RATE_DEFAULT = 1;
+
 var NV = {
   lines: [],
   idx: -1,
@@ -9917,6 +9955,7 @@ var NV = {
   paused: false,
   finished: false,
   gap: NV_GAP_DEFAULT,   // 默认停顿（统一值）
+  rate: NV_RATE_DEFAULT, // v183：播报倍速（1 = 原速，只影响 utterance.rate）
   gaps: {},              // v179：按步骤名索引的逐句停顿时长
   timer: null,
   utter: null,
@@ -9929,6 +9968,8 @@ var NV = {
 var NV_PROMPT = 'none';
 // v181：播报询问是否已处理（已被点过「开始/跳过播报」后不再显示该按钮组）
 var NV_ASKED = false;
+// v183：队长已确认的停留态下点了「开始语音播报」，播报结束/关闭面板后再进组队页
+var NV_PENDING_ENTER = false;
 
 (function nvInitEnv() {
   try {
@@ -9953,6 +9994,10 @@ var NV_ASKED = false;
         }
       }
     }
+  } catch (e) {}
+  // v183：播报倍速（持久化，非法值回退 1 倍）
+  try {
+    NV.rate = nvClampRate(localStorage.getItem('avalon_voice_rate'));
   } catch (e) {}
   // 语音列表在部分浏览器是异步加载的，提前预热一次
   if (NV.supported) {
@@ -10230,7 +10275,15 @@ function nvRenderPanel() {
       + '</div>';
   }
 
-  var myRoleHTML = '';
+  // v183：播报倍速按钮（6 档横向）
+  var rateBtnsHTML = '';
+  for (var ri = 0; ri < NV_RATE_OPTS.length; ri++) {
+    var rev = NV_RATE_OPTS[ri];
+    rateBtnsHTML += '<button class="nv-rate-btn' + (Math.abs(rev - NV.rate) < 0.001 ? ' active' : '') + '"'
+      + ' data-rate="' + rev + '" onclick="nvSetRate(' + rev + ')">×' + rev + '</button>';
+  }
+
+  var myRoleHTML = '';
   if (state.myRole && state.myRole !== '不明') {
     myRoleHTML = '<span class="nv-badge">我的身份：' + escAttr(state.myRole) + '</span>';
   }
@@ -10272,6 +10325,10 @@ function nvRenderPanel() {
     +     '</div>'
     +   '</div>'
     + '</div>'
+    + '<div class="nv-setting nv-rate-wrap">'
+    +   '<span class="nv-setting-label">播报倍速</span>'
+    +   '<div class="nv-rate-btns">' + rateBtnsHTML + '</div>'
+    + '</div>'
     + '<div class="nv-setting">'
     +   '<span class="nv-setting-label">背景乐</span>'
     +   '<button class="btn small nv-bgm-btn" id="nv-bgm-toggle" onclick="nvmToggle()">' + (NVM.enabled ? '已开启' : '已关闭') + '</button>'
@@ -10279,7 +10336,7 @@ function nvRenderPanel() {
     +   '<span class="nv-gap-val" id="nv-bgm-val">' + Math.round(NVM.vol * 100) + '%</span>'
     + '</div>'
     + '<div class="nv-tip" id="nv-tip">' + (NV.supported
-        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转。'
+        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转；倍速与停顿可分别调整，互不影响。'
         : '当前浏览器不支持语音合成（speechSynthesis），已降级为纯文字播报，可手动逐句推进。') + '</div>'
     + '</div>';
 
@@ -10393,7 +10450,7 @@ function nvStartUtterance(line, mySeq, voice) {
     return;
   }
   u.lang = 'zh-CN';   // 每个 Utterance 显式指定普通话，避免跟随系统默认语言
-  u.rate = 1;
+  u.rate = NV.rate;   // v183：倍速只作用于语音本身（原基准 1），不改音色/音量，也不影响句间停顿
   u.pitch = 1;
   u.volume = 1;
   if (voice) u.voice = voice;
@@ -10491,6 +10548,7 @@ function nvFinish() {
   var cap = document.getElementById('nv-caption');
   if (sn) sn.textContent = '播报结束';
   if (cap) cap.textContent = '夜间流程播报完毕，请开始第一轮组队。';
+  nvEnterTeamStageIfPending();   // v183：队长确认停留态下播完即切到组队页
 }
 
 function nvTogglePlay() {
@@ -10672,6 +10730,32 @@ function nvResetGaps() {
     localStorage.setItem('avalon_voice_gap', String(NV_GAP_DEFAULT));
   } catch (e) {}
   toast('已恢复默认停顿 3 秒', 'ok');
+}
+
+/* ---------- v183：播报倍速（只作用于语音 rate，句间停顿仍按真实秒数独立执行） ---------- */
+function nvClampRate(v) {
+  var r = parseFloat(v);
+  if (isNaN(r)) return NV_RATE_DEFAULT;
+  for (var i = 0; i < NV_RATE_OPTS.length; i++) {
+    if (Math.abs(NV_RATE_OPTS[i] - r) < 0.001) return NV_RATE_OPTS[i];
+  }
+  return NV_RATE_DEFAULT;
+}
+
+// 切换倍速：立即持久化并在下一句生效，正在朗读的当前句不打断
+function nvSetRate(v) {
+  NV.rate = nvClampRate(v);
+  try { localStorage.setItem('avalon_voice_rate', String(NV.rate)); } catch (e) {}
+  nvRefreshRateBtns();
+}
+
+function nvRefreshRateBtns() {
+  var btns = document.querySelectorAll('.nv-rate-btn');
+  for (var i = 0; i < btns.length; i++) {
+    var rv = parseFloat(btns[i].getAttribute('data-rate'));
+    if (Math.abs(rv - NV.rate) < 0.001) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
 }
 
 function nvSyncBtnSafe() {
@@ -10994,6 +11078,7 @@ function nvClose() {
   NV.open = false;
   var ov = document.getElementById('nv-overlay');
   if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  nvEnterTeamStageIfPending();   // v183：关闭面板后若仍在队长确认停留态则进组队页
 }
 
 /* ---------- 打开夜间播报 ---------- */
@@ -11176,9 +11261,10 @@ function ldrPickConfirm() {
   LDR_PICK.preview = null;
   LDR_PICK.rolling = false;
   LDR_PICK.mode = 'none';
-  NV_PROMPT = 'none';
+  // v183：确认后只写入队长并停在队长页（播报卡片保留），不跳组队页
+  NV_PROMPT = 'confirmed';
   selectLeader(idx);
-  try { toast('队长已确定：' + playerLabel(idx)); } catch (e) {}
+  try { toast('队长已确定：' + playerLabel(idx) + '，请选择是否进行开局播报'); } catch (e) {}
 }
 
 /* 取消：不写入任何队长，保持在选择页 */
@@ -11197,29 +11283,35 @@ function startNightOpeningSequence() {
   // v181：不再自动掷色子，改由用户主动选择；未确认前 missions[0].leader 保持 null
   NV_PROMPT = 'choose';
   NV_ASKED = false;
+  NV_PENDING_ENTER = false;
+  state._nvDecided = false;   // v183：是否已决定开局播报（播完 / 跳过 / 关闭面板后置 true）
   ldrResetPick();
   renderStepPanel();
 }
 
-/* 点「开始语音播报」：隐藏按钮并进入播报面板（v181：不受队长是否确认限制） */
+/* 点「开始语音播报」：进入播报面板；队长已确认时播完（或关闭面板）才进入组队页（v183） */
 function nvPromptStart() {
-  if (NV_PROMPT !== 'pending' && NV_PROMPT !== 'choose') return;
+  if (NV_PROMPT !== 'pending' && NV_PROMPT !== 'choose' && NV_PROMPT !== 'confirmed') return;
   NV_ASKED = true;
   if (NV_PROMPT === 'pending') NV_PROMPT = 'none';
+  // v183：队长已确认的停留态 —— 播报结束/关闭面板后再进组队页
+  NV_PENDING_ENTER = (NV_PROMPT === 'confirmed');
   nvmEnsure();   // v179：以本次点击作为手势解锁 AudioContext，兼容移动端
   var sb = document.getElementById('nv-prompt-start');
   if (sb) sb.style.display = 'none';
   var kb = document.getElementById('nv-prompt-skip');
   if (kb) kb.style.display = 'none';
-  renderStepPanel();
+  if (NV_PROMPT !== 'confirmed') renderStepPanel();   // v183：停留态页面不变，避免卡片重建闪烁
   openNightVoice(true);
 }
 
-/* 点「跳过播报」：隐藏按钮，不播放任何语音（v181：队长未确认时仍留在选择页） */
+/* 点「跳过播报」：不播放语音；队长已确认时直接进入组队页（v183） */
 function nvPromptSkip() {
-  if (NV_PROMPT !== 'pending' && NV_PROMPT !== 'choose') return;
+  if (NV_PROMPT !== 'pending' && NV_PROMPT !== 'choose' && NV_PROMPT !== 'confirmed') return;
   NV_ASKED = true;
-  if (NV_PROMPT === 'pending') NV_PROMPT = 'none';
+  if (NV_PROMPT === 'pending' || NV_PROMPT === 'confirmed') NV_PROMPT = 'none';
+  NV_PENDING_ENTER = false;
+  state._nvDecided = true;   // v183：已决定不播报，进组队页后不再回队长页
   var sb = document.getElementById('nv-prompt-start');
   if (sb) sb.style.display = 'none';
   var kb = document.getElementById('nv-prompt-skip');
@@ -11227,4 +11319,13 @@ function nvPromptSkip() {
   renderStepPanel();
   try { if (typeof toast === 'function') toast('已跳过语音播报，请开始组队'); } catch (e) {}
   setTimeout(function () { renderStepPanel(); }, 30);
+}
+
+/* v183：队长已确认的停留态下，播报结束/关闭面板后统一进入组队页 */
+function nvEnterTeamStageIfPending() {
+  if (!NV_PENDING_ENTER) return;
+  NV_PENDING_ENTER = false;
+  state._nvDecided = true;   // v183：播报已结束（或关闭面板），可以进组队页
+  if (NV_PROMPT === 'confirmed') NV_PROMPT = 'none';
+  try { renderStepPanel(); } catch (e) {}
 }

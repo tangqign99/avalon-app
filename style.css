@@ -1422,10 +1422,18 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .nv-gap-all-label{font-size:11px}
 .nv-gap-actions .btn{flex:0 0 auto;min-width:0}
 .nv-bgm-btn{flex:0 0 auto}
+/* v183：播报倍速（6 档横向排布，窄屏不溢出） */
+.nv-rate-wrap{gap:8px}
+.nv-rate-btns{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;flex:1;min-width:0}
+.nv-rate-btn{padding:5px 0;min-width:0;min-height:30px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text-dim);font-size:12px;line-height:1.2;font-family:inherit;white-space:nowrap;overflow:hidden;cursor:pointer;transition:all .15s}
+.nv-rate-btn:hover{color:var(--text-bright);border-color:rgba(201,168,76,0.55)}
+.nv-rate-btn.active{border-color:var(--gold);color:var(--gold-light);background:rgba(201,168,76,0.18);font-weight:700}
 @media (max-width:480px){
   .nv-gap-preview{display:none}
   .nv-gap-name{font-size:11px}
   .nv-gaps-body{max-height:30vh}
+  .nv-rate-btns{gap:4px}
+  .nv-rate-btn{font-size:11px;min-height:28px;padding:5px 0}
 }
 .nv-tip{padding:0 14px 12px;font-size:11px;line-height:1.5;color:var(--text-dim);flex-shrink:0}
 @media (max-width:480px){
