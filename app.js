@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v172';
+var SW_VERSION = 'v174';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -1566,8 +1566,8 @@ function generateLiveScreenshot() {
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     return ctx.measureText(text).width;
   }
-  function dt(text, x, y, size, color, align) {
-    ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+  function dt(text, x, y, size, color, align, bold) {
+    ctx.font = (bold ? 'bold ' : '') + size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     ctx.fillStyle = color || TXT;
     ctx.textAlign = align || 'left';
     ctx.textBaseline = 'top';
@@ -1591,6 +1591,8 @@ function generateLiveScreenshot() {
     ctx.textBaseline = 'top';
     var cx = x;
     for (var si = 0; si < segs.length; si++) {
+      if (segs[si].bold) ctx.font = 'bold ' + sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+      else ctx.font = sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
       ctx.fillStyle = segs[si].color || TXT;
       ctx.textAlign = 'left';
       ctx.fillText(segs[si].text, cx, y);
@@ -1599,14 +1601,14 @@ function generateLiveScreenshot() {
     return cx;
   }
 
-  var GOLD = '#f4d03f';
-  var GREEN = '#27ae60';
-  var GREEN_BRIGHT = '#2ecc71';
-  var RED = '#e74c3c';
-  var BLUE = '#5dade2';
-  var TXT = '#e8dcc8';
-  var TXT_SEC = '#a89070';
-  var TXT_DIM = '#7a6e5e';
+  var GOLD = '#c8910a';
+  var GREEN = '#1e8e3e';
+  var GREEN_BRIGHT = '#16a34a';
+  var RED = '#d32f2f';
+  var BLUE = '#1976d2';
+  var TXT = '#3b2f22';
+  var TXT_SEC = '#8a6d4f';
+  var TXT_DIM = '#b09a80';
 
   // Compute stats
   var doneMissions = 0, failMissions = 0;
@@ -1676,9 +1678,9 @@ function generateLiveScreenshot() {
   ctx.scale(SCALE, SCALE);
 
   var grad = ctx.createLinearGradient(0, 0, 0, totalH);
-  grad.addColorStop(0, '#1a0e30');
-  grad.addColorStop(0.4, '#120926');
-  grad.addColorStop(1, '#0d0617');
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.4, '#fff7ec');
+  grad.addColorStop(1, '#ffedd8');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, totalH);
 
@@ -1693,12 +1695,12 @@ function generateLiveScreenshot() {
     var bx = (W - badgeW) / 2;
     rr(bx, y, badgeW, 28, 14);
     var g = ctx.createLinearGradient(bx, 0, bx + badgeW, 0);
-    g.addColorStop(0, '#5b3d8e'); g.addColorStop(1, '#7c5bbf');
+    g.addColorStop(0, '#e65100'); g.addColorStop(1, '#fb8c00');
     ctx.fillStyle = g;
     ctx.fill();
     dt(badgeText, W/2, y + 6, 15, '#fff', 'center');
     var ty = y + 28 + 8;
-    dt('阿瓦隆（进行中）', W/2, ty, 20, GOLD, 'center');
+    dt('阿瓦隆（进行中）', W/2, ty, 20, '#e65100', 'center');
     var iy = ty + 26 + 4;
     dt((state.gameStartTime || _bjTimestamp()) + ' · ' + state.playerCount + '人局', W/2, iy, 11, TXT_DIM, 'center');
   })();
@@ -1708,7 +1710,7 @@ function generateLiveScreenshot() {
   (function() {
     var dy = y + 8;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#e65100'); g.addColorStop(0.7, '#e65100'); g.addColorStop(1, 'transparent');
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
@@ -1722,7 +1724,7 @@ function generateLiveScreenshot() {
     for (var pi = 0; pi < pc; pi++) {
       var col = pi % 2, row = Math.floor(pi / 2);
       var px = PAD + col * (colW + 12), py = gridY + row * 28;
-      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      ctx.fillStyle = 'rgba(230,81,0,0.05)';
       rr(px, py, colW, 24, 6); ctx.fill();
       dt('⬢', px + 8, py + 5, 10, TXT_DIM, 'left');
       dt(pn(pi), px + 22, py + 4, 13, TXT, 'left');
@@ -1734,7 +1736,7 @@ function generateLiveScreenshot() {
   (function() {
     var dy = y + 8;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#e65100'); g.addColorStop(0.7, '#e65100'); g.addColorStop(1, 'transparent');
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
@@ -1755,8 +1757,8 @@ function generateLiveScreenshot() {
       if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
       var cardH = calcMissionCardH(m);
       var cx = PAD + 16;
-      ctx.fillStyle = 'rgba(255,255,255,0.04)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
-      var leftColor = isSuc ? GREEN : (m.result === 'fail' ? RED : '#7c5bbf');
+      ctx.fillStyle = 'rgba(230,81,0,0.05)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
+      var leftColor = isSuc ? GREEN : (m.result === 'fail' ? RED : '#ff9800');
       ctx.fillStyle = leftColor; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
       var roundLabel = '任务 ' + (qi + 1) + ' · ' + m.size + '人出战';
       if (!m.result) roundLabel += ' · 进行中';
@@ -1764,13 +1766,13 @@ function generateLiveScreenshot() {
       if (m.result) {
         var tagText = isShielded ? ('✓ 成功（含' + m.shieldedFails + '张失败票）') : isPureSuc ? '✓ 成功（全票通过）' : isSuc ? '✓ 成功' : '✗ 失败';
         var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
-        ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
+        ctx.fillStyle = isSuc ? 'rgba(30,142,62,0.14)' : 'rgba(211,47,47,0.14)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
         dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
       } else {
         var tagText2 = '⏳ 进行中';
         var tagW2 = tw(tagText2, 11) + 16, tagX2 = PAD + contentW - 16 - tagW2;
-        ctx.fillStyle = 'rgba(124,91,191,0.2)'; rr(tagX2, qy + 9, tagW2, 18, 9); ctx.fill();
-        dt(tagText2, PAD + contentW - 16 - tagW2 / 2, qy + 11, 11, '#b39ddb', 'center');
+        ctx.fillStyle = 'rgba(230,81,0,0.12)'; rr(tagX2, qy + 9, tagW2, 18, 9); ctx.fill();
+        dt(tagText2, PAD + contentW - 16 - tagW2 / 2, qy + 11, 11, '#e65100', 'center');
       }
       var ay = qy + 10 + 18 + 8;
       for (var a = 0; a < attempts.length; a++) {
@@ -1828,7 +1830,7 @@ function generateLiveScreenshot() {
             }
           }
           if (evilNames.length > 0) {
-            dt('失败卡：' + m.shieldedFails + '张（' + evilNames.join('、') + '）', cx, ay, 12, RED, 'left');
+            dt('失败卡：' + m.shieldedFails + '张（' + evilNames.join('、') + '）', cx, ay, 12, RED, 'left', true);
           }
         }
         else if (isPureSuc) { dt('任务结果：✓ 成功（全票通过）', cx, ay, 12, GREEN_BRIGHT, 'left'); }
@@ -1851,7 +1853,8 @@ function generateLiveScreenshot() {
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
           var rl = lc.round ? '第' + lc.round + '轮后：' : '';
           var lcLabel = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '反方' : (lc.result === 'skip' ? '不报' : (lc.result || '?'));
-          dt(rl + pn(hldr) + ' 查验 ' + pn(tgt) + ' → ' + lcLabel, PAD + 12, ry, 12, TXT_SEC, 'left');
+          dt(rl + pn(hldr) + ' 查验 ' + pn(tgt) + ' → ', PAD + 12, ry, 12, TXT, 'left');
+          dt(lcLabel, PAD + 12 + tw(rl + pn(hldr) + ' 查验 ' + pn(tgt) + ' → ', 12), ry, 12, lcLabel === '反方' ? RED : GREEN_BRIGHT, 'left', true);
           ry += 18;
         }
         ry += 4;
@@ -1872,7 +1875,7 @@ function generateLiveScreenshot() {
   (function() {
     var dy = y + 6;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#e65100'); g.addColorStop(0.7, '#e65100'); g.addColorStop(1, 'transparent');
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
@@ -1883,7 +1886,7 @@ function generateLiveScreenshot() {
     var namesStr = '';
     for (var pi = 0; pi < pc; pi++) { namesStr += pnShort(pi); if (pi < pc - 1) namesStr += '、'; }
     dt('玩家：' + namesStr, PAD, y + 18, 12, TXT_DIM, 'left');
-    ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.fillStyle = '#8a6d4f'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     ctx.fillText('阿瓦隆 · The Resistance Avalon', W / 2, totalH - PAD);
   })();
 
@@ -8411,7 +8414,7 @@ function generateGameScreenshot(idx) {
   function pn(idx) { var p = ids[idx]; return (idx + 1) + '\u53f7 ' + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
   function pnShort(idx) { var p = ids[idx]; return (idx + 1) + ((p && p.name) || '\u73a9\u5bb6' + (idx + 1)); }
   function isEvil(idx) { var p = ids[idx]; return p && getFinalFaction(p.role, rec.lancelotFlips && rec.lancelotFlips[idx]) === 'evil'; }
-  function evilColor(idx) { return isEvil(idx) ? '#e74c3c' : '#e8dcc8'; }
+  function evilColor(idx) { return isEvil(idx) ? '#d32f2f' : '#3b2f22'; }
   // 投票值查找：从 votes 对象中按多种 key 格式匹配玩家 vi 的投票
   function getVoteValue(votes, vi) {
     if (!votes) return null;
@@ -8432,6 +8435,8 @@ function generateGameScreenshot(idx) {
     ctx.textBaseline = 'top';
     var cx = x;
     for (var si = 0; si < segs.length; si++) {
+      if (segs[si].bold) ctx.font = 'bold ' + sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+      else ctx.font = sz + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
       ctx.fillStyle = segs[si].color || TXT;
       ctx.textAlign = 'left';
       ctx.fillText(segs[si].text, cx, y);
@@ -8440,21 +8445,21 @@ function generateGameScreenshot(idx) {
     return cx;
   }
 
-  var GOLD = '#f4d03f';
-  var GREEN = '#27ae60';
-  var GREEN_BRIGHT = '#2ecc71';
-  var RED = '#e74c3c';
-  var BLUE = '#5dade2';
-  var TXT = '#e8dcc8';
-  var TXT_SEC = '#a89070';
-  var TXT_DIM = '#7a6e5e';
+  var GOLD = '#c8910a';
+  var GREEN = '#1e8e3e';
+  var GREEN_BRIGHT = '#16a34a';
+  var RED = '#d32f2f';
+  var BLUE = '#1976d2';
+  var TXT = '#3b2f22';
+  var TXT_SEC = '#8a6d4f';
+  var TXT_DIM = '#b09a80';
 
   function tw(text, size) {
     ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     return ctx.measureText(text).width;
   }
-  function dt(text, x, y, size, color, align) {
-    ctx.font = size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+  function dt(text, x, y, size, color, align, bold) {
+    ctx.font = (bold ? 'bold ' : '') + size + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     ctx.fillStyle = color || TXT;
     ctx.textAlign = align || 'left';
     ctx.textBaseline = 'top';
@@ -8556,9 +8561,9 @@ function generateGameScreenshot(idx) {
   ctx.scale(SCALE, SCALE);
 
   var grad = ctx.createLinearGradient(0, 0, 0, totalH);
-  grad.addColorStop(0, '#1a0e30');
-  grad.addColorStop(0.4, '#120926');
-  grad.addColorStop(1, '#0d0617');
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.4, '#fff7ec');
+  grad.addColorStop(1, '#ffedd8');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, totalH);
 
@@ -8583,7 +8588,7 @@ function generateGameScreenshot(idx) {
     ctx.fill();
     dt(badgeText, W/2, y + 6, 15, '#fff', 'center');
     var ty = y + 28 + 8;
-    dt('\u7b2c' + (idx + 1) + '\u5c40 \u00b7 \u963f\u74e6\u9686', W/2, ty, 20, GOLD, 'center');
+    dt('\u7b2c' + (idx + 1) + '\u5c40 \u00b7 \u963f\u74e6\u9686', W/2, ty, 20, '#e65100', 'center');
     var iy = ty + 26 + 4;
     dt((rec.date || '--') + ' \u00b7 ' + (rec.playerCount || '?') + '\u4eba\u5c40', W/2, iy, 11, TXT_DIM, 'center');
   })();
@@ -8593,7 +8598,7 @@ function generateGameScreenshot(idx) {
   (function() {
     var dy = y + 8;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#e65100'); g.addColorStop(0.7, '#e65100'); g.addColorStop(1, 'transparent');
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
@@ -8608,11 +8613,11 @@ function generateGameScreenshot(idx) {
       var col = pi % 2, row = Math.floor(pi / 2);
       var px = PAD + col * (colW + 12), py = gridY + row * 28;
       var id = ids[pi], flippedS = rec.lancelotFlips && rec.lancelotFlips[pi], evil = getFinalFaction(id.role, flippedS) === 'evil';
-      ctx.fillStyle = evil ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)';
+      ctx.fillStyle = evil ? 'rgba(211,47,47,0.10)' : 'rgba(30,142,62,0.08)';
       rr(px, py, colW, 24, 6); ctx.fill();
       dt(evil ? '\u25b2' : '\u2b22', px + 8, py + 5, 10, evil ? RED : BLUE, 'left');
-      dt(pn(pi), px + 22, py + 4, 13, TXT, 'left');
-      dt(id.role || '', px + colW - 8 - tw(id.role || '', 11), py + 5, 11, evil ? RED : BLUE, 'left');
+      dt(pn(pi), px + 22, py + 4, 13, evil ? RED : TXT, 'left', evil ? true : false);
+      dt(id.role || '', px + colW - 8 - tw(id.role || '', 11), py + 5, 11, evil ? RED : BLUE, 'left', evil ? true : false);
     }
   })();
   y += secH[si++];
@@ -8621,7 +8626,7 @@ function generateGameScreenshot(idx) {
   (function() {
     var dy = y + 8;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#e65100'); g.addColorStop(0.7, '#e65100'); g.addColorStop(1, 'transparent');
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
@@ -8639,14 +8644,14 @@ function generateGameScreenshot(idx) {
       if (attempts.length === 0) attempts = [{ leader: m.leader, team: m.team, votes: m.votes || {} }];
       var cardH = calcMissionCardH(m);
       var cx = PAD + 16;
-      ctx.fillStyle = 'rgba(255,255,255,0.04)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
+      ctx.fillStyle = 'rgba(230,81,0,0.05)'; rr(PAD, qy, contentW, cardH, 8); ctx.fill();
       // \u6210\u529f\u8f6e\u6b21\u7528\u91d1\u8272\u5de6\u8fb9\u6761+\u91d1\u8272\u8fb9\u6846\u9ad8\u4eae
       ctx.fillStyle = isSuc ? GOLD : RED; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
       if (isSuc) { ctx.strokeStyle = 'rgba(201,168,76,0.35)'; ctx.lineWidth = 1; rr(PAD, qy, contentW, cardH, 8); ctx.stroke(); }
       dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba\u51fa\u6218', cx, qy + 10, 13, TXT_SEC, 'left');
       var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
       var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
-      ctx.fillStyle = isSuc ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
+      ctx.fillStyle = isSuc ? 'rgba(30,142,62,0.14)' : 'rgba(211,47,47,0.14)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
       dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
       var ay = qy + 10 + 18 + 8;
       for (var a = 0; a < attempts.length; a++) {
@@ -8665,7 +8670,7 @@ function generateGameScreenshot(idx) {
         for (var ti = 0; ti < teamIndices.length; ti++) {
           var tiVal = (typeof teamIndices[ti] === 'number') ? teamIndices[ti] : parseInt(teamIndices[ti]);
           if (ti > 0) hSegs.push({ text: '\u3001', color: TXT_DIM });
-          hSegs.push({ text: pnShort(tiVal), color: evilColor(tiVal) });
+          hSegs.push({ text: pnShort(tiVal), color: evilColor(tiVal), bold: isEvil(tiVal) });
         }
         dtSegments(cx, ay, hSegs, 11);
         ay += 18;
@@ -8673,7 +8678,7 @@ function generateGameScreenshot(idx) {
         var vSegs = [{ text: '\u6295\u7968\uff1a', color: TXT_DIM }];
         for (var vi = 0; vi < pc; vi++) {
           var vvv = getVoteValue(att.votes, vi);
-          vSegs.push({ text: pnShort(vi), color: evilColor(vi) });
+          vSegs.push({ text: pnShort(vi), color: evilColor(vi), bold: isEvil(vi) });
           vSegs.push({ text: (vvv === 'approve' ? '\u2713' : vvv === 'reject' ? '\u2717' : '?') + ' ', color: vvv === 'approve' ? GREEN_BRIGHT : vvv === 'reject' ? RED : TXT_DIM });
         }
         vSegs.push({ text: ' \u2014 ' + approves + ':' + rejects + ' ' + (passed ? '\u901a\u8fc7' : '\u5426\u51b3') + ' ' + (passed ? '\u2713' : '\u2717'), color: passed ? GREEN_BRIGHT : RED });
@@ -8703,7 +8708,7 @@ function generateGameScreenshot(idx) {
             }
           }
           if (evilNames.length > 0) {
-            dt('\u5931\u8d25\u5361\uff1a' + m.shieldedFails + '\u5f20\uff08' + evilNames.join('\u3001') + '\uff09', cx, ay, 12, RED, 'left');
+            dt('\u5931\u8d25\u5361\uff1a' + m.shieldedFails + '\u5f20\uff08' + evilNames.join('\u3001') + '\uff09', cx, ay, 12, RED, 'left', true);
           }
         }
         else if (isPureSuc) { dt('\u4efb\u52a1\u7ed3\u679c\uff1a\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09', cx, ay, 12, GREEN_BRIGHT, 'left'); }
@@ -8727,7 +8732,8 @@ function generateGameScreenshot(idx) {
           var hldr = (lc.holder != null) ? lc.holder : 0, tgt = (lc.target != null) ? lc.target : 0;
           var rl = lc.round ? '\u7b2c' + lc.round + '\u8f6e\u540e\uff1a' : '';
           var resultLabel2 = lc.result === 'good' ? '好人' : lc.result === 'evil' ? '反方' : (lc.result === 'skip' ? '不报' : (lc.result || '?'));
-          dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ' + resultLabel2, PAD + 12, ry, 12, TXT_SEC, 'left');
+          dt(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ', PAD + 12, ry, 12, TXT, 'left');
+          dt(resultLabel2, PAD + 12 + tw(rl + pn(hldr) + ' \u67e5\u9a8c ' + pn(tgt) + ' \u2192 ', 12), ry, 12, resultLabel2 === '反方' ? RED : GREEN_BRIGHT, 'left', true);
           ry += 18;
         }
         ry += 4;
@@ -8754,8 +8760,8 @@ function generateGameScreenshot(idx) {
       }
       if (hasAssassin) {
         var aboxY = ry - 4, aboxH = 18 + 18 + 18 + 10;
-        ctx.fillStyle = 'rgba(192,57,43,0.08)'; rr(PAD, aboxY, contentW, aboxH, 8); ctx.fill();
-        ctx.strokeStyle = 'rgba(192,57,43,0.25)'; ctx.lineWidth = 1; rr(PAD, aboxY, contentW, aboxH, 8); ctx.stroke();
+        ctx.fillStyle = 'rgba(211,47,47,0.10)'; rr(PAD, aboxY, contentW, aboxH, 8); ctx.fill();
+        ctx.strokeStyle = 'rgba(211,47,47,0.35)'; ctx.lineWidth = 1; rr(PAD, aboxY, contentW, aboxH, 8); ctx.stroke();
         dt('\u597d\u4eba\u5b8c\u6210' + doneMissions + '\u6b21\u4efb\u52a1 \u2192 \u8fdb\u5165\u523a\u6740\u9636\u6bb5', PAD + 12, aboxY + 6, 12, RED, 'left');
         dt('\u523a\u5ba2\u731c\u6d4b\u6885\u6797\u662f ' + (rec.assassinTarget || ''), PAD + 12, aboxY + 6 + 18, 12, TXT, 'left');
         var hitT = rec.assassinSuccess ? '\u731c\u5bf9\u4e86!' : '\u731c\u9519\u4e86!';
@@ -8779,7 +8785,7 @@ function generateGameScreenshot(idx) {
   (function() {
     var dy = y + 6;
     var g = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#5b3d8e'); g.addColorStop(0.7, '#5b3d8e'); g.addColorStop(1, 'transparent');
+    g.addColorStop(0, 'transparent'); g.addColorStop(0.3, '#e65100'); g.addColorStop(0.7, '#e65100'); g.addColorStop(1, 'transparent');
     ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, dy); ctx.lineTo(W - PAD, dy); ctx.stroke();
   })();
   y += secH[si++];
@@ -8789,7 +8795,7 @@ function generateGameScreenshot(idx) {
     dt('\u4efb\u52a1\uff1a' + doneMissions + '\u2713 ' + failMissions + '\u2717', PAD, y, 12, TXT_DIM, 'left');
     dt('\u597d\u4eba\u9635\u7ebf\uff1a' + goodPlayers.join('\u3001'), PAD, y + 18, 12, TXT_DIM, 'left');
     dt('\u574f\u4eba\u9635\u7ebf\uff1a' + evilPlayers.join('\u3001'), PAD, y + 36, 12, TXT_DIM, 'left');
-    ctx.fillStyle = '#5a4e3e'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.fillStyle = '#8a6d4f'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.font = '10px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
     ctx.fillText('\u963f\u74e6\u9686 \u00b7 The Resistance Avalon', W / 2, totalH - PAD);
   })();
 
