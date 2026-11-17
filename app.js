@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v176';
+var SW_VERSION = 'v177';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -9910,25 +9910,98 @@ function nvUnlockSpeech() {
   } catch (e) {}
 }
 
-/* ---------- 语音选择 ---------- */
+/* ---------- 语音选择（v177：严格 zh-CN 标准普通话，排除港台/粤语音色） ---------- */
+var NV_VOICE_PREF = ['Natural', 'Xiaoxiao', 'Yunxi', 'Yunxia', 'Huihui'];
+// 港台 / 粤语音色黑名单（名称或 voiceURI 命中即排除）
+var NV_VOICE_BLOCK = /粤|粵|Cantonese|Hong\s*Kong|香港|Taiwan|台灣|台湾|Hant/i;
+
+function nvGetVoices() {
+  try { return window.speechSynthesis.getVoices() || []; } catch (e) { return []; }
+}
+
+function nvNormalizeLang(v) {
+  if (!v || !v.lang) return '';
+  return String(v.lang).replace(/_/g, '-').toLowerCase();
+}
+
+// 只接受大陆普通话标识（zh-CN / zh-CHS / zh-Hans），其余（zh-HK / zh-TW / yue 等）一律不算候选
+function nvIsZhCN(v) {
+  if (!v) return false;
+  var lang = nvNormalizeLang(v);
+  if (!lang) return false;
+  if (!/^zh-(cn|chs|hans)$/.test(lang)) return false;
+  if (NV_VOICE_BLOCK.test((v.name || '') + ' ' + (v.voiceURI || ''))) return false;
+  return true;
+}
+
+function nvScoreVoice(v) {
+  var name = (v.name || '') + ' ' + (v.voiceURI || '');
+  var score = 0, i;
+  if (/Microsoft/i.test(name)) score += 5;          // 优先 Microsoft 中文音色
+  if (/Natural/i.test(name)) score += 8;            // 优先神经网络自然音色
+  for (i = 0; i < NV_VOICE_PREF.length; i++) {
+    if (new RegExp(NV_VOICE_PREF[i], 'i').test(name)) { score += 10; break; }
+  }
+  return score;
+}
+
 function nvPickVoice() {
   if (!NV.supported) return null;
-  var vs = [];
-  try { vs = window.speechSynthesis.getVoices() || []; } catch (e) { vs = []; }
+  var vs = nvGetVoices();
   if (!vs.length) return null;
-  var i, v, best = null, zh = null;
+  var best = null, bestScore = -1, i, v, s;
   for (i = 0; i < vs.length; i++) {
     v = vs[i];
-    if (!v || !v.lang) continue;
-    if (/^zh/i.test(v.lang)) {
-      if (zh === null) zh = v;
-      if (/^zh[-_]CN/i.test(v.lang)) {
-        if (!best) best = v;
-        if (/Tingting|Xiaoxiao|Yaoyao|Huihui|Mandarin|China/i.test(v.name || '')) best = v;
-      }
-    }
+    if (!nvIsZhCN(v)) continue;
+    s = nvScoreVoice(v);
+    if (s > bestScore) { bestScore = s; best = v; }
   }
-  return best || zh || null;
+  // 绝不回退到 zh-HK / zh-TW / 粤语音色：无 zh-CN 候选时返回 null
+  return best;
+}
+
+// 语音列表在多数浏览器是异步加载的：等 voiceschanged / 轮询，最多等 1.5s
+function nvResolveVoice(cb) {
+  if (NV._voice) { cb(NV._voice); return; }
+  var done = false;
+  var finish = function (v) {
+    if (done) return;
+    done = true;
+    NV._voice = v || null;
+    cb(NV._voice);
+  };
+  var first = nvPickVoice();
+  if (first) { finish(first); return; }
+  if (nvGetVoices().length) { finish(null); return; }   // 列表已就绪但没有 zh-CN 音色
+  var waited = 0, step = 120, limit = 1500;
+  var onChanged = function () {
+    var v = nvPickVoice();
+    if (v) { cleanup(); finish(v); }
+  };
+  var cleanup = function () {
+    try { window.speechSynthesis.removeEventListener('voiceschanged', onChanged); } catch (e) {}
+  };
+  try { window.speechSynthesis.addEventListener('voiceschanged', onChanged); } catch (e) {}
+  var tick = function () {
+    if (done) return;
+    var v = nvPickVoice();
+    if (v) { cleanup(); finish(v); return; }
+    waited += step;
+    if (waited >= limit) { cleanup(); finish(null); return; }
+    setTimeout(tick, step);
+  };
+  setTimeout(tick, step);
+}
+
+// 未选到 zh-CN 音色时给出降级提示（不切换到港台音色）
+function nvWarnNoCnVoice() {
+  if (NV._noCnVoiceTip) return;
+  NV._noCnVoiceTip = true;
+  var tip = document.getElementById('nv-tip');
+  if (tip) {
+    tip.textContent = '未检测到标准普通话（zh-CN）音色，已按 lang=zh-CN 交由系统默认语音朗读；'
+      + '若发音带口音，请在系统「语音/语言」中安装中文（中国大陆）语音包后重试。';
+  }
 }
 
 /* ---------- 本场角色集合 ---------- */
@@ -10002,16 +10075,9 @@ function buildNightVoiceLines() {
     push('红色方请闭眼', '红色方请闭眼。');
   }
 
-  // 4) 除莫德雷德以外的红色方竖大拇指（只竖拇指不睁眼的奥伯伦 / 红色兰斯洛特在本段内说明）
+  // 4) 除莫德雷德以外的红色方竖大拇指（v177：本段只念一句，不再追加"X只竖起大拇指，不要睁眼"重复提示）
   if (thumbs.length) {
-    var thumbText = '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。';
-    var thumbOnly = [];
-    if (hasOberon) thumbOnly.push('奥伯伦');
-    if (hasRedLancelot) thumbOnly.push('红色兰斯洛特');
-    if (thumbOnly.length) {
-      thumbText += thumbOnly.join('、') + '只竖起大拇指，不要睁眼。';
-    }
-    push('红色方竖大拇指', thumbText);
+    push('红色方竖大拇指', '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。');
   }
 
   // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
@@ -10034,9 +10100,9 @@ function buildNightVoiceLines() {
     push('梅林和莫甘娜竖拇指', mvText);
   }
 
-  // 8) 派西维尔请睁眼（无派西维尔整段跳过）
+  // 8) 派西维尔请睁眼（无派西维尔整段跳过；v177：固定一句，不做有/无莫甘娜分支）
   if (has('派西维尔')) {
-    push('派西维尔请睁眼', '派西维尔请睁眼，请辨认谁是梅林。');
+    push('派西维尔请睁眼', '派西维尔请睁眼，请派西维尔确认两个梅林身份。');
     // 9) 派西维尔闭眼
     push('派西维尔请闭眼', '派西维尔请闭眼。');
   }
@@ -10207,6 +10273,14 @@ function nvSpeakAt(i) {
     return;
   }
 
+  // v177：先等语音列表就绪并锁定 zh-CN 标准普通话音色，再真正开口
+  nvResolveVoice(function (voice) {
+    if (mySeq !== NV.seq || !NV.open) return;
+    nvStartUtterance(line, mySeq, voice);
+  });
+}
+
+function nvStartUtterance(line, mySeq, voice) {
   var u;
   try {
     u = new SpeechSynthesisUtterance(line.text);
@@ -10214,12 +10288,12 @@ function nvSpeakAt(i) {
     nvSimAdvance(mySeq, line.text);
     return;
   }
-  u.lang = 'zh-CN';
+  u.lang = 'zh-CN';   // 每个 Utterance 显式指定普通话，避免跟随系统默认语言
   u.rate = 1;
   u.pitch = 1;
   u.volume = 1;
-  var v = nvPickVoice();
-  if (v) u.voice = v;
+  if (voice) u.voice = voice;
+  else nvWarnNoCnVoice();
   u.onstart = function () {
     NV._started = true;
   };
