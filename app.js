@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v177';
+var SW_VERSION = 'v178';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -1340,7 +1340,7 @@ function doStartGame() {
   var msg = '游戏开始！共 ' + state.playerCount + ' 名玩家，5 轮任务';
   if (state.myRole) msg += '（你的身份：' + state.myRole + '）';
   toast(msg);
-  // v175：开局流程 —— 先摇骰子随机选出第一轮队长，随后自动进入夜间身份语音播报
+  // v178：开局流程 —— 先摇骰子随机选出第一轮队长，停在队长页由用户选择「开始语音播报」或「跳过播报」
   try { startNightOpeningSequence(); } catch (e) { console.warn('夜间播报启动失败', e); }
 }
 
@@ -2085,6 +2085,21 @@ function renderStepPanel() {
   }
 
   var leaderName = playerLabel(m.leader);
+
+  // v178：开局骰子选出首轮队长后停在此页，由用户选择「开始语音播报」或「跳过播报」
+  if (NV_PROMPT === 'pending') {
+    h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
+    h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
+    h += '<div style="text-align:center;padding:18px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+    h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
+    h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报，直接开始组队。</div>';
+    h += '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+    h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
+    h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
+    h += '</div></div>';
+    c.innerHTML = h;
+    return;
+  }
 
   if (state._teamConfirmedPending) {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
@@ -9874,6 +9889,9 @@ var NV = {
   open: false
 };
 
+// v178：开局骰子选出队长后，先停在队长页询问是否播报（'none' / 'pending'）
+var NV_PROMPT = 'none';
+
 (function nvInitEnv() {
   try {
     NV.supported = !!(window && window.speechSynthesis && window.SpeechSynthesisUtterance);
@@ -10054,14 +10072,14 @@ function buildNightVoiceLines() {
   var hasOberon = has('奥伯伦');
   var hasRedLancelot = has('兰斯洛特(红)');
 
-  // 2) 红色方睁眼互认：直接点名具体身份，并排除不睁眼的奥伯伦 / 红色兰斯洛特
-  var excludeNames = [];
-  if (hasOberon) excludeNames.push('奥伯伦');
-  if (hasRedLancelot) excludeNames.push('红色兰斯洛特');
+  // 2) 红色方睁眼互认（v178：奥伯伦/红色兰斯洛特改为"竖起大拇指"，只有本场存在的角色才会被念到）
+  var thumbOnly = [];   // 只竖大拇指、不睁眼的角色（仅本场存在时才出现在句子里）
+  if (hasOberon) thumbOnly.push('奥伯伦');
+  if (hasRedLancelot) thumbOnly.push('红色兰斯洛特');
   if (openEvil.length) {
     var openText;
-    if (excludeNames.length) {
-      openText = '请红色方除' + excludeNames.join('、') + '竖起大拇指不要睁眼，请'
+    if (thumbOnly.length) {
+      openText = '请红色方' + thumbOnly.join('、') + '竖起大拇指，请'
         + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
     } else {
       openText = '请红色方' + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
@@ -10069,15 +10087,18 @@ function buildNightVoiceLines() {
     push('红色方请睁眼', openText);
     // 3) 红色方闭眼
     push('红色方请闭眼', '红色方请闭眼。');
-  } else if (excludeNames.length) {
-    // 兜底：本场没有需要睁眼互认的红色方，仅提示不睁眼者竖起大拇指
-    push('红色方请睁眼', '请红色方除' + excludeNames.join('、') + '竖起大拇指不要睁眼。');
+  } else if (thumbOnly.length) {
+    // 兜底：本场只有奥伯伦/红色兰斯洛特，没有需要睁眼互认的红色方
+    push('红色方请睁眼', '请红色方' + thumbOnly.join('、') + '竖起大拇指。');
     push('红色方请闭眼', '红色方请闭眼。');
   }
 
-  // 4) 除莫德雷德以外的红色方竖大拇指（v177：本段只念一句，不再追加"X只竖起大拇指，不要睁眼"重复提示）
+  // 4) 红色方竖大拇指（v178："除莫德雷德以外"仅在本场存在莫德雷德时出现）
   if (thumbs.length) {
-    push('红色方竖大拇指', '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。');
+    var thumbText = has('莫德雷德')
+      ? '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。'
+      : '请红色方竖起大拇指：' + nvJoinNames(thumbs) + '。';
+    push('红色方竖大拇指', thumbText);
   }
 
   // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
@@ -10100,24 +10121,18 @@ function buildNightVoiceLines() {
     push('梅林和莫甘娜竖拇指', mvText);
   }
 
-  // 8) 派西维尔请睁眼（无派西维尔整段跳过；v177：固定一句，不做有/无莫甘娜分支）
+  // 8) 派西维尔请睁眼（无派西维尔整段跳过；v178：本场无梅林时不得念出"梅林"）
   if (has('派西维尔')) {
-    push('派西维尔请睁眼', '派西维尔请睁眼，请派西维尔确认两个梅林身份。');
+    var percText = has('梅林')
+      ? '派西维尔请睁眼，请派西维尔确认两个梅林身份。'
+      : '派西维尔请睁眼，请派西维尔确认你看到的那两个身份。';
+    push('派西维尔请睁眼', percText);
     // 9) 派西维尔闭眼
     push('派西维尔请闭眼', '派西维尔请闭眼。');
   }
 
-  // 10) 天亮请睁眼（念首轮队长与组队人数）
-  var leader = null;
-  if (state.missions && state.missions.length) leader = state.missions[0].leader;
-  var counts = MISSION_COUNTS[state.playerCount];
-  var firstSize = counts ? counts[0] : 2;
-  var dawn = '天亮请睁眼。';
-  if (leader !== null && leader !== undefined && state.playerNames && state.playerNames[leader]) {
-    dawn += '本局第一轮队长是' + playerLabel(leader) + '，';
-  }
-  dawn += '请开始第一轮组队，需要' + firstSize + '人出任务。游戏开始。';
-  push('天亮请睁眼', dawn);
+  // 10) 天亮请睁眼（v178：只念"天亮请睁眼。"，队长与人数信息仅界面展示，不再朗读）
+  push('天亮请睁眼', '天亮请睁眼。');
 
   return lines;
 }
@@ -10562,14 +10577,41 @@ function playLeaderDiceRoll(cb) {
   }, 95);
 }
 
-/* ---------- 开局序列：骰子选队长 → 夜间播报 ---------- */
+/* ---------- 开局序列：骰子选队长 → 停在队长页询问是否播报（v178） ---------- */
 function startNightOpeningSequence() {
   if (!state.missions || !state.missions.length) return;
-  var m0 = state.missions[0];
+  NV_PROMPT = 'none';
   playLeaderDiceRoll(function (idx) {
     if (state.missions[0] && state.missions[0].leader === null) {
       selectLeader(idx);
     }
-    setTimeout(function () { openNightVoice(true); }, 280);
+    // 停在队长展示页，显示「开始语音播报」「跳过播报」两个按钮，不再自动播报
+    NV_PROMPT = 'pending';
+    renderStepPanel();
   });
+}
+
+/* 点「开始语音播报」：隐藏按钮并进入播报面板 */
+function nvPromptStart() {
+  if (NV_PROMPT !== 'pending') return;
+  NV_PROMPT = 'none';
+  var sb = document.getElementById('nv-prompt-start');
+  if (sb) sb.style.display = 'none';
+  var kb = document.getElementById('nv-prompt-skip');
+  if (kb) kb.style.display = 'none';
+  renderStepPanel();
+  openNightVoice(true);
+}
+
+/* 点「跳过播报」：隐藏按钮，不播放任何语音，直接进入组队 */
+function nvPromptSkip() {
+  if (NV_PROMPT !== 'pending') return;
+  NV_PROMPT = 'none';
+  var sb = document.getElementById('nv-prompt-start');
+  if (sb) sb.style.display = 'none';
+  var kb = document.getElementById('nv-prompt-skip');
+  if (kb) kb.style.display = 'none';
+  renderStepPanel();
+  try { if (typeof toast === 'function') toast('已跳过语音播报，请开始组队'); } catch (e) {}
+  setTimeout(function () { renderStepPanel(); }, 30);
 }
