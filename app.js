@@ -168,7 +168,16 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v185';
+var SW_VERSION = 'v186';
+/* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
+var _cloudHistCache = null;
+var _cloudHistCacheRaw = null;
+var _cloudHistCacheAt = 0;
+var CLOUD_HIST_TTL = 60000;
+/* ---- v186：云端历史异步预取（不再使用同步 XHR，避免切页阻塞） ---- */
+var _cloudRowsPrefetched = null;   // 已异步拉到的云端原始行（待合并一次）
+var _cloudRowsPrefetching = false; // 是否正在预取
+var _cloudLastPrefetchAt = 0;      // 上次预取时间（用于 TTL 节流）
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -385,6 +394,9 @@ function invalidateHistoryCache() {
   _historyCache = null;
   _normalizedHistoryRawCache = null;
   _normalizedHistoryCache = null;
+  _cloudHistCache = null;
+  _cloudHistCacheRaw = null;
+  _cloudHistCacheAt = 0;
 }
 // 将旧格式 roundTendencies（纯数值对象数组）迁移为新格式（带 r/a 元数据）
 function migrateRoundTendenciesV2(v2) {
@@ -440,20 +452,17 @@ function migrateRoundTendenciesV2(v2) {
 }
 
 function loadHistory() {
-  // 先尝试从 Supabase 全量拉取，不可用时回退到 localStorage
+  // v186：本次会话已同步且本地存储未变时直接用缓存，不再发起同步 XHR
+  var rawNow = null;
+  try { rawNow = localStorage.getItem('avalon_history_v2') || '[]'; } catch(e0) { rawNow = '[]'; }
+  if (_cloudHistCache && _cloudHistCacheRaw === rawNow && (Date.now() - _cloudHistCacheAt) < CLOUD_HIST_TTL) {
+    return _cloudHistCache.slice();
+  }
+  // v186：本地优先 + 后台异步预取 —— 有预取结果时在本地合并，否则先返回本地并异步拉云端
   var sb = getSupabase();
-  if (sb) {
+  if (sb && _cloudRowsPrefetched && _cloudRowsPrefetched.length > 0) {
     try {
-      var result = null;
-      var xhr = new XMLHttpRequest();
-      var token = SUPABASE_KEY;
-      xhr.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc&limit=1000', false);
-      xhr.setRequestHeader('apikey', token);
-      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-      xhr.send();
-      if (xhr.status >= 200 && xhr.status < 300) {
-        result = JSON.parse(xhr.responseText);
-      }
+      var result = _cloudRowsPrefetched;
       if (result && result.length > 0) {
         var cloudHistory = [];
         var deletedKeys = loadDeletedKeys();
@@ -513,6 +522,12 @@ function loadHistory() {
         if (tzMigrated && merged.length > 0) console.log('[Time] cloud+local after migrate:', merged[0].st);
         // 写回 localStorage 作为缓存
         saveHistory(merged);
+        // v186：缓存本次云端同步结果
+        try {
+          _cloudHistCache = merged.slice();
+          _cloudHistCacheRaw = localStorage.getItem('avalon_history_v2') || '[]';
+          _cloudHistCacheAt = Date.now();
+        } catch(eC) {}
         // 时区迁移后，将 _tzMigrated 标记异步写回 Supabase 防止下次加载仍触发迁移
         if (tzMigrated) {
           (function() {
@@ -536,15 +551,47 @@ function loadHistory() {
         }
         console.log('[loadHistory] loaded ' + merged.length + ' records from cloud + local');
         if (_migratedCount > 0) toast('\u5df2\u8f6c\u6362 ' + _migratedCount + ' \u6761 UTC\u65f6\u95f4\u4e3a\u5317\u4eac\u65f6\u95f4\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u4ee5\u5e94\u7528\u4fee\u6539', 'info');
+        _cloudRowsPrefetched = null;
         return merged.slice();
       }
     } catch(e) {
-      console.warn('[loadHistory] Supabase sync failed, falling back to localStorage:', e);
+      console.warn('[loadHistory] merge prefetched rows failed, falling back to localStorage:', e);
     }
   }
 
-  // 回退到 localStorage
+  // 回退到 localStorage（同时后台异步预取云端，调用方不等网络）
+  prefetchCloudRows();
   return loadHistoryLocal();
+}
+
+// v186：异步预取云端历史行（异步 XHR，不阻塞主线程；完成后按需刷新统计页）
+function prefetchCloudRows(cb) {
+  if (_cloudRowsPrefetching) return;
+  if (_cloudRowsPrefetched && _cloudRowsPrefetched.length > 0) { if (cb) { try { cb(); } catch(e0) {} } return; }
+  if (_cloudLastPrefetchAt && (Date.now() - _cloudLastPrefetchAt) < CLOUD_HIST_TTL) { if (cb) { try { cb(); } catch(e1) {} } return; }
+  var _sbp = null;
+  try { _sbp = getSupabase(); } catch(e2) { _sbp = null; }
+  if (!_sbp) return;
+  _cloudRowsPrefetching = true;
+  _cloudLastPrefetchAt = Date.now();
+  try {
+    var xhrP = new XMLHttpRequest();
+    xhrP.open('GET', SUPABASE_URL + '/rest/v1/game_records?select=id,game_data,game_data_v2,created_at&order=created_at.asc&limit=1000', true);
+    xhrP.setRequestHeader('apikey', SUPABASE_KEY);
+    xhrP.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
+    xhrP.onload = function() {
+      _cloudRowsPrefetching = false;
+      if (xhrP.status >= 200 && xhrP.status < 300) {
+        try { _cloudRowsPrefetched = JSON.parse(xhrP.responseText) || []; } catch(eP) { _cloudRowsPrefetched = []; }
+        _cloudHistCache = null; _cloudHistCacheRaw = null; _cloudHistCacheAt = 0;
+        if (cb) { try { cb(); } catch(eCb) {} }
+        var ap = document.querySelector('.page.active');
+        if (ap && ap.id === 'page-stats') { try { renderStats(); } catch(eR) {} }
+      }
+    };
+    xhrP.onerror = function() { _cloudRowsPrefetching = false; };
+    xhrP.send();
+  } catch(ePF) { _cloudRowsPrefetching = false; }
 }
 
 function loadHistoryLocal() {
@@ -834,7 +881,8 @@ function normalizeRecord(record) {
   return record; // 兼容未迁移的旧格式
 }
 function getSortedNamePool() {
-  var history = loadNormalizedHistory();
+  // v186：名池排序只需出现频次，用本地历史即可，首屏不再发起同步 XHR
+  var history = loadHistoryLocal().map(function(r) { return normalizeRecord(r); });
   var counts = {};
   for (var i = 0; i < history.length; i++) {
     var rec = history[i];
@@ -945,7 +993,7 @@ function setActiveNav(page) {
 function showPage(page) {
   var prevPage = state._currentPage;
   var pg = document.getElementById('page-' + page);
-  // v185：未知页面（如已下线的 tools）直接忽略，避免所有页被隐藏后出现空白页
+  // 未知页面直接忽略，避免所有页被隐藏后出现空白页
   if (!pg) { console.warn('[nav] unknown page: ' + page); return; }
   state._currentPage = page;
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
@@ -6556,6 +6604,7 @@ function deduplicateHistory(history) {
   // v185：首屏先可用；Supabase SDK、实时订阅、离线队列重推全部延后到首屏空闲
   var afterFirstPaint = function() {
     try { processOfflineQueues(); } catch(e) {}
+    try { prefetchCloudRows(); } catch(e) {}
     if (typeof window.supabase !== 'undefined') {
       try { setupRealtimeSubscriptions(); } catch(e) { console.warn('[Realtime] setup failed', e); }
     } else {
