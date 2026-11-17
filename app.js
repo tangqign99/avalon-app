@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v174';
+var SW_VERSION = 'v176';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -9854,8 +9854,8 @@ function pad2(n) {
    播报台词按本场实际角色池（state.activeRoles / state.playerRoles / state.myRole）动态拼装，
    角色不存在则整段跳过。变量与函数统一使用 NV / nv 前缀，避免与既有 speech* 发言阶段逻辑冲突。 */
 
-var NV_EVIL_OPEN = ['莫甘娜', '刺客', '莫德雷德', '爪牙'];     // 睁眼互认的坏人
-var NV_EVIL_THUMB = ['莫甘娜', '刺客', '爪牙', '奥伯伦', '兰斯洛特(红)']; // 给梅林竖拇指（= 坏人 - 莫德雷德）
+var NV_EVIL_OPEN = ['莫甘娜', '刺客', '莫德雷德', '爪牙'];     // 睁眼互认的红色方
+var NV_EVIL_THUMB = ['莫甘娜', '刺客', '爪牙', '奥伯伦', '兰斯洛特(红)']; // 给梅林竖拇指（= 红色方 - 莫德雷德）
 var NV_GAP_MIN = 0;
 var NV_GAP_MAX = 8;
 var NV_GAP_DEFAULT = 3;
@@ -9949,6 +9949,18 @@ function nvRoleSet() {
   return set;
 }
 
+/* ---------- 播报用角色名（念白口语化） ---------- */
+function nvRoleName(r) {
+  if (r === '兰斯洛特(红)') return '红色兰斯洛特';
+  if (r === '兰斯洛特(蓝)') return '蓝色兰斯洛特';
+  return r;
+}
+function nvJoinNames(list) {
+  var out = [];
+  for (var i = 0; i < list.length; i++) out.push(nvRoleName(list[i]));
+  return out.join('、');
+}
+
 /* ---------- 台词动态拼装 ---------- */
 function buildNightVoiceLines() {
   var R = nvRoleSet();
@@ -9964,47 +9976,72 @@ function buildNightVoiceLines() {
   // 1) 天黑请闭眼
   push('天黑请闭眼', '天黑请闭眼，请所有玩家闭上眼睛。');
 
-  var openEvil = pick(NV_EVIL_OPEN);
+  var openEvil = pick(NV_EVIL_OPEN);   // 互相认识、需要睁眼的红色方
+  var thumbs = pick(NV_EVIL_THUMB);    // 给梅林竖拇指的红色方（= 红色方 - 莫德雷德）
   var hasOberon = has('奥伯伦');
   var hasRedLancelot = has('兰斯洛特(红)');
 
-  // 2) 坏人请睁眼（仅互相认识的坏人）
+  // 2) 红色方睁眼互认：直接点名具体身份，并排除不睁眼的奥伯伦 / 红色兰斯洛特
+  var excludeNames = [];
+  if (hasOberon) excludeNames.push('奥伯伦');
+  if (hasRedLancelot) excludeNames.push('红色兰斯洛特');
   if (openEvil.length) {
-    push('坏人请睁眼', '坏人请睁眼。本局坏人是：' + openEvil.join('、') + '，请互相确认你们的同伴。');
-    push('坏人请闭眼', '坏人请闭眼。');
-  }
-
-  // 3) 不睁眼、只竖大拇指的坏人
-  if (hasOberon) {
-    push('奥伯伦竖拇指', '奥伯伦不要睁眼，请竖起大拇指。');
-  }
-  if (hasRedLancelot) {
-    push('红色兰斯洛特竖拇指', '红色兰斯洛特不要睁眼，请竖起大拇指。');
-  }
-
-  // 4) 梅林请睁眼（竖拇指名单 = 本场所有坏人 - 莫德雷德，不点名莫德雷德）
-  if (has('梅林')) {
-    var thumbs = pick(NV_EVIL_THUMB);
-    var melinText;
-    if (thumbs.length) {
-      melinText = '梅林请睁眼。竖起大拇指的玩家中，包括' + thumbs.join('、') + '。';
+    var openText;
+    if (excludeNames.length) {
+      openText = '请红色方除' + excludeNames.join('、') + '竖起大拇指不要睁眼，请'
+        + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
     } else {
-      melinText = '梅林请睁眼。';
+      openText = '请红色方' + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
     }
-    push('梅林请睁眼', melinText);
+    push('红色方请睁眼', openText);
+    // 3) 红色方闭眼
+    push('红色方请闭眼', '红色方请闭眼。');
+  } else if (excludeNames.length) {
+    // 兜底：本场没有需要睁眼互认的红色方，仅提示不睁眼者竖起大拇指
+    push('红色方请睁眼', '请红色方除' + excludeNames.join('、') + '竖起大拇指不要睁眼。');
+    push('红色方请闭眼', '红色方请闭眼。');
+  }
+
+  // 4) 除莫德雷德以外的红色方竖大拇指（只竖拇指不睁眼的奥伯伦 / 红色兰斯洛特在本段内说明）
+  if (thumbs.length) {
+    var thumbText = '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。';
+    var thumbOnly = [];
+    if (hasOberon) thumbOnly.push('奥伯伦');
+    if (hasRedLancelot) thumbOnly.push('红色兰斯洛特');
+    if (thumbOnly.length) {
+      thumbText += thumbOnly.join('、') + '只竖起大拇指，不要睁眼。';
+    }
+    push('红色方竖大拇指', thumbText);
+  }
+
+  // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
+  if (has('梅林')) {
+    push('梅林请睁眼', '梅林请睁眼，请看竖着大拇指的玩家并记住他们。');
+    // 6) 梅林闭眼、所有人放下大拇指
     push('梅林请闭眼', '梅林请闭眼，所有人请放下大拇指。');
   }
 
-  // 5) 派西维尔请睁眼（无派西维尔整段跳过）
+  // 7) 梅林和莫甘娜竖起大拇指（无莫甘娜只念梅林）
+  if (has('梅林') || has('莫甘娜')) {
+    var mvText;
+    if (has('梅林') && has('莫甘娜')) {
+      mvText = '请梅林和莫甘娜竖起大拇指。';
+    } else if (has('梅林')) {
+      mvText = '请梅林竖起大拇指。';
+    } else {
+      mvText = '请莫甘娜竖起大拇指。';
+    }
+    push('梅林和莫甘娜竖拇指', mvText);
+  }
+
+  // 8) 派西维尔请睁眼（无派西维尔整段跳过）
   if (has('派西维尔')) {
-    var perText = has('莫甘娜')
-      ? '派西维尔请睁眼。梅林和莫甘娜竖起了大拇指。'
-      : '派西维尔请睁眼。梅林竖起了大拇指。';
-    push('派西维尔请睁眼', perText);
+    push('派西维尔请睁眼', '派西维尔请睁眼，请辨认谁是梅林。');
+    // 9) 派西维尔闭眼
     push('派西维尔请闭眼', '派西维尔请闭眼。');
   }
 
-  // 6) 天亮请睁眼
+  // 10) 天亮请睁眼（念首轮队长与组队人数）
   var leader = null;
   if (state.missions && state.missions.length) leader = state.missions[0].leader;
   var counts = MISSION_COUNTS[state.playerCount];
