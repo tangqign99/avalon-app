@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v178';
+var SW_VERSION = 'v180';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -10642,7 +10642,7 @@ function nvSyncBtnSafe() {
   try { nvSyncAllBtn(); } catch (e) {}
 }
 
-/* ---------- v179：背景乐（Web Audio 程序化合成柔和垫乐，无版权音频） ---------- */
+/* ---------- v180：背景乐（Web Audio 程序化合成「F 轻快拨弦」，零外部依赖、无版权音频） ---------- */
 var NVM = {
   ctx: null,
   master: null,
@@ -10651,10 +10651,37 @@ var NVM = {
   playing: false,
   enabled: true,
   vol: 0.08,
-  duck: false
+  duck: false,
+  timer: null,
+  nextTime: 0,
+  step: 0
 };
 var NVM_DUCK_RATIO = 0.6;   // 朗读时压低到约六成
 var NVM_VOL_MAX = 0.30;
+
+/* 编曲参数：BPM 112 / 4-4 / 每拍两个八分音符 */
+var NVM_BPM = 112;
+var NVM_EIGHTH = 60 / NVM_BPM / 2;   // ≈0.2679s
+var NVM_STEPS_PER_BAR = 8;           // 4 拍 × 2
+var NVM_ATTACK = 0.003;              // 3ms attack 防爆音
+var NVM_DECAY_K = 6;                 // exp(-6t) 快速衰减
+var NVM_TAIL = 0.6;                  // 拨弦尾长上限 0.6s
+var NVM_BASS_AMP = 0.12;             // 每小节第一拍低音根音
+var NVM_LOOKAHEAD = 0.25;
+var NVM_TICK_MS = 25;
+
+/* 五声音阶 C4 D4 E4 G4 A4 C5 */
+var NVM_SCALE = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+/* 行进型旋律（八分音符序列，索引指向 NVM_SCALE），上下流动、避免连续重复 */
+var NVM_PATTERNS = [
+  [0, 2, 3, 4, 3, 2, 1, 0],
+  [1, 3, 4, 5, 4, 3, 2, 1],
+  [2, 4, 3, 5, 4, 2, 3, 1],
+  [0, 3, 4, 3, 5, 4, 2, 0],
+  [1, 2, 4, 3, 2, 4, 5, 3]
+];
+/* 每小节低音根音（C3 / A2 / G2 / C3） */
+var NVM_BASS = [130.81, 110.00, 98.00, 130.81];
 
 (function nvmInitCfg() {
   try {
@@ -10691,48 +10718,94 @@ function nvmEnsure() {
   }
 }
 
-// 柔和和弦垫：C3 / G3 / C4 / E4 正弦叠加 + 轻微失谐 + 低通 + 缓慢呼吸
+// 拨弦音色：基频 + 二次泛音 0.3 + 三次泛音 0.12，3ms attack，exp(-6t) 指数衰减，尾长 ≤0.6s
+function nvmPluck(at, freq, amp, tail) {
+  var ctx = NVM.ctx;
+  if (!ctx || !freq) return;
+  if (!(tail > 0)) tail = NVM_TAIL;
+  if (tail > NVM_TAIL) tail = NVM_TAIL;
+  var env = ctx.createGain();
+  var stopAt = at + tail + 0.02;
+  var floor = Math.max(amp * Math.exp(-NVM_DECAY_K * (tail - NVM_ATTACK)), 0.00001);
+  try {
+    env.gain.setValueAtTime(0.00001, at);
+    env.gain.linearRampToValueAtTime(amp, at + NVM_ATTACK);
+    env.gain.exponentialRampToValueAtTime(floor, at + tail);
+  } catch (e) {
+    try { env.gain.value = amp; } catch (e2) {}
+  }
+  env.connect(NVM.bus);
+
+  var parts = [[1, 1], [2, 0.3], [3, 0.12]];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    var f = freq * p[0];
+    if (f > 12000) continue;
+    var o = ctx.createOscillator();
+    var og = ctx.createGain();
+    o.type = 'sine';           // 仅 sine / triangle，禁用 square / sawtooth
+    o.frequency.value = f;
+    og.gain.value = p[1];
+    o.connect(og);
+    og.connect(env);
+    try { o.start(at); o.stop(stopAt); } catch (e) {}
+    NVM.oscs.push(o);
+  }
+  while (NVM.oscs.length > 96) {
+    var old = NVM.oscs.shift();
+    try { old.disconnect(); } catch (e) {}
+  }
+}
+
+// 滤波链：highpass 300Hz（切净低频嗡鸣）+ lowpass 5500Hz + 双延迟（0.12s/0.19s，反馈 0.15/0.10，无混响）
 function nvmBuildGraph() {
   var ctx = NVM.ctx;
   var bus = ctx.createGain();
-  bus.gain.value = 0.9;
+  bus.gain.value = 1;
+
+  var hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 300;
+  hp.Q.value = 0.7;
+
   var lp = ctx.createBiquadFilter();
   lp.type = 'lowpass';
-  lp.frequency.value = 1500;
-  lp.Q.value = 0.3;
-  bus.connect(lp);
-  lp.connect(NVM.master);
+  lp.frequency.value = 5500;
+  lp.Q.value = 0.7;
 
-  var trem = ctx.createGain();
-  trem.gain.value = 0.84;
-  trem.connect(bus);
-  var lfo = ctx.createOscillator();
-  var lfoGain = ctx.createGain();
-  lfo.type = 'sine';
-  lfo.frequency.value = 0.08;
-  lfoGain.gain.value = 0.13;
-  lfo.connect(lfoGain);
-  lfoGain.connect(trem.gain);
-  try { lfo.start(); } catch (e) {}
+  var post = ctx.createGain();
+  post.gain.value = 0.9;
 
-  var notes = [130.81, 196.00, 261.63, 329.63];
-  var oscs = [];
-  for (var i = 0; i < notes.length; i++) {
-    for (var d = 0; d < 2; d++) {
-      var o = ctx.createOscillator();
-      var og = ctx.createGain();
-      o.type = 'sine';
-      o.frequency.value = notes[i];
-      try { o.detune.value = d === 0 ? -5 : 5; } catch (e) {}
-      og.gain.value = 0.16;
-      o.connect(og);
-      og.connect(trem);
-      try { o.start(); } catch (e) {}
-      oscs.push(o);
-    }
-  }
-  NVM.oscs = oscs;
-  NVM.chain = [bus, lp, trem, lfo, lfoGain];
+  var d1 = ctx.createDelay(1.0);
+  d1.delayTime.value = 0.12;
+  var fb1 = ctx.createGain();
+  fb1.gain.value = 0.15;
+
+  var d2 = ctx.createDelay(1.0);
+  d2.delayTime.value = 0.19;
+  var fb2 = ctx.createGain();
+  fb2.gain.value = 0.10;
+
+  var wet = ctx.createGain();
+  wet.gain.value = 0.26;
+
+  bus.connect(hp);
+  hp.connect(lp);
+  lp.connect(post);
+  post.connect(NVM.master);
+  post.connect(d1);
+  post.connect(d2);
+  d1.connect(fb1);
+  fb1.connect(d1);
+  d1.connect(wet);
+  d2.connect(fb2);
+  fb2.connect(d2);
+  d2.connect(wet);
+  wet.connect(NVM.master);
+
+  NVM.bus = bus;
+  NVM.nodes = [bus, hp, lp, post, d1, fb1, d2, fb2, wet];
+  NVM.chain = NVM.nodes.slice();
 }
 
 function nvmApplyGain(fadeSec) {
@@ -10749,6 +10822,33 @@ function nvmApplyGain(fadeSec) {
   }
 }
 
+// 单步发声：八分音符位置 idx（0-7），小节第一拍叠一个轻低音根音（无持续低音铺底）
+function nvmEmitStep(step, at) {
+  var idx = step % NVM_STEPS_PER_BAR;
+  var bar = Math.floor(step / NVM_STEPS_PER_BAR);
+  var pat = NVM_PATTERNS[bar % NVM_PATTERNS.length];
+  var f = NVM_SCALE[pat[idx] % NVM_SCALE.length];
+  var amp = (idx % 2 === 0) ? 0.5 : 0.34;   // 强弱交替，轻快律动
+  if (idx === 0) {
+    nvmPluck(at, NVM_BASS[bar % NVM_BASS.length], NVM_BASS_AMP, 0.45);
+  }
+  nvmPluck(at, f, amp, NVM_TAIL);
+}
+
+// 前瞻调度（setInterval 每 25ms 排 0.25s），保证时间稳定无抖动
+function nvmSchedule() {
+  var ctx = NVM.ctx;
+  if (!ctx || !NVM.playing) return;
+  var horizon = ctx.currentTime + NVM_LOOKAHEAD;
+  if (NVM.nextTime < ctx.currentTime - 0.4) NVM.nextTime = ctx.currentTime + 0.05;
+  var guard = 0;
+  while (NVM.nextTime < horizon && guard++ < 64) {
+    nvmEmitStep(NVM.step, NVM.nextTime);
+    NVM.step++;
+    NVM.nextTime += NVM_EIGHTH;
+  }
+}
+
 // 播报开始即播放（暂停/停顿期间持续）
 function nvmStart() {
   if (!NVM.enabled) return;
@@ -10757,16 +10857,23 @@ function nvmStart() {
   if (NVM.playing) { nvmApplyGain(0.25); return; }
   try {
     nvmBuildGraph();
+    NVM.step = 0;
+    NVM.nextTime = ctx.currentTime + 0.05;
     NVM.playing = true;
+    nvmSchedule();
+    if (NVM.timer) clearInterval(NVM.timer);
+    NVM.timer = setInterval(nvmSchedule, NVM_TICK_MS);
     nvmApplyGain(1.2);
   } catch (e) {
     NVM.playing = false;
+    if (NVM.timer) { clearInterval(NVM.timer); NVM.timer = null; }
   }
 }
 
 // 播报结束 / 跳过 / 关闭面板即停止（淡出后释放节点）
 function nvmStop() {
   var ctx = NVM.ctx;
+  if (NVM.timer) { clearInterval(NVM.timer); NVM.timer = null; }
   if (ctx && NVM.master && NVM.playing) {
     var now = ctx.currentTime;
     try {
@@ -10781,9 +10888,11 @@ function nvmStop() {
   NVM.playing = false;
   NVM.duck = false;
   var oscs = NVM.oscs.slice();
-  var chain = NVM.chain.slice();
+  var chain = (NVM.nodes || NVM.chain || []).slice();
   NVM.oscs = [];
   NVM.chain = [];
+  NVM.nodes = [];
+  NVM.bus = null;
   setTimeout(function () {
     var i;
     for (i = 0; i < oscs.length; i++) {
@@ -10791,7 +10900,6 @@ function nvmStop() {
       try { oscs[i].disconnect(); } catch (e) {}
     }
     for (i = 0; i < chain.length; i++) {
-      try { chain[i].stop(); } catch (e) {}
       try { chain[i].disconnect(); } catch (e) {}
     }
   }, 640);
@@ -10866,8 +10974,9 @@ function openNightVoice(autoStart) {
   NV._errCount = 0;
   nvRenderPanel();
   if (!NV.supported) {
-    // 降级为纯文字：不报错，仍可手动逐句推进
+    // 降级为纯文字：不报错，仍可手动逐句推进；v180：背景乐与 TTS 无关，照常播放
     NV.playing = false;
+    try { nvmStart(); } catch (e) {}
     nvRefreshPlayBtn();
     return;
   }
