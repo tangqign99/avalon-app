@@ -1444,3 +1444,15 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 @keyframes nvDicePop{0%{transform:scale(1)}55%{transform:scale(1.16)}100%{transform:scale(1)}}
 .nv-dice-name{font-size:18px;font-weight:700;color:var(--text-bright);min-height:26px}
 .nv-dice-sub{margin-top:6px;font-size:11px;color:var(--text-dim)}
+/* v181：开局选择队长模块 + 手动选号 + 骰子框内操作区 */
+.ldr-pick-module{margin-bottom:12px;padding:14px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card)}
+.ldr-pick-desc{font-size:12px;line-height:1.7;color:var(--text-dim);margin-bottom:10px}
+.ldr-pick-btns{display:flex;gap:10px;flex-wrap:wrap}
+.ldr-pick-btns .btn{flex:1 1 46%;min-width:132px}
+.ldr-pick-tip{margin-top:8px;font-size:11px;color:var(--text-dim)}
+.ldr-numgrid{display:none;flex-wrap:wrap;gap:8px;justify-content:center;margin:2px 0 10px}
+.ldr-num{width:44px;padding:8px 0;font-size:16px;font-weight:700;color:var(--gold-light);background:rgba(201,168,76,0.10);border:2px solid var(--gold);border-radius:10px;cursor:pointer}
+.ldr-num.sel{background:var(--gold);color:#1a1408;box-shadow:0 0 14px rgba(232,212,139,0.6)}
+.nv-dice-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.nv-dice-actions .btn{min-width:96px}
+.nv-dice-idle .nv-dice{animation:none}

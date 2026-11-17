@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v180';
+var SW_VERSION = 'v181';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -1328,6 +1328,10 @@ function doStartGame() {
   state.speakTimes = {};
   state._teamConfirmedPending = false;
   state._excaliburPreConfirm = false;
+  // v181：开局进入「选择队长」页，不自动掷色子；未确认前一概不写 leader
+  NV_PROMPT = 'choose';
+  NV_ASKED = false;
+  ldrResetPick();
   state.playerRoles = state.playerRoles || [];
   stopTimer();
   for (var i = 0; i < state.playerCount; i++) {
@@ -2017,6 +2021,30 @@ function switchRound(i) {
   renderGame();
 }
 
+/* v181：开局「选择队长」阶段页面 —— 上方选择模块，下方原播报按钮组 */
+function renderLeaderPickStage(c, m, reqSize, pc) {
+  var h = '';
+  h += '<div class="ldr-pick-module">';
+  h += '<div class="step-label" style="margin-bottom:8px">选择队长</div>';
+  h += '<div class="ldr-pick-desc">掷色子随机选，或手动指定 1~' + pc + ' 号玩家。号码停住后需点「确认」才生效，确认前可重掷。</div>';
+  h += '<div class="ldr-pick-btns">';
+  h += '<button class="btn primary" id="ldr-dice-btn" onclick="ldrPickDice()">&#127922; 掷色子选队长</button>';
+  h += '<button class="btn" id="ldr-manual-btn" onclick="ldrPickManual()">&#9995; 手动选择队长</button>';
+  h += '</div>';
+  h += '<div class="ldr-pick-tip">确认后进入组队页（首轮需 ' + reqSize + ' 人出任务）</div>';
+  h += '</div>';
+  if (!NV_ASKED) {
+    h += '<div style="text-align:center;padding:18px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+    h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
+    h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报。</div>';
+    h += '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+    h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
+    h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
+    h += '</div></div>';
+  }
+  c.innerHTML = h;
+}
+
 function renderStepPanel() {
   var m = state.missions[state.currentRound];
   console.log('[debug-renderStep] round=' + state.currentRound + ' leader=' + (m ? m.leader : 'MISSING') + ' teamLen=' + (m && m.team ? m.team.length : '?') + ' teamPending=' + state._teamConfirmedPending + ' hasResult=' + (m && m.result ? 'yes' : 'no'));
@@ -2067,6 +2095,12 @@ function renderStepPanel() {
   }
 
   var votesConfirmed = Object.keys(m.votes).length > 0;
+
+  // v181：开局选队长页 —— 上方「选择队长」模块，下方原「开始语音播报 / 跳过播报」
+  if (m.leader === null && NV_PROMPT === 'choose' && state.currentRound === 0) {
+    renderLeaderPickStage(c, m, reqSize, pc);
+    return;
+  }
 
   if (m.leader === null) {
     if (state._firstLeaderPicked) {
@@ -9891,8 +9925,10 @@ var NV = {
   open: false
 };
 
-// v178：开局骰子选出队长后，先停在队长页询问是否播报（'none' / 'pending'）
+// v181：开局停在队长页由用户选队长（'choose'），确认后置 'none'；'pending' 为旧版状态保留兼容
 var NV_PROMPT = 'none';
+// v181：播报询问是否已处理（已被点过「开始/跳过播报」后不再显示该按钮组）
+var NV_ASKED = false;
 
 (function nvInitEnv() {
   try {
@@ -10989,65 +11025,187 @@ function openNightVoice(autoStart) {
   }
 }
 
-/* ---------- 骰子随机选队长动画 ---------- */
-function playLeaderDiceRoll(cb) {
-  var pc = state.playerCount;
-  var target = Math.floor(Math.random() * pc);
-  var old = document.getElementById('nv-dice-overlay');
-  if (old && old.parentNode) old.parentNode.removeChild(old);
+/* ---------- v181：开局队长选择（掷色子 / 手动，均需点「确认」才生效） ---------- */
+var LDR_PICK = { preview: null, rolling: false, mode: 'none', timer: null };
 
+function ldrResetPick() {
+  if (LDR_PICK.timer) { clearInterval(LDR_PICK.timer); LDR_PICK.timer = null; }
+  LDR_PICK.preview = null;
+  LDR_PICK.rolling = false;
+  LDR_PICK.mode = 'none';
+  ldrRemoveOverlay();
+}
+
+function ldrRemoveOverlay() {
+  var ov = document.getElementById('nv-dice-overlay');
+  if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+}
+
+function ldrBuildOverlay() {
+  ldrRemoveOverlay();
   var ov = document.createElement('div');
   ov.className = 'nv-dice-overlay';
   ov.id = 'nv-dice-overlay';
-  ov.innerHTML =
-    '<div class="nv-dice-panel">'
-    + '<div class="nv-dice-title">🎲 随机决定首发队长</div>'
-    + '<div class="nv-dice" id="nv-dice-face">?</div>'
-    + '<div class="nv-dice-name" id="nv-dice-name">摇骰子中…</div>'
-    + '<div class="nv-dice-sub">结果将直接作为第 1 轮队长</div>'
-    + '</div>';
+  var h = '';
+  h += '<div class="nv-dice-panel">';
+  h += '<div class="nv-dice-title" id="nv-dice-title">🎲 随机决定首发队长</div>';
+  h += '<div class="nv-dice" id="nv-dice-face">?</div>';
+  h += '<div class="nv-dice-name" id="nv-dice-name">请选择一种方式</div>';
+  h += '<div class="nv-dice-sub" id="nv-dice-sub">号码停住后点「确认」才生效</div>';
+  h += '<div class="ldr-numgrid" id="nv-dice-numgrid"></div>';
+  h += '<div class="nv-dice-actions">';
+  h += '<button class="btn primary" id="nv-dice-roll" onclick="ldrPickDice()">&#127922; 掷色子选队长</button>';
+  h += '<button class="btn" id="nv-dice-manual" onclick="ldrPickManual()">&#9995; 手动选择队长</button>';
+  h += '<button class="btn" id="nv-dice-confirm" onclick="ldrPickConfirm()" style="display:none;background:linear-gradient(135deg,#e8d48b,#c9a84c);color:#1a1408;border:none;font-weight:700">确认</button>';
+  h += '<button class="btn" id="nv-dice-cancel" onclick="ldrPickCancel()">取消</button>';
+  h += '</div></div>';
+  ov.innerHTML = h;
   document.body.appendChild(ov);
+  return ov;
+}
 
+/* 掷色子：沿用原骰子 UI 与动画（同框、95ms 跳动 16 次、末次定格），停住后不跳转，只出「确认」 */
+function ldrPickDice() {
+  var pc = state.playerCount;
+  var ov = document.getElementById('nv-dice-overlay') || ldrBuildOverlay();
   var face = document.getElementById('nv-dice-face');
   var nameEl = document.getElementById('nv-dice-name');
+  var title = document.getElementById('nv-dice-title');
+  var sub = document.getElementById('nv-dice-sub');
+  var grid = document.getElementById('nv-dice-numgrid');
+  var btnRoll = document.getElementById('nv-dice-roll');
+  var btnMan = document.getElementById('nv-dice-manual');
+  var btnOk = document.getElementById('nv-dice-confirm');
+  if (!face || !btnOk) return;
+  if (LDR_PICK.timer) { clearInterval(LDR_PICK.timer); LDR_PICK.timer = null; }
+  LDR_PICK.mode = 'dice';
+  LDR_PICK.preview = null;
+  LDR_PICK.rolling = true;
+  ov.classList.remove('nv-dice-done');
+  ov.classList.remove('nv-dice-idle');
+  if (title) title.textContent = '🎲 随机决定首发队长';
+  if (grid) { grid.innerHTML = ''; grid.style.display = 'none'; }
+  if (btnRoll) { btnRoll.style.display = ''; btnRoll.textContent = '🎲 掷色子选队长'; }
+  if (btnMan) btnMan.style.display = '';
+  btnOk.style.display = 'none';
+  if (sub) sub.textContent = '摇骰子中…';
+  if (nameEl) nameEl.textContent = '摇骰子中…';
+  if (face) face.textContent = '?';
+  var target = Math.floor(Math.random() * pc);
   var ticks = 0;
   var total = 16;
-  var iv = setInterval(function () {
+  LDR_PICK.timer = setInterval(function () {
     ticks++;
     var n = 1 + Math.floor(Math.random() * pc);
     if (face) face.textContent = String(n);
     if (nameEl) nameEl.textContent = (state.playerNames[n - 1] || ('玩家' + n));
     if (ticks >= total) {
-      clearInterval(iv);
+      clearInterval(LDR_PICK.timer);
+      LDR_PICK.timer = null;
       if (face) face.textContent = String(target + 1);
       if (nameEl) nameEl.textContent = playerLabel(target);
       if (ov) ov.classList.add('nv-dice-done');
-      setTimeout(function () {
-        if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
-        if (typeof cb === 'function') cb(target);
-      }, 1150);
+      LDR_PICK.preview = target;
+      LDR_PICK.rolling = false;
+      if (sub) sub.textContent = '可重掷，点「确认」后生效';
+      if (btnRoll) btnRoll.textContent = '🔁 重新掷色子';
+      btnOk.style.display = '';
     }
   }, 95);
 }
 
-/* ---------- 开局序列：骰子选队长 → 停在队长页询问是否播报（v178） ---------- */
-function startNightOpeningSequence() {
-  if (!state.missions || !state.missions.length) return;
-  NV_PROMPT = 'none';
-  playLeaderDiceRoll(function (idx) {
-    if (state.missions[0] && state.missions[0].leader === null) {
-      selectLeader(idx);
-    }
-    // 停在队长展示页，显示「开始语音播报」「跳过播报」两个按钮，不再自动播报
-    NV_PROMPT = 'pending';
-    renderStepPanel();
-  });
+/* 手动选择：在同一个框里列出 1~N 号，选中后同框定格 */
+function ldrPickManual() {
+  var pc = state.playerCount;
+  var ov = document.getElementById('nv-dice-overlay') || ldrBuildOverlay();
+  var face = document.getElementById('nv-dice-face');
+  var nameEl = document.getElementById('nv-dice-name');
+  var title = document.getElementById('nv-dice-title');
+  var sub = document.getElementById('nv-dice-sub');
+  var grid = document.getElementById('nv-dice-numgrid');
+  var btnRoll = document.getElementById('nv-dice-roll');
+  var btnOk = document.getElementById('nv-dice-confirm');
+  if (!face || !grid) return;
+  if (LDR_PICK.timer) { clearInterval(LDR_PICK.timer); LDR_PICK.timer = null; }
+  LDR_PICK.mode = 'manual';
+  LDR_PICK.preview = null;
+  LDR_PICK.rolling = false;
+  ov.classList.remove('nv-dice-done');
+  ov.classList.add('nv-dice-idle');
+  if (title) title.textContent = '✋ 手动选择首发队长';
+  if (face) face.textContent = '?';
+  if (nameEl) nameEl.textContent = '请选择 1~' + pc + ' 号';
+  if (sub) sub.textContent = '选中号码后点「确认」才生效';
+  if (btnRoll) { btnRoll.style.display = ''; btnRoll.textContent = '🎲 掷色子选队长'; }
+  if (btnOk) btnOk.style.display = 'none';
+  var gh = '';
+  for (var i = 0; i < pc; i++) {
+    gh += '<button class="ldr-num" id="ldr-num-' + i + '" onclick="ldrPickNum(' + i + ')">' + (i + 1) + '</button>';
+  }
+  grid.innerHTML = gh;
+  grid.style.display = 'flex';
 }
 
-/* 点「开始语音播报」：隐藏按钮并进入播报面板 */
-function nvPromptStart() {
-  if (NV_PROMPT !== 'pending') return;
+function ldrPickNum(i) {
+  var pc = state.playerCount;
+  if (i < 0 || i >= pc) return;
+  var ov = document.getElementById('nv-dice-overlay');
+  var face = document.getElementById('nv-dice-face');
+  var nameEl = document.getElementById('nv-dice-name');
+  var sub = document.getElementById('nv-dice-sub');
+  var btnOk = document.getElementById('nv-dice-confirm');
+  LDR_PICK.preview = i;
+  LDR_PICK.mode = 'manual';
+  if (ov) { ov.classList.remove('nv-dice-idle'); ov.classList.add('nv-dice-done'); }
+  if (face) face.textContent = String(i + 1);
+  if (nameEl) nameEl.textContent = playerLabel(i);
+  if (sub) sub.textContent = '已选 ' + (i + 1) + ' 号，点「确认」后生效';
+  for (var k = 0; k < pc; k++) {
+    var b = document.getElementById('ldr-num-' + k);
+    if (b) { if (k === i) b.classList.add('sel'); else b.classList.remove('sel'); }
+  }
+  if (btnOk) btnOk.style.display = '';
+}
+
+/* 确认：此时才写入 missions[currentRound].leader 并进入组队页 */
+function ldrPickConfirm() {
+  var idx = LDR_PICK.preview;
+  if (idx === null || idx === undefined) return;
+  if (LDR_PICK.timer) { clearInterval(LDR_PICK.timer); LDR_PICK.timer = null; }
+  ldrRemoveOverlay();
+  LDR_PICK.preview = null;
+  LDR_PICK.rolling = false;
+  LDR_PICK.mode = 'none';
   NV_PROMPT = 'none';
+  selectLeader(idx);
+  try { toast('队长已确定：' + playerLabel(idx)); } catch (e) {}
+}
+
+/* 取消：不写入任何队长，保持在选择页 */
+function ldrPickCancel() {
+  if (LDR_PICK.timer) { clearInterval(LDR_PICK.timer); LDR_PICK.timer = null; }
+  ldrRemoveOverlay();
+  LDR_PICK.preview = null;
+  LDR_PICK.rolling = false;
+  LDR_PICK.mode = 'none';
+  renderStepPanel();
+}
+
+/* ---------- 开局序列：停在队长页，由用户掷色子/手动选队长并确认，询问是否播报（v181） ---------- */
+function startNightOpeningSequence() {
+  if (!state.missions || !state.missions.length) return;
+  // v181：不再自动掷色子，改由用户主动选择；未确认前 missions[0].leader 保持 null
+  NV_PROMPT = 'choose';
+  NV_ASKED = false;
+  ldrResetPick();
+  renderStepPanel();
+}
+
+/* 点「开始语音播报」：隐藏按钮并进入播报面板（v181：不受队长是否确认限制） */
+function nvPromptStart() {
+  if (NV_PROMPT !== 'pending' && NV_PROMPT !== 'choose') return;
+  NV_ASKED = true;
+  if (NV_PROMPT === 'pending') NV_PROMPT = 'none';
   nvmEnsure();   // v179：以本次点击作为手势解锁 AudioContext，兼容移动端
   var sb = document.getElementById('nv-prompt-start');
   if (sb) sb.style.display = 'none';
@@ -11057,10 +11215,11 @@ function nvPromptStart() {
   openNightVoice(true);
 }
 
-/* 点「跳过播报」：隐藏按钮，不播放任何语音，直接进入组队 */
+/* 点「跳过播报」：隐藏按钮，不播放任何语音（v181：队长未确认时仍留在选择页） */
 function nvPromptSkip() {
-  if (NV_PROMPT !== 'pending') return;
-  NV_PROMPT = 'none';
+  if (NV_PROMPT !== 'pending' && NV_PROMPT !== 'choose') return;
+  NV_ASKED = true;
+  if (NV_PROMPT === 'pending') NV_PROMPT = 'none';
   var sb = document.getElementById('nv-prompt-start');
   if (sb) sb.style.display = 'none';
   var kb = document.getElementById('nv-prompt-skip');
