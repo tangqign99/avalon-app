@@ -1406,6 +1406,27 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .nv-setting-label{white-space:nowrap}
 .nv-setting input[type=range]{flex:1;accent-color:var(--gold);height:22px}
 .nv-gap-val{color:var(--gold-light);min-width:44px;text-align:right}
+/* v179：逐句停顿设置区 + 背景乐控制 */
+.nv-gaps-wrap{display:block;padding:2px 14px 10px}
+.nv-setting-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--gold-light)}
+.nv-setting-hint{font-size:11px;color:var(--text-dim)}
+.nv-gaps-body{max-height:34vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;background:rgba(0,0,0,0.18);-webkit-overflow-scrolling:touch}
+.nv-gap-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;color:var(--text-dim);border-bottom:1px dashed rgba(255,255,255,0.07)}
+.nv-gap-row:last-child{border-bottom:none}
+.nv-gap-idx{color:var(--gold);flex:0 0 auto}
+.nv-gap-name{color:var(--text-bright);flex:0 0 auto;white-space:nowrap}
+.nv-gap-preview{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.65;font-size:11px}
+.nv-gap-input{width:58px;flex:0 0 auto;padding:3px 4px;border-radius:6px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text-bright);font-size:12px;text-align:center}
+.nv-gap-unit{flex:0 0 auto;font-size:11px}
+.nv-gap-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 0 2px}
+.nv-gap-all-label{font-size:11px}
+.nv-gap-actions .btn{flex:0 0 auto;min-width:0}
+.nv-bgm-btn{flex:0 0 auto}
+@media (max-width:480px){
+  .nv-gap-preview{display:none}
+  .nv-gap-name{font-size:11px}
+  .nv-gaps-body{max-height:30vh}
+}
 .nv-tip{padding:0 14px 12px;font-size:11px;line-height:1.5;color:var(--text-dim);flex-shrink:0}
 @media (max-width:480px){
   .nv-caption{font-size:15px;min-height:48px}

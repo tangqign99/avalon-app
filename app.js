@@ -9872,7 +9872,8 @@ function pad2(n) {
 var NV_EVIL_OPEN = ['莫甘娜', '刺客', '莫德雷德', '爪牙'];     // 睁眼互认的红色方
 var NV_EVIL_THUMB = ['莫甘娜', '刺客', '爪牙', '奥伯伦', '兰斯洛特(红)']; // 给梅林竖拇指（= 红色方 - 莫德雷德）
 var NV_GAP_MIN = 0;
-var NV_GAP_MAX = 8;
+var NV_GAP_MAX = 10;      // v179：逐句停顿支持 0~10 秒
+var NV_GAP_STEP = 0.5;    // v179：步长 0.5 秒
 var NV_GAP_DEFAULT = 3;
 
 var NV = {
@@ -9881,7 +9882,8 @@ var NV = {
   playing: false,
   paused: false,
   finished: false,
-  gap: NV_GAP_DEFAULT,
+  gap: NV_GAP_DEFAULT,   // 默认停顿（统一值）
+  gaps: {},              // v179：按步骤名索引的逐句停顿时长
   timer: null,
   utter: null,
   seq: 0,
@@ -9901,6 +9903,20 @@ var NV_PROMPT = 'none';
   try {
     var g = parseFloat(localStorage.getItem('avalon_voice_gap'));
     if (!isNaN(g) && g >= NV_GAP_MIN && g <= NV_GAP_MAX) NV.gap = g;
+  } catch (e) {}
+  // v179：逐句停顿设置（按步骤名索引；缺项回退默认 3 秒）
+  try {
+    var rawGaps = localStorage.getItem('avalon_voice_gaps');
+    if (rawGaps) {
+      var gapObj = JSON.parse(rawGaps);
+      if (gapObj && typeof gapObj === 'object') {
+        for (var gk in gapObj) {
+          if (!Object.prototype.hasOwnProperty.call(gapObj, gk)) continue;
+          var gv = parseFloat(gapObj[gk]);
+          if (!isNaN(gv)) NV.gaps[gk] = nvClampGap(gv);
+        }
+      }
+    }
   } catch (e) {}
   // 语音列表在部分浏览器是异步加载的，提前预热一次
   if (NV.supported) {
@@ -9923,6 +9939,8 @@ function nvUnlockSpeech() {
     u.rate = 1;
     window.speechSynthesis.speak(u);
     setTimeout(function () {
+      // v179：若此时已经在朗读正式台词，不要用解锁用的空 utterance 取消它
+      if (NV.playing || NV._started) return;
       try { window.speechSynthesis.cancel(); } catch (e) {}
     }, 220);
   } catch (e) {}
@@ -10067,29 +10085,24 @@ function buildNightVoiceLines() {
   // 1) 天黑请闭眼
   push('天黑请闭眼', '天黑请闭眼，请所有玩家闭上眼睛。');
 
-  var openEvil = pick(NV_EVIL_OPEN);   // 互相认识、需要睁眼的红色方
-  var thumbs = pick(NV_EVIL_THUMB);    // 给梅林竖拇指的红色方（= 红色方 - 莫德雷德）
-  var hasOberon = has('奥伯伦');
+  var openEvil = pick(NV_EVIL_OPEN);   // 互相认识、需要睁眼的红色方（莫甘娜/刺客/莫德雷德/爪牙）
+  var thumbs = pick(NV_EVIL_THUMB);    // 第4句给梅林竖拇指的红色方（含奥伯伦）
   var hasRedLancelot = has('兰斯洛特(红)');
 
-  // 2) 红色方睁眼互认（v178：奥伯伦/红色兰斯洛特改为"竖起大拇指"，只有本场存在的角色才会被念到）
-  var thumbOnly = [];   // 只竖大拇指、不睁眼的角色（仅本场存在时才出现在句子里）
-  if (hasOberon) thumbOnly.push('奥伯伦');
-  if (hasRedLancelot) thumbOnly.push('红色兰斯洛特');
-  if (openEvil.length) {
+  // 2) 红色方睁眼互认（v179：奥伯伦完全退出本段——不念名、不睁眼、不竖大拇指；红色兰斯洛特保持"竖起大拇指"）
+  if (openEvil.length || hasRedLancelot) {
     var openText;
-    if (thumbOnly.length) {
-      openText = '请红色方' + thumbOnly.join('、') + '竖起大拇指，请'
+    if (hasRedLancelot && openEvil.length) {
+      openText = '请红色方红色兰斯洛特竖起大拇指，请'
         + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
+    } else if (hasRedLancelot) {
+      // 本场没有需要睁眼互认的红色方，只念红色兰斯洛特竖大拇指
+      openText = '请红色方红色兰斯洛特竖起大拇指。';
     } else {
       openText = '请红色方' + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
     }
     push('红色方请睁眼', openText);
     // 3) 红色方闭眼
-    push('红色方请闭眼', '红色方请闭眼。');
-  } else if (thumbOnly.length) {
-    // 兜底：本场只有奥伯伦/红色兰斯洛特，没有需要睁眼互认的红色方
-    push('红色方请睁眼', '请红色方' + thumbOnly.join('、') + '竖起大拇指。');
     push('红色方请闭眼', '红色方请闭眼。');
   }
 
@@ -10131,8 +10144,10 @@ function buildNightVoiceLines() {
     push('派西维尔请闭眼', '派西维尔请闭眼。');
   }
 
-  // 10) 天亮请睁眼（v178：只念"天亮请睁眼。"，队长与人数信息仅界面展示，不再朗读）
+  // 10) 天亮请睁眼（v178：队长与人数信息仅界面展示，不再朗读）
   push('天亮请睁眼', '天亮请睁眼。');
+  // 11) v179：天亮后再加一句，此句之后不再播报任何语音
+  push('所有人整理表情', '所有人整理表情，睁开眼睛。');
 
   return lines;
 }
@@ -10162,6 +10177,23 @@ function nvRenderPanel() {
       + '</div>';
   }
 
+  // v179：逐句停顿设置行（按当前实际句序列出，显示步骤名 + 文本前十字）
+  var gapsHTML = '';
+  for (var gi = 0; gi < NV.lines.length; gi++) {
+    var gStep = NV.lines[gi].step;
+    var gFull = NV.lines[gi].text || '';
+    var gCut = gFull.length > 10 ? gFull.slice(0, 10) + '…' : gFull;
+    gapsHTML += '<div class="nv-gap-row">'
+      + '<span class="nv-gap-idx">' + (gi + 1) + '.</span>'
+      + '<span class="nv-gap-name">' + escAttr(gStep) + '</span>'
+      + '<span class="nv-gap-preview" title="' + escAttr(gFull) + '">' + escAttr(gCut) + '</span>'
+      + '<input type="number" class="nv-gap-input" min="' + NV_GAP_MIN + '" max="' + NV_GAP_MAX
+      + '" step="' + NV_GAP_STEP + '" value="' + nvGapOf(gStep) + '" data-step="' + escAttr(gStep)
+      + '" onchange="nvSetGapFor(this)">'
+      + '<span class="nv-gap-unit">秒</span>'
+      + '</div>';
+  }
+
   var myRoleHTML = '';
   if (state.myRole && state.myRole !== '不明') {
     myRoleHTML = '<span class="nv-badge">我的身份：' + escAttr(state.myRole) + '</span>';
@@ -10185,10 +10217,30 @@ function nvRenderPanel() {
     +   '<button class="btn small" onclick="nvNext()">下一句</button>'
     +   '<button class="btn small" onclick="nvSkip()">跳过</button>'
     + '</div>'
+    + '<div class="nv-setting nv-gaps-wrap">'
+    +   '<div class="nv-setting-head" onclick="nvToggleGapsBody()">'
+    +     '<span class="nv-setting-label">逐句停顿设置</span>'
+    +     '<span class="nv-setting-hint" id="nv-gaps-hint">共 ' + NV.lines.length + ' 句，点击展开</span>'
+    +   '</div>'
+    +   '<div class="nv-gaps-body" id="nv-gaps-body" style="display:none">'
+    +     gapsHTML
+    +     '<div class="nv-gap-actions">'
+    +       '<span class="nv-gap-all-label">统一设为</span>'
+    +       '<input type="number" id="nv-gap-all" class="nv-gap-input" min="' + NV_GAP_MIN + '" max="' + NV_GAP_MAX + '" step="' + NV_GAP_STEP + '" value="' + NV.gap + '" oninput="nvSyncAllBtn()">'
+    +       '<span class="nv-gap-unit">秒</span>'
+    +       '<button class="btn small" id="nv-gap-all-btn" onclick="nvApplyAllGaps()">统一设为 ' + NV.gap + ' 秒</button>'
+    +     '</div>'
+    +     '<div class="nv-gap-actions">'
+    +       '<button class="btn small primary" onclick="nvSaveGaps()">保存停顿设置</button>'
+    +       '<button class="btn small" onclick="nvResetGaps()">恢复默认 3 秒</button>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
     + '<div class="nv-setting">'
-    +   '<span class="nv-setting-label">句间停顿</span>'
-    +   '<input type="range" id="nv-gap" min="' + NV_GAP_MIN + '" max="' + NV_GAP_MAX + '" step="1" value="' + NV.gap + '" oninput="nvSetGap(this.value)">'
-    +   '<span class="nv-gap-val" id="nv-gap-val">' + NV.gap + ' 秒</span>'
+    +   '<span class="nv-setting-label">背景乐</span>'
+    +   '<button class="btn small nv-bgm-btn" id="nv-bgm-toggle" onclick="nvmToggle()">' + (NVM.enabled ? '已开启' : '已关闭') + '</button>'
+    +   '<input type="range" id="nv-bgm-vol" min="2" max="30" step="1" value="' + Math.round(NVM.vol * 100) + '" oninput="nvmSetVol(this.value)">'
+    +   '<span class="nv-gap-val" id="nv-bgm-val">' + Math.round(NVM.vol * 100) + '%</span>'
     + '</div>'
     + '<div class="nv-tip" id="nv-tip">' + (NV.supported
         ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转。'
@@ -10274,6 +10326,7 @@ function nvSpeakAt(i) {
   if (!NV.open) return;
   if (i < 0) i = 0;
   if (i >= NV.lines.length) { nvFinish(); return; }
+  nvmStart();   // v179：播报开始即播放背景乐（停顿期间不断，结束/跳过才停）
   NV.idx = i;
   NV.finished = false;
   NV._speakStart = 0;
@@ -10311,12 +10364,15 @@ function nvStartUtterance(line, mySeq, voice) {
   else nvWarnNoCnVoice();
   u.onstart = function () {
     NV._started = true;
+    nvmDuck(true);    // v179：语音朗读时把背景乐压低到约六成
   };
   u.onend = function () {
+    nvmDuck(false);
     if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
     nvScheduleNext();
   };
   u.onerror = function () {
+    nvmDuck(false);
     if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
     NV._errCount = (NV._errCount || 0) + 1;
     if (NV._errCount >= 2) nvMarkUnsupported();
@@ -10367,6 +10423,7 @@ function nvStartUtterance(line, mySeq, voice) {
       return;
     }
     NV._speakStart = 0;
+    nvmDuck(false);
     nvScheduleNext();
   };
   NV._speakStart = Date.now();
@@ -10376,7 +10433,10 @@ function nvStartUtterance(line, mySeq, voice) {
 function nvScheduleNext() {
   nvClearTimer();
   if (!NV.open || !NV.playing || NV.paused) return;
-  var gapMs = Math.round(NV.gap * 1000);
+  // v179：第 N 句结束后按"该句"配置的秒数停顿，再播下一句
+  var curLine = NV.lines[NV.idx];
+  var gapSec = curLine ? nvGapOf(curLine.step) : NV.gap;
+  var gapMs = Math.round(gapSec * 1000);
   if (gapMs <= 0) { nvSpeakAt(NV.idx + 1); return; }
   NV.timer = setTimeout(function () {
     if (!NV.open || !NV.playing || NV.paused) return;
@@ -10389,6 +10449,7 @@ function nvFinish() {
   NV.paused = false;
   NV.finished = true;
   nvClearTimer();
+  nvmStop();   // v179：播报结束即停止背景乐
   nvRefreshPlayBtn();
   var sn = document.getElementById('nv-step-name');
   var cap = document.getElementById('nv-caption');
@@ -10399,6 +10460,7 @@ function nvFinish() {
 function nvTogglePlay() {
   if (!NV.open) { openNightVoice(false); return; }
   nvUnlockSpeech();
+  nvmEnsure();   // v179：手势内解锁 AudioContext（移动端必需）
   if (NV.finished) { nvStartFrom(0); return; }
   if (NV.playing && !NV.paused) { nvPause(); return; }
   if (NV.paused) { nvResume(); return; }
@@ -10421,6 +10483,7 @@ function nvPause() {
   NV.seq++;
   nvClearTimer();
   nvStopSpeech();
+  nvmDuck(false);   // v179：暂停时背景乐不中断，只恢复正常音量
   nvRefreshPlayBtn();
   var sn = document.getElementById('nv-step-name');
   if (sn && NV.idx >= 0) sn.textContent = '已暂停 · 第 ' + (NV.idx + 1) + ' 句';
@@ -10482,8 +10545,288 @@ function nvSkip() {
   NV.seq++;
   nvClearTimer();
   nvStopSpeech();
+  nvmStop();   // v179：跳过播报后停止背景乐
   nvClose();
   toast('已跳过夜间语音播报，可随时点「夜间播报」重新打开');
+}
+
+/* ---------- v179：逐句停顿时长 ---------- */
+function nvClampGap(v) {
+  var g = parseFloat(v);
+  if (isNaN(g)) g = NV_GAP_DEFAULT;
+  g = Math.round(g / NV_GAP_STEP) * NV_GAP_STEP;
+  if (g < NV_GAP_MIN) g = NV_GAP_MIN;
+  if (g > NV_GAP_MAX) g = NV_GAP_MAX;
+  return g;
+}
+
+// 取某一句的停顿秒数：优先逐句配置，缺项回退默认值
+function nvGapOf(step) {
+  if (step && Object.prototype.hasOwnProperty.call(NV.gaps, step)) {
+    var v = parseFloat(NV.gaps[step]);
+    if (!isNaN(v)) return v;
+  }
+  return NV.gap;
+}
+
+function nvToggleGapsBody() {
+  var body = document.getElementById('nv-gaps-body');
+  var hint = document.getElementById('nv-gaps-hint');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (hint) hint.textContent = open ? ('共 ' + NV.lines.length + ' 句，点击展开') : ('共 ' + NV.lines.length + ' 句，点击收起');
+}
+
+// 单句输入即时生效（未点保存前不写入本地存储）
+function nvSetGapFor(el) {
+  if (!el) return;
+  var step = el.getAttribute('data-step');
+  var g = nvClampGap(el.value);
+  el.value = g;
+  if (step) NV.gaps[step] = g;
+}
+
+function nvSyncAllBtn() {
+  var inp = document.getElementById('nv-gap-all');
+  var btn = document.getElementById('nv-gap-all-btn');
+  if (!inp || !btn) return;
+  var g = nvClampGap(inp.value);
+  btn.textContent = '统一设为 ' + g + ' 秒';
+}
+
+function nvApplyAllGaps() {
+  var inp = document.getElementById('nv-gap-all');
+  var g = nvClampGap(inp ? inp.value : NV_GAP_DEFAULT);
+  if (inp) inp.value = g;
+  NV.gap = g;
+  var rows = document.querySelectorAll('.nv-gap-input[data-step]');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].value = g;
+    NV.gaps[rows[i].getAttribute('data-step')] = g;
+  }
+  nvSyncAllBtn();
+  toast('所有句子停顿已统一为 ' + g + ' 秒，点「保存停顿设置」长期生效', 'ok');
+}
+
+function nvSaveGaps() {
+  try {
+    var obj = {};
+    for (var k in NV.gaps) {
+      if (Object.prototype.hasOwnProperty.call(NV.gaps, k)) obj[k] = NV.gaps[k];
+    }
+    localStorage.setItem('avalon_voice_gaps', JSON.stringify(obj));
+    localStorage.setItem('avalon_voice_gap', String(NV.gap));
+    toast('已保存逐句停顿设置，下次打开仍沿用', 'ok');
+  } catch (e) {
+    toast('保存失败：浏览器本地存储不可用', 'warn');
+  }
+}
+
+function nvResetGaps() {
+  NV.gaps = {};
+  NV.gap = NV_GAP_DEFAULT;
+  var rows = document.querySelectorAll('.nv-gap-input[data-step]');
+  for (var i = 0; i < rows.length; i++) rows[i].value = NV_GAP_DEFAULT;
+  var inp = document.getElementById('nv-gap-all');
+  if (inp) inp.value = NV_GAP_DEFAULT;
+  nvSyncBtnSafe();
+  try {
+    localStorage.setItem('avalon_voice_gaps', '{}');
+    localStorage.setItem('avalon_voice_gap', String(NV_GAP_DEFAULT));
+  } catch (e) {}
+  toast('已恢复默认停顿 3 秒', 'ok');
+}
+
+function nvSyncBtnSafe() {
+  try { nvSyncAllBtn(); } catch (e) {}
+}
+
+/* ---------- v179：背景乐（Web Audio 程序化合成柔和垫乐，无版权音频） ---------- */
+var NVM = {
+  ctx: null,
+  master: null,
+  chain: [],
+  oscs: [],
+  playing: false,
+  enabled: true,
+  vol: 0.08,
+  duck: false
+};
+var NVM_DUCK_RATIO = 0.6;   // 朗读时压低到约六成
+var NVM_VOL_MAX = 0.30;
+
+(function nvmInitCfg() {
+  try {
+    if (localStorage.getItem('avalon_bgm_on') === '0') NVM.enabled = false;
+    var v = parseFloat(localStorage.getItem('avalon_bgm_vol'));
+    if (!isNaN(v) && v >= 0 && v <= NVM_VOL_MAX) NVM.vol = v;
+  } catch (e) {}
+})();
+
+function nvmTargetGain() {
+  var g = NVM.vol * (NVM.duck ? NVM_DUCK_RATIO : 1);
+  if (g < 0) g = 0;
+  if (g > 1) g = 1;
+  return g;
+}
+
+// 创建 / 唤醒 AudioContext（必须在用户手势里调用一次以解锁移动端）
+function nvmEnsure() {
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!NVM.ctx) {
+      NVM.ctx = new AC();
+      NVM.master = NVM.ctx.createGain();
+      NVM.master.gain.value = 0;
+      NVM.master.connect(NVM.ctx.destination);
+    }
+    if (NVM.ctx.state === 'suspended' && NVM.ctx.resume) {
+      try { NVM.ctx.resume(); } catch (e) {}
+    }
+    return NVM.ctx;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 柔和和弦垫：C3 / G3 / C4 / E4 正弦叠加 + 轻微失谐 + 低通 + 缓慢呼吸
+function nvmBuildGraph() {
+  var ctx = NVM.ctx;
+  var bus = ctx.createGain();
+  bus.gain.value = 0.9;
+  var lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 1500;
+  lp.Q.value = 0.3;
+  bus.connect(lp);
+  lp.connect(NVM.master);
+
+  var trem = ctx.createGain();
+  trem.gain.value = 0.84;
+  trem.connect(bus);
+  var lfo = ctx.createOscillator();
+  var lfoGain = ctx.createGain();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.08;
+  lfoGain.gain.value = 0.13;
+  lfo.connect(lfoGain);
+  lfoGain.connect(trem.gain);
+  try { lfo.start(); } catch (e) {}
+
+  var notes = [130.81, 196.00, 261.63, 329.63];
+  var oscs = [];
+  for (var i = 0; i < notes.length; i++) {
+    for (var d = 0; d < 2; d++) {
+      var o = ctx.createOscillator();
+      var og = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = notes[i];
+      try { o.detune.value = d === 0 ? -5 : 5; } catch (e) {}
+      og.gain.value = 0.16;
+      o.connect(og);
+      og.connect(trem);
+      try { o.start(); } catch (e) {}
+      oscs.push(o);
+    }
+  }
+  NVM.oscs = oscs;
+  NVM.chain = [bus, lp, trem, lfo, lfoGain];
+}
+
+function nvmApplyGain(fadeSec) {
+  if (!NVM.ctx || !NVM.master) return;
+  var now = NVM.ctx.currentTime;
+  var target = nvmTargetGain();
+  try {
+    var gain = NVM.master.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(gain.value, now);
+    gain.linearRampToValueAtTime(target, now + (fadeSec || 0.25));
+  } catch (e) {
+    try { NVM.master.gain.value = target; } catch (e2) {}
+  }
+}
+
+// 播报开始即播放（暂停/停顿期间持续）
+function nvmStart() {
+  if (!NVM.enabled) return;
+  var ctx = nvmEnsure();
+  if (!ctx) return;
+  if (NVM.playing) { nvmApplyGain(0.25); return; }
+  try {
+    nvmBuildGraph();
+    NVM.playing = true;
+    nvmApplyGain(1.2);
+  } catch (e) {
+    NVM.playing = false;
+  }
+}
+
+// 播报结束 / 跳过 / 关闭面板即停止（淡出后释放节点）
+function nvmStop() {
+  var ctx = NVM.ctx;
+  if (ctx && NVM.master && NVM.playing) {
+    var now = ctx.currentTime;
+    try {
+      var gain = NVM.master.gain;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(0, now + 0.5);
+    } catch (e) {
+      try { NVM.master.gain.value = 0; } catch (e2) {}
+    }
+  }
+  NVM.playing = false;
+  NVM.duck = false;
+  var oscs = NVM.oscs.slice();
+  var chain = NVM.chain.slice();
+  NVM.oscs = [];
+  NVM.chain = [];
+  setTimeout(function () {
+    var i;
+    for (i = 0; i < oscs.length; i++) {
+      try { oscs[i].stop(); } catch (e) {}
+      try { oscs[i].disconnect(); } catch (e) {}
+    }
+    for (i = 0; i < chain.length; i++) {
+      try { chain[i].stop(); } catch (e) {}
+      try { chain[i].disconnect(); } catch (e) {}
+    }
+  }, 640);
+}
+
+// 语音朗读期间轻微压低背景乐
+function nvmDuck(on) {
+  var next = !!on;
+  if (NVM.duck === next) return;
+  NVM.duck = next;
+  if (NVM.playing) nvmApplyGain(0.12);
+}
+
+function nvmToggle() {
+  NVM.enabled = !NVM.enabled;
+  try { localStorage.setItem('avalon_bgm_on', NVM.enabled ? '1' : '0'); } catch (e) {}
+  var btn = document.getElementById('nv-bgm-toggle');
+  if (btn) btn.textContent = NVM.enabled ? '已开启' : '已关闭';
+  if (!NVM.enabled) {
+    nvmStop();
+  } else if (NV.open && (NV.playing || NV.paused)) {
+    nvmStart();
+  }
+}
+
+function nvmSetVol(v) {
+  var pct = parseFloat(v);
+  if (isNaN(pct)) pct = 8;
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+  NVM.vol = Math.min(NVM_VOL_MAX, pct / 100);
+  var lab = document.getElementById('nv-bgm-val');
+  if (lab) lab.textContent = Math.round(NVM.vol * 100) + '%';
+  try { localStorage.setItem('avalon_bgm_vol', String(NVM.vol)); } catch (e) {}
+  if (NVM.playing) nvmApplyGain(0.2);
 }
 
 function nvSetGap(v) {
@@ -10501,6 +10844,7 @@ function nvClose() {
   NV.seq++;
   nvClearTimer();
   nvStopSpeech();
+  nvmStop();   // v179：关闭面板即停止背景乐
   NV.playing = false;
   NV.paused = false;
   NV.open = false;
@@ -10595,6 +10939,7 @@ function startNightOpeningSequence() {
 function nvPromptStart() {
   if (NV_PROMPT !== 'pending') return;
   NV_PROMPT = 'none';
+  nvmEnsure();   // v179：以本次点击作为手势解锁 AudioContext，兼容移动端
   var sb = document.getElementById('nv-prompt-start');
   if (sb) sb.style.display = 'none';
   var kb = document.getElementById('nv-prompt-skip');
