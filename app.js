@@ -136,7 +136,7 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v181';
+var SW_VERSION = 'v182';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -2034,10 +2034,10 @@ function renderLeaderPickStage(c, m, reqSize, pc) {
   h += '<div class="ldr-pick-tip">确认后进入组队页（首轮需 ' + reqSize + ' 人出任务）</div>';
   h += '</div>';
   if (!NV_ASKED) {
-    h += '<div style="text-align:center;padding:18px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+    h += '<div style="text-align:center;padding:18px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
     h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
     h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报。</div>';
-    h += '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+    h += '<div class="ldr-pick-btns">';
     h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
     h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
     h += '</div></div>';
@@ -2124,10 +2124,10 @@ function renderStepPanel() {
   if (NV_PROMPT === 'pending') {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
-    h += '<div style="text-align:center;padding:18px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
+    h += '<div style="text-align:center;padding:18px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
     h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
     h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报，直接开始组队。</div>';
-    h += '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+    h += '<div class="ldr-pick-btns">';
     h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
     h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
     h += '</div></div>';
@@ -10583,7 +10583,7 @@ function nvSkip() {
   nvStopSpeech();
   nvmStop();   // v179：跳过播报后停止背景乐
   nvClose();
-  toast('已跳过夜间语音播报，可随时点「夜间播报」重新打开');
+  toast('已跳过夜间语音播报');
 }
 
 /* ---------- v179：逐句停顿时长 ---------- */
