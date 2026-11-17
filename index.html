@@ -14,13 +14,19 @@
 
 <title>阿瓦隆辅助</title>
 
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d0b08'/%3E%3Cpath d='M32 8 L44 40 L32 34 L20 40 Z' fill='%23c9a84c'/%3E%3Crect x='28' y='40' width='8' height='14' fill='%23c9a84c'/%3E%3C/svg%3E">
+
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v184">
+<link rel="stylesheet" href="./style.css?v=v185">
 
-<script defer src="./vendor/supabase.min.js?v=2.108.2"></script>
+<link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
-<script defer src="./app-v184.js"></script>
+<link rel="dns-prefetch" href="//nzbpopxrxniixnhnqktw.supabase.co">
+
+<!-- v185：Supabase SDK 不再随首屏加载，由 app-v185.js 在首屏空闲后按需注入 -->
+
+<script defer src="./app-v185.js"></script>
 
 </head>
 
@@ -37,8 +43,6 @@
     <button id="nav-setup" class="active" onclick="showPage('setup')">设置</button>
 
     <button id="nav-game" onclick="goToGame()">游戏</button>
-
-    <button id="nav-tools" onclick="showPage('tools')">工具</button>
 
     <button id="nav-end" onclick="showPage('end')">结束</button>
 
@@ -188,7 +192,7 @@
 
   </div>
 
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v184</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v185</div>
 
 </section>
 
@@ -441,126 +445,6 @@
 
 
 
-<!-- ===== 工具 ===== -->
-
-<section class="page" id="page-tools">
-
-  <h2 style="color:var(--gold-light);text-align:center;margin-bottom:8px">工具箱</h2>
-
-  <div class="card">
-
-    <h2>录音播放</h2>
-
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">功能开发中，后续将支持上传录音文件并播放。</p>
-
-    <div style="text-align:center;padding:24px 0;color:var(--text-dim);font-size:14px">功能开发中</div>
-
-  </div>
-
-
-
-  <div class="card" id="tendency-card">
-
-    <div class="tend-card-header">
-
-      <h2 style="margin:0">倾向分析</h2>
-
-      <button class="btn" onclick="toggleTendPanel()" id="tend-toggle-btn">&#9654; 倾向分析</button>
-
-    </div>
-
-    <div id="tend-panel" class="tend-panel">
-
-    <div class="card" id="tend-role-card">
-
-      <h2>我的身份</h2>
-
-      <div id="tend-role-grid"></div>
-
-    </div>
-
-
-
-    <div class="card" id="tend-perspective-card">
-
-      <h2 id="tend-perspective-title">倾向分析</h2>
-
-      <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px" id="tend-perspective-desc"></p>
-
-    </div>
-
-
-
-    <div class="card" id="v7-engine-card">
-
-      <div class="v7-card-header">
-
-        <h2 style="margin:0">&#9883; v7 算法面板</h2>
-
-        <span class="v7-version-badge">v110</span>
-
-      </div>
-
-      <div id="v7-engine-status" class="v7-status-bar"></div>
-
-      <div id="v7-engine-steps" class="v7-step-grid"></div>
-
-      <div class="v7-formula">
-
-        <span style="color:var(--accent)">&#9888;</span>
-
-        <strong>评分公式</strong>：分数 = 好人证据 / (好人证据 + 坏人证据) &#215; 100
-
-        &nbsp;|&nbsp; 先验 10:10，随轮次推进逐步收敛
-
-      </div>
-
-    </div>
-
-
-
-    <div class="card" id="known-identity-card">
-
-      <h2>已知身份标注</h2>
-
-      <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">标记100%确认的玩家身份（可随时增改），用于缩小分析范围</p>
-
-      <div id="known-identity-grid"></div>
-
-    </div>
-
-
-
-    <div class="card" id="tend-result-card">
-
-      <h2 id="tend-result-title">分析结果</h2>
-
-      <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px" id="tend-result-desc"></p>
-
-      <div id="tend-result-list"></div>
-
-    </div>
-
-
-
-    <div class="card" id="tend-evidence-card">
-
-      <h2>关键证据</h2>
-
-      <div id="tend-evidence-list"></div>
-
-    </div>
-
-  </div>
-
-  </div>
-
-
-
-</section>
-
-
-
 <!-- 复盘弹窗（全局） -->
 
 <div class="modal-overlay" id="replay-modal-overlay" style="display:none" onclick="closeReplayModal(event)">
@@ -595,7 +479,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v184</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v185</div>
 
 
 
@@ -817,17 +701,18 @@
 
 <script>
 
-// PWA Service Worker 注册 - v184
+// PWA Service Worker 注册 - v185
 
 if('serviceWorker' in navigator){
+
+  // v185：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义（原实现会在注册成功时抛 ReferenceError）
+  var SW_VERSION = 'v185';
 
   navigator.serviceWorker.getRegistrations().then(function(regs){
 
     return Promise.all(regs.map(function(r){ return r.unregister(); }));
 
   }).then(function(){
-
-    var SW_VERSION = 'v184';
 
     return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
 

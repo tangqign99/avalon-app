@@ -71,7 +71,8 @@ function createRestFallbackClient() {
       headers['Prefer'] = (headers['Prefer'] ? headers['Prefer'] + ',' : '') + 'resolution=merge-duplicates';
     }
     if (opts.onConflict) {
-      url += (url.indexOf('?') === -1 ? '?' : '&') + 'onConflict=' + encodeURIComponent(opts.onConflict);
+      // v185：Supabase REST 的冲突列参数名是 on_conflict（写成 onConflict 会被 PostgREST 拒绝 PGRST100）
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'on_conflict=' + encodeURIComponent(opts.onConflict);
     }
     if (opts.select) {
       url += (url.indexOf('?') === -1 ? '?' : '&') + 'select=' + encodeURIComponent(opts.select);
@@ -136,7 +137,38 @@ function createRestFallbackClient() {
     removeChannel: function() {}
   };
 }
-var SW_VERSION = 'v184';
+/* ---- v185：Supabase SDK 延后加载（首屏不再下载 200KB SDK，空闲后再注入）---- */
+var _sdkState = 'idle'; // idle | loading | loaded | failed
+var _sdkWaiters = [];
+function loadSupabaseSDK(cb) {
+  if (typeof window.supabase !== 'undefined') {
+    _sdkState = 'loaded';
+    if (typeof cb === 'function') { try { cb(true); } catch(e) {} }
+    return;
+  }
+  if (typeof cb === 'function') _sdkWaiters.push(cb);
+  if (_sdkState === 'loading') return;
+  _sdkState = 'loading';
+  var s = document.createElement('script');
+  s.src = './vendor/supabase.min.js?v=2.108.2';
+  s.async = true;
+  var finish = function(ok) {
+    _sdkState = ok ? 'loaded' : 'failed';
+    if (ok) {
+      // SDK 到位后丢弃降级客户端，后续调用走真实 SDK（realtime 需要）
+      _supabase = null;
+      _supabaseConnected = false;
+    }
+    var ws = _sdkWaiters.slice();
+    _sdkWaiters.length = 0;
+    for (var i = 0; i < ws.length; i++) { try { ws[i](ok); } catch(e) {} }
+  };
+  s.onload = function() { finish(true); };
+  s.onerror = function() { console.warn('[Supabase] SDK load failed, keep REST fallback'); finish(false); };
+  document.head.appendChild(s);
+}
+
+var SW_VERSION = 'v185';
 var _migratedCount = 0; // \u8ddf\u8e2a UTC\u8f6c\u5316\u4e3a\u5317\u4eac\u65f6\u95f4\u7684\u8bb0\u5f55\u6570
 
 /* ---- UUID utility ---- */
@@ -912,22 +944,17 @@ function setActiveNav(page) {
 }
 function showPage(page) {
   var prevPage = state._currentPage;
+  var pg = document.getElementById('page-' + page);
+  // v185：未知页面（如已下线的 tools）直接忽略，避免所有页被隐藏后出现空白页
+  if (!pg) { console.warn('[nav] unknown page: ' + page); return; }
   state._currentPage = page;
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-  var pg = document.getElementById('page-' + page);
-  if (pg) pg.classList.add('active');
+  pg.classList.add('active');
   setActiveNav(page);
   if (page === 'game') {
     renderGame();
   }
   if (page === 'setup') { renderSetup(); }
-  if (page === 'tend') {
-    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
-  }
-  if (page === 'tools') {
-    renderV7EngineInfo(); renderTendRoleSelector(); renderTendPerspective(); renderKnownIdentityGrid(); renderTendResult();
-    processOfflineQueues();
-  }
   if (page === 'end') renderEnd();
   if (page === 'stats') {
     if (prevPage !== 'stats') state._historyPage = 0;
@@ -1497,10 +1524,32 @@ function performUndo() {
   // 清除计时结束后调度的 speakEnd / transitionToVotes 回调，防止撤销后重启计时
   clearTimeout(window._undoSpeakEndTimeout);
   clearTimeout(window._undoTransitionTimeout);
+  // v185：组队阶段撤销 -> 回到「队长已确认 + 播报双按钮」停留界面（不自动重播）
+  var backToLeaderStage = false;
+  try { backToLeaderStage = restoreLeaderConfirmedStageAfterUndo(); } catch (_) {}
   renderGame();
   renderUndoButton();
   renderTimerDisplay();
-  toast('已撤销', 'info');
+  toast(backToLeaderStage ? '已撤销，回到队长确认页（可重选队长或开始播报）' : '已撤销', 'info');
+}
+
+/* v185：撤销后若处于首轮、队长已确定且队伍为空，则还原为队长已确认的停留界面
+   条件：第一轮 / leader 已写入 / team 为空 / 无投票 / 无结果 / 未进入发言确认
+   还原后：队长保持已确认、可点「重选」、可点「开始语音播报」或「跳过播报」，但不自动播放语音 */
+function restoreLeaderConfirmedStageAfterUndo() {
+  if (!state.missions || !state.missions.length) return false;
+  if (state.currentRound !== 0) return false;
+  var m = state.missions[0];
+  if (!m || m.leader === null || m.leader === undefined) return false;
+  if (m.team && m.team.length > 0) return false;
+  if (m.result) return false;
+  if (m.votes && Object.keys(m.votes).length > 0) return false;
+  if (state._teamConfirmedPending) return false;
+  NV_PROMPT = 'confirmed';     // 播报卡片可按「开始语音播报」
+  NV_ASKED = true;             // 已询问过，不重复弹出
+  NV_PENDING_ENTER = false;    // 明确不自动重播、不自动跳组队页
+  state._nvDecided = false;    // 播报尚未决定 -> 命中停留界面分支
+  return true;
 }
 
 function renderUndoButton() {
@@ -2044,7 +2093,7 @@ function nvPromptCardHTML() {
   var h = '';
   h += '<div style="text-align:center;padding:18px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
   h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
-  h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报。</div>';
+  h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭上眼睛就位，点「开始语音播报」按顺序念本场身份；也可跳过播报。</div>';
   h += '<div class="ldr-pick-btns">';
   h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
   h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
@@ -2156,7 +2205,7 @@ function renderStepPanel() {
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
     h += '<div style="text-align:center;padding:18px 12px;border:2px solid var(--gold);border-radius:var(--radius);background:var(--bg-card);margin:12px 0">';
     h += '<div style="font-size:17px;color:var(--gold-light);margin-bottom:6px">开局夜间身份播报</div>';
-    h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭眼就位，点「开始语音播报」按顺序念本场身份；也可跳过播报，直接开始组队。</div>';
+    h += '<div style="font-size:13px;color:var(--text-dim);margin-bottom:14px">请所有玩家闭上眼睛就位，点「开始语音播报」按顺序念本场身份；也可跳过播报，直接开始组队。</div>';
     h += '<div class="ldr-pick-btns">';
     h += '<button class="btn primary" id="nv-prompt-start" onclick="nvPromptStart()">开始语音播报</button>';
     h += '<button class="btn" id="nv-prompt-skip" onclick="nvPromptSkip()">跳过播报</button>';
@@ -2243,153 +2292,6 @@ function renderStepPanel() {
 
   c.innerHTML = h;
 }
-
-/* ===== Tools Page - Toggle Tendency Panel ===== */
-function toggleTendPanel() {
-  var panel = document.getElementById('tend-panel');
-  var btn = document.getElementById('tend-toggle-btn');
-  if (!panel || !btn) return;
-  var open = panel.classList.toggle('open');
-  btn.innerHTML = open ? '&#9660; 倾向分析' : '&#9654; 倾向分析';
-}
-
-/* ==================== TENDENCY RENDER ==================== */
-function renderTendencyItem(idx, score, merlinProb) {
-  var cls, barCls;
-  if (score >= 60) { cls = 'trust'; barCls = 'trust'; }
-  else if (score >= 40) { cls = 'neutral'; barCls = 'neutral'; }
-  else { cls = 'suspect'; barCls = 'suspect'; }
-  var selfMark = (idx === state.selfIndex) ? ' <span style="color:var(--gold-light);font-size:10px">&#9733;&#25105;</span>' : '';
-  var h = '<div class="tendency-item">';
-  h += '<span class="tend-name">' + playerLabel(idx) + selfMark + '</span>';
-  h += '<div class="tend-bar-wrap"><div class="tend-bar-fill ' + barCls + '" style="width:' + score + '%"></div></div>';
-  h += '<span class="tend-score ' + cls + '">' + score + '</span>';
-  if (merlinProb !== undefined) {
-    h += '<span class="merlin-pct-col">' + merlinProb + '%</span>';
-  }
-  h += '</div>';
-  return h;
-}
-
-function renderTendencyMini() {
-  var el = $('tendency-mini');
-  if (!el) return;
-  var probs = computeMerlinProbability();
-  var h = '';
-  for (var i = 0; i < state.playerCount; i++) {
-    h += renderTendencyItem(i, state.tendencies[i] != null ? state.tendencies[i] : 50, probs[i]);
-  }
-  el.innerHTML = h;
-}
-
-/* ==================== MERLIN PREDICTION ==================== */
-function computeMerlinProbability() {
-  var pc = state.playerCount;
-  var probs = {};
-  for (var i = 0; i < pc; i++) {
-    probs[i] = 0;
-  }
-
-  var totalWeight = 0;
-
-  // --- Current game analysis ---
-  for (var round = 0; round < state.missions.length; round++) {
-    var m = state.missions[round];
-    if (!m || !m.team || m.team.length === 0) continue;
-    if (!m.result) continue;
-
-    var attempts = m.launchAttempts || [];
-    for (var a = 0; a < attempts.length; a++) {
-      var att = attempts[a];
-      var attApproves = 0;
-      for (var k = 0; k < pc; k++) { if (att.votes[k] === 'approve') attApproves++; }
-      if (attApproves <= Math.floor(pc / 2)) continue;
-
-      for (var i = 0; i < pc; i++) {
-        if (i === state.selfIndex) continue;
-        var vote = att.votes[i];
-        if (m.result === 'success' && vote === 'approve') probs[i] += 3;
-        if (m.result === 'fail' && vote === 'reject') probs[i] += 2;
-      }
-      totalWeight += 3;
-      break;
-    }
-  }
-
-  // Tendency scores
-  for (var i = 0; i < pc; i++) {
-    if (i === state.selfIndex) continue;
-    var t = state.tendencies[i] != null ? state.tendencies[i] : 50;
-    probs[i] += t * 0.5;
-    totalWeight += 0.5;
-  }
-
-  // --- Historical analysis: check past games where each player was Merlin ---
-  var history = loadNormalizedHistory();
-  if (history.length > 0) {
-    for (var i = 0; i < pc; i++) {
-      if (i === state.selfIndex) continue;
-      var playerName = state.playerNames[i];
-      var merlinGames = [];
-
-      for (var h = 0; h < history.length; h++) {
-        var rec = history[h];
-        if (!rec.identities) continue;
-        for (var j = 0; j < rec.identities.length; j++) {
-          if (rec.identities[j].name === playerName && rec.identities[j].role === '梅林') {
-            merlinGames.push(rec);
-            break;
-          }
-        }
-      }
-
-      if (merlinGames.length > 0) {
-        var successApproves = 0, failRejects = 0, totalVotes = 0;
-        for (var h = 0; h < merlinGames.length; h++) {
-          var rec = merlinGames[h];
-          if (!rec.missions) continue;
-          for (var m = 0; m < rec.missions.length; m++) {
-            var mission = rec.missions[m];
-            if (!mission.votes || !mission.result) continue;
-            var vote = mission.votes[playerName];
-            if (!vote) continue;
-            totalVotes++;
-            if (mission.result === 'success' && vote === 'approve') successApproves++;
-            if (mission.result === 'fail' && vote === 'reject') failRejects++;
-          }
-        }
-        if (totalVotes > 0) {
-          var merlinScore = (successApproves + failRejects) / totalVotes;
-          var historyWeight = Math.min(merlinGames.length * 2, 8);
-          probs[i] += merlinScore * historyWeight;
-          totalWeight += historyWeight;
-        }
-      }
-    }
-  }
-
-  // Normalize
-  var maxProb = 0;
-  for (var i = 0; i < pc; i++) {
-    if (probs[i] > maxProb) maxProb = probs[i];
-  }
-
-  if (maxProb > 0) {
-    for (var i = 0; i < pc; i++) {
-      probs[i] = Math.round((probs[i] / maxProb) * 90 + 5);
-      if (probs[i] > 95) probs[i] = 95;
-    }
-  } else {
-    for (var i = 0; i < pc; i++) {
-      probs[i] = Math.round(20 + Math.random() * 30);
-    }
-  }
-
-  return probs;
-}
-
-/* ==================== IDENTITY SIMULATION ==================== */
-var SIM_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','兰斯洛特(红)','兰斯洛特(蓝)','奥伯伦'];
 
 /* ==================== LADY OF THE LAKE ==================== */
 function renderLadyLakeResults() {
@@ -2910,7 +2812,6 @@ function setPlayerPrediction(idx, role) {
     state.playerPredictions[idx] = role;
   }
   renderPredictPlayerDropdowns();
-  renderTendencyMini();
 }
 
 function renderPredictPlayerDropdowns() {
@@ -4050,7 +3951,6 @@ function applyLaunchTendencies() {
     if (state.tendencies[i] < 0) state.tendencies[i] = 0;
     if (state.tendencies[i] > 100) state.tendencies[i] = 100;
   }
-  renderTendencyMini();
 }
 
 function renderStepPanelWithResult() {
@@ -4208,7 +4108,6 @@ function updateFinalTendencies() {
     if (state.tendencies[i] < 0) state.tendencies[i] = 0;
     if (state.tendencies[i] > 100) state.tendencies[i] = 100;
   }
-  renderTendencyMini();
 }
 
 function checkGameEnd() {
@@ -6654,13 +6553,30 @@ function deduplicateHistory(history) {
   }
   showPage('setup');
 
-  // 尝试重推待发送队列
-  processOfflineQueues();
-
-  // 首屏先可用，再延后非必要网络任务，提升手机刷新速度
-  setTimeout(function() {
-    setupRealtimeSubscriptions();
-  }, 1200);
+  // v185：首屏先可用；Supabase SDK、实时订阅、离线队列重推全部延后到首屏空闲
+  var afterFirstPaint = function() {
+    try { processOfflineQueues(); } catch(e) {}
+    if (typeof window.supabase !== 'undefined') {
+      try { setupRealtimeSubscriptions(); } catch(e) { console.warn('[Realtime] setup failed', e); }
+    } else {
+      loadSupabaseSDK(function(ok) {
+        if (ok) { try { setupRealtimeSubscriptions(); } catch(e) { console.warn('[Realtime] setup failed', e); } }
+      });
+    }
+  };
+  // v185：再等页面 load 完成（首屏图片/样式全部就绪）后空闲再加载云端能力，避免抢首屏带宽
+  var scheduleDeferred = function() {
+    if (typeof window.requestIdleCallback === 'function') {
+      requestIdleCallback(function() { setTimeout(afterFirstPaint, 300); }, { timeout: 2500 });
+    } else {
+      setTimeout(afterFirstPaint, 1200);
+    }
+  };
+  if (document.readyState === 'complete') {
+    scheduleDeferred();
+  } else {
+    window.addEventListener('load', scheduleDeferred, { once: true });
+  }
 
 })();
 
@@ -6680,1096 +6596,6 @@ var ROLE_CATEGORY = {
 
 function isGoodRole(role) { return ROLE_CATEGORY[role] === 'good'; }
 function isEvilRole(role) { return ROLE_CATEGORY[role] === 'evil'; }
-
-function getPerspective() {
-  if (!state.myRole) return 'unknown';
-  // Lancelot: faction depends on flip count
-  if (state.myRole === '兰斯洛特(蓝)' || state.myRole === '兰斯洛特(红)') {
-    return (state.lancelotFlipCount % 2 === 0) ? isGoodRole(state.myRole) ? 'good' : 'evil' : isGoodRole(state.myRole) ? 'evil' : 'good';
-  }
-  return isGoodRole(state.myRole) ? 'good' : 'evil';
-}
-
-function getKnownLabel(idx) {
-  return state.knownIdentities[idx] || null;
-}
-
-function getRoleOptions() {
-  return [
-    { value: '', label: '不明' },
-    { value: '正方', label: '正方（通用）' },
-    { value: '反方', label: '反方（通用）' },
-    { value: '梅林', label: '梅林' },
-    { value: '派西维尔', label: '派西维尔' },
-    { value: '忠臣', label: '忠臣' },
-    { value: '莫甘娜', label: '莫甘娜' },
-    { value: '刺客', label: '刺客' },
-    { value: '莫德雷德', label: '莫德雷德' },
-    { value: '奥伯伦', label: '奥伯伦' },
-    { value: '爪牙', label: '爪牙' },
-    { value: '兰斯洛特(蓝)', label: '兰斯洛特(蓝)' },
-    { value: '兰斯洛特(红)', label: '兰斯洛特(红)' }
-  ];
-}
-
-/* ------- Tend Role Selector ------- */
-function setTendRole(role) {
-  state.myRole = role;
-  state.knownIdentities[state.selfIndex] = role;
-  renderTendRoleSelector();
-  renderTendPerspective();
-  renderKnownIdentityGrid();
-  renderTendResult();
-}
-function clearTendRole() {
-  state.myRole = null;
-  delete state.knownIdentities[state.selfIndex];
-  renderTendRoleSelector();
-  renderTendPerspective();
-  renderKnownIdentityGrid();
-  renderTendResult();
-}
-function renderTendRoleSelector() {
-  var grid = document.getElementById('tend-role-grid');
-  var card = document.getElementById('tend-role-card');
-  if (!grid || !card) return;
-  var h = '';
-  if (state.myRole) {
-    h += '<div style="display:flex;align-items:center;gap:8px">';
-    h += '<span style="font-size:14px;font-weight:600;color:var(--gold-light)">当前身份：' + escapeHtml(state.myRole) + '</span>';
-    h += '<button class="btn tiny" onclick="clearTendRole()">清除</button>';
-    h += '</div>';
-  }
-  h += '<select onchange="setTendRole(this.value)" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.25);background:var(--parchment);color:var(--text);font-size:15px;cursor:pointer;min-height:44px;margin-top:6px">';
-  h += '<option value="">-- 选择身份 --</option>';
-  for (var j = 0; j < ALL_ROLES.length; j++) {
-    var r = ALL_ROLES[j];
-    var sel = state.myRole === r ? ' selected' : '';
-    h += '<option value="' + r + '"' + sel + '>' + r + '</option>';
-  }
-  h += '</select>';
-  grid.innerHTML = h;
-}
-
-/* ------- Perspective header ------- */
-function renderTendPerspective() {
-  var persp = getPerspective();
-  var titleEl = document.getElementById('tend-perspective-title');
-  var descEl = document.getElementById('tend-perspective-desc');
-
-  if (!state.myRole) {
-    titleEl.textContent = '倾向分析';
-    descEl.textContent = '请在上方「我的身份」卡片中选择你的角色';
-    return;
-  }
-
-  if (persp === 'good') {
-    titleEl.textContent = '好人视角：寻找反方';
-    descEl.textContent = '你当前身份是「' + state.myRole + '」，正在分析其他玩家是反方的概率';
-  } else {
-    titleEl.textContent = '反方视角：寻找梅林';
-    descEl.textContent = '你当前身份是「' + state.myRole + '」，正在分析其他玩家是梅林的概率';
-  }
-}
-
-/* ------- Known identity grid ------- */
-function renderKnownIdentityGrid() {
-  var el = document.getElementById('known-identity-grid');
-  var opts = getRoleOptions();
-  var h = '<div class="known-identity-row">';
-
-  for (var i = 0; i < state.playerCount; i++) {
-    if (i === state.selfIndex) continue;
-    var cur = state.knownIdentities[i] || '';
-    h += '<div class="known-item">';
-    h += '<span class="known-name">' + escapeHtml(state.playerNames[i]) + '</span>';
-    h += '<select class="known-select" onchange="setKnownIdentity(' + i + ', this.value)"' +
-         ' id="known-sel-' + i + '">';
-    for (var j = 0; j < opts.length; j++) {
-      h += '<option value="' + opts[j].value + '"' + (opts[j].value === cur ? ' selected' : '') + '>' +
-           opts[j].label + '</option>';
-    }
-    h += '</select>';
-    h += '</div>';
-  }
-
-  h += '</div>';
-  el.innerHTML = h;
-}
-
-function setKnownIdentity(idx, value) {
-  if (value === '') {
-    delete state.knownIdentities[idx];
-  } else {
-    state.knownIdentities[idx] = value;
-  }
-  renderTendResult();
-}
-
-function buildTendScoreCacheKey() {
-  var missionSig = (state.missions || []).map(function(m) {
-    return {
-      r: m.round,
-      s: m.size,
-      ld: m.leader,
-      t: m.team,
-      v: m.votes,
-      res: m.result,
-      fc: m.failCount,
-      lf: m.launchFailures
-    };
-  });
-  return JSON.stringify({
-    pc: state.playerCount,
-    names: state.playerNames,
-    self: state.selfIndex,
-    role: state.myRole,
-    known: state.knownIdentities,
-    lady: state.ladyLakeChecks,
-    ex: state.excaliburHistory,
-    lanc: state.lancelotFlipped,
-    missions: missionSig
-  });
-}
-
-function cloneTendScoreList(list) {
-  if (!list) return null;
-  var cloned = list.map(function(item) {
-    return {
-      idx: item.idx,
-      score: item.score,
-      evidence: (item.evidence || []).slice()
-    };
-  });
-  cloned._dataQuality = list._dataQuality;
-  cloned._totalRounds = list._totalRounds;
-  return cloned;
-}
-
-/* ------- Scoring engine ------- */
-/* ---------- v7 Progressive Evidence-Accumulation Scoring Engine ---------- */
-function computeSuspectScores() {
-  var cacheKey = buildTendScoreCacheKey();
-  if (_tendScoreCacheKey === cacheKey && _tendScoreCacheValue) {
-    return cloneTendScoreList(_tendScoreCacheValue);
-  }
-
-  var pc = state.playerCount;
-  var persp = getPerspective();
-  var selfIdx = state.selfIndex;
-
-  // Evidence accumulation: good_ev / evil_ev with 10/10 smooth prior
-  var ev = {};
-  for (var i = 0; i < pc; i++) {
-    if (i === selfIdx) {
-      ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
-      var _myPersp = getPerspective();
-      if (_myPersp === 'good') {
-        ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
-        ev[i].lockReason = '自己（' + state.myRole + '）';
-        ev[i].reasons.push(ev[i].lockReason);
-      } else if (_myPersp === 'evil') {
-        ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
-        ev[i].lockReason = '自己（' + state.myRole + '）';
-        ev[i].reasons.push(ev[i].lockReason);
-      }
-      continue;
-    }
-    ev[i] = { good_ev: 10, evil_ev: 10, merlin: 0, locked: false, lockReason: '', reasons: [] };
-  }
-
-  var knownIdentities = state.knownIdentities || {};
-
-  // Step 1: Lock known identities (hard anchors)
-  for (var i = 0; i < pc; i++) {
-    if (i === selfIdx) continue;  // self handled above
-    var label = knownIdentities[i];
-    if (!label) continue;
-    if (isGoodRole(label) || label === '正方' || label === '好人') {
-      ev[i].good_ev = 100; ev[i].evil_ev = 0; ev[i].locked = true;
-      ev[i].lockReason = '已知：' + label;
-      ev[i].reasons.push('已知正派：' + label);
-      if (label === '梅林') ev[i].merlin = 100;
-    } else if (isEvilRole(label) || label === '反方' || label === '坏人') {
-      ev[i].good_ev = 0; ev[i].evil_ev = 100; ev[i].locked = true;
-      ev[i].lockReason = '已知：' + label;
-      ev[i].reasons.push('已知反派：' + label);
-    }
-  }
-
-  // Step 2: Lady of the Lake checks (strong signal, non-locking)
-  var ladyChecks = state.ladyLakeChecks || [];
-  for (var c = 0; c < ladyChecks.length; c++) {
-    var check = ladyChecks[c];
-    var target = check.target;
-    if (target === undefined || target === selfIdx) continue;
-    if (!ev[target] || ev[target].locked) continue;
-    if (check.result === 'good') {
-      ev[target].good_ev += 20;
-      ev[target].reasons.push('湖中仙女：' + (state.playerNames[target] || '') + '为好 +20');
-    } else if (check.result === 'evil') {
-      ev[target].evil_ev += 20;
-      ev[target].reasons.push('湖中仙女：' + (state.playerNames[target] || '') + '为坏 +20');
-    }
-  }
-
-
-  // Step 2B: 王者之剑声明类证据
-  var exHistory = state.excaliburHistory || [];
-  for (var exi = 0; exi < exHistory.length; exi++) {
-    var ex = exHistory[exi];
-    if (!ex || ex.used !== true || ex.holder === undefined || ex.holder < 0) continue;
-    var holder = ex.holder;
-    var target = ex.target;
-    var dir = ex.claimedDirection || '';
-    if (ev[holder] && !ev[holder].locked) {
-      if (!ex.feedbackRecorded) {
-        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用，待反馈；该轮任务权重降低');
-      } else if (dir === 'fail_to_success') {
-        ev[holder].good_ev += 10;
-        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑声明：失败→成功，持剑者好人证据 +10');
-      } else if (dir === 'success_to_fail') {
-        ev[holder].evil_ev += 15;
-        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑声明：成功→失败，持剑者坏人证据 +15');
-      } else if (dir === 'unknown') {
-        ev[holder].evil_ev += 4;
-        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用但未说明方向 +4');
-      } else if (dir === 'refused') {
-        ev[holder].evil_ev += 5;
-        ev[holder].reasons.push('R' + (ex.round + 1) + '王者之剑已使用但拒绝说明 +5');
-      }
-    }
-    if (target !== null && target !== undefined && ev[target] && !ev[target].locked && ex.feedbackRecorded) {
-      if (dir === 'fail_to_success') {
-        ev[target].evil_ev += 8;
-        ev[target].reasons.push('R' + (ex.round + 1) + '王者之剑声明：目标原为失败牌 +8');
-      } else if (dir === 'success_to_fail') {
-        ev[target].good_ev += 6;
-        ev[target].reasons.push('R' + (ex.round + 1) + '王者之剑声明：目标原为成功牌，好人也可能被改成失败 +6');
-      }
-    }
-  }
-
-  // Step 3: Task result hard constraints (with round recency decay & dual-fail detection)
-  var missions = state.missions || [];
-  var completed = [];
-  for (var m = 0; m < missions.length; m++) {
-    if (missions[m].result) completed.push(missions[m]);
-  }
-  var totalRounds = completed.length;
-
-  // Collect known evils/goods for constraint propagation
-  var knownEvils = [];
-  var knownGoods = [];
-  for (var i = 0; i < pc; i++) {
-    if (i === selfIdx) continue;
-    if (ev[i].locked) {
-      if (ev[i].evil_ev === 100) knownEvils.push(i);
-      if (ev[i].good_ev === 100) knownGoods.push(i);
-    }
-  }
-
-  function roundRecency(r, total) {
-    if (total <= 2) return r === 0 ? 0.95 : 1.0;
-    return [0.7, 0.85, 1.0, 1.0, 1.0][Math.min(r, 4)] || 1.0;
-  }
-
-  for (var r = 0; r < completed.length; r++) {
-    var m = completed[r];
-    var team = m.team || [];
-    var resultStr = m.result;
-    var teamSize = team.length;
-    var failCount = m.failCount || 0;
-    var recency = roundRecency(r, totalRounds);
-    var exRoundRec = getExcaliburRecord(m.round != null ? m.round : r);
-    if (exRoundRec && exRoundRec.used === true) recency *= 0.7;
-
-    var knownEvilInTeam = [];
-    var unknownInTeam = [];
-    for (var t = 0; t < team.length; t++) {
-      var ti = team[t];
-      if (ti === selfIdx) continue;
-      if (ev[ti] && ev[ti].locked && ev[ti].evil_ev === 100) knownEvilInTeam.push(ti);
-      else if (ev[ti] && !ev[ti].locked) unknownInTeam.push(ti);
-    }
-
-    if (resultStr === 'fail') {
-      if (knownEvilInTeam.length > 0) {
-        for (var u = 0; u < unknownInTeam.length; u++) {
-          ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '失败(有已知坏人，不罚)');
-        }
-      } else if (unknownInTeam.length === 1) {
-        ev[unknownInTeam[0]].evil_ev += Math.floor(40 * recency);
-        ev[unknownInTeam[0]].reasons.push('R' + (r+1) + '失败，唯一未知者 +' + Math.floor(40 * recency));
-      } else if (unknownInTeam.length > 1) {
-        var share, note;
-        if (teamSize >= 5 && failCount >= 2) {
-          share = Math.floor(80 * recency / unknownInTeam.length);
-          note = '至少2坏人';
-        } else {
-          share = Math.floor(60 * recency / unknownInTeam.length);
-          note = '必有坏人';
-        }
-        for (var u = 0; u < unknownInTeam.length; u++) {
-          ev[unknownInTeam[u]].evil_ev += share;
-          ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '失败(' + note + ') +' + share);
-        }
-      }
-    }
-
-    if (resultStr === 'success') {
-      var addGood = knownEvilInTeam.length > 0 ? Math.floor(4 * recency) : Math.floor(6 * recency);
-      var suffix = knownEvilInTeam.length > 0 ? '(有坏人伪装)' : '';
-      for (var u = 0; u < unknownInTeam.length; u++) {
-        ev[unknownInTeam[u]].good_ev += addGood;
-        ev[unknownInTeam[u]].reasons.push('R' + (r+1) + '成功' + suffix + ' +' + addGood);
-      }
-    }
-  }
-
-  // Step 4: Multi-round cross analysis (adaptive threshold)
-  var failCountMap = {};
-  var successCountMap = {};
-  for (var i = 0; i < pc; i++) { failCountMap[i] = 0; successCountMap[i] = 0; }
-  for (var r = 0; r < completed.length; r++) {
-    var m = completed[r];
-    var team = m.team || [];
-    if (m.result === 'fail') {
-      for (var t = 0; t < team.length; t++) failCountMap[team[t]]++;
-    } else {
-      for (var t = 0; t < team.length; t++) successCountMap[team[t]]++;
-    }
-  }
-
-  var failThreshold = totalRounds <= 2 ? 1 : 2;
-  var successThreshold = totalRounds <= 2 ? 2 : 3;
-
-  for (var i = 0; i < pc; i++) {
-    if (i === selfIdx || ev[i].locked) continue;
-    if (failCountMap[i] >= failThreshold) {
-      var failRoundsWithKnownEvil = 0;
-      for (var r = 0; r < completed.length; r++) {
-        var m = completed[r];
-        if (m.result !== 'fail') continue;
-        var team = m.team || [];
-        if (team.indexOf(i) === -1) continue;
-        var hasKnownEvil = false;
-        for (var t = 0; t < team.length; t++) {
-          if (ev[team[t]] && ev[team[t]].locked && ev[team[t]].evil_ev === 100) { hasKnownEvil = true; break; }
-        }
-        if (hasKnownEvil) failRoundsWithKnownEvil++;
-      }
-      if (failRoundsWithKnownEvil < failCountMap[i]) {
-        var weight = totalRounds >= 3 ? 12 : 8;
-        ev[i].evil_ev += weight;
-        ev[i].reasons.push(failCountMap[i] + '轮失败 +' + weight);
-      }
-    }
-    if (successCountMap[i] >= successThreshold) {
-      ev[i].good_ev += 8;
-      ev[i].reasons.push(successCountMap[i] + '轮成功 +8');
-    }
-  }
-
-  // Step 5: Launch failure analysis
-  var leaderLaunchFails = {};
-  for (var r = 0; r < completed.length; r++) {
-    var m = completed[r];
-    var leader = m.leader;
-    var lf = m.launchFailures || 0;
-    if (!leader || lf <= 0) continue;
-    try {
-      var leaderIdx = parseInt(leader.split('号')[0]) - 1;
-      leaderLaunchFails[leaderIdx] = (leaderLaunchFails[leaderIdx] || 0) + lf;
-    } catch(e) {}
-  }
-  for (var i in leaderLaunchFails) {
-    i = parseInt(i);
-    if (i === selfIdx || !ev[i] || ev[i].locked) continue;
-    if (leaderLaunchFails[i] >= 3) {
-      ev[i].evil_ev += 3;
-      ev[i].reasons.push('累计' + leaderLaunchFails[i] + '次发车失败 +3');
-    }
-  }
-
-  // Step 6: Voting analysis (skip unanimous rounds, adaptive min votes)
-  for (var i = 0; i < pc; i++) {
-    if (i === selfIdx || ev[i].locked) continue;
-    var evilMatch = 0, evilTotal = 0;
-    var goodMatch = 0, goodTotal = 0;
-
-    for (var r = 0; r < completed.length; r++) {
-      var m = completed[r];
-      if (!m.votes) continue;
-      var iVote = m.votes[i];
-      if (!iVote) continue;
-
-      // Skip unanimous rounds
-      var allEvilVotes = [];
-      for (var e = 0; e < knownEvils.length; e++) {
-        var evv = m.votes[knownEvils[e]];
-        if (evv) allEvilVotes.push(evv);
-      }
-      if (allEvilVotes.length >= 2 && allEvilVotes.every(function(v) { return v === allEvilVotes[0]; })) continue;
-
-      var allGoodVotes = [];
-      for (var g = 0; g < knownGoods.length; g++) {
-        var gvv = m.votes[knownGoods[g]];
-        if (gvv) allGoodVotes.push(gvv);
-      }
-      if (allGoodVotes.length >= 2 && allGoodVotes.every(function(v) { return v === allGoodVotes[0]; })) continue;
-
-      for (var e = 0; e < knownEvils.length; e++) {
-        var eVote = m.votes[knownEvils[e]];
-        if (eVote) { evilTotal++; if (iVote === eVote) evilMatch++; }
-      }
-      for (var g = 0; g < knownGoods.length; g++) {
-        var gVote = m.votes[knownGoods[g]];
-        if (gVote) { goodTotal++; if (iVote === gVote) goodMatch++; }
-      }
-    }
-
-    var totalKnown = knownEvils.length + knownGoods.length;
-    var minVotes = totalRounds <= 2 ? Math.min(3, Math.floor(totalRounds * totalKnown / 2)) : 3;
-    if (evilTotal >= minVotes) {
-      var rate = evilMatch / evilTotal;
-      if (rate > 0.75) {
-        ev[i].evil_ev += 12;
-        ev[i].reasons.push('投票与坏人一致' + Math.round(rate*100) + '% +12');
-      }
-    }
-    if (goodTotal >= minVotes) {
-      var rate = goodMatch / goodTotal;
-      if (rate > 0.7) {
-        ev[i].good_ev += 10;
-        ev[i].reasons.push('投票与好人一致' + Math.round(rate*100) + '% +10');
-      }
-    }
-  }
-
-  // Step 7: Merlin hunting (evil perspective only)
-  if (persp === 'evil' && knownEvils.length > 0 && totalRounds >= 2) {
-    for (var i = 0; i < pc; i++) {
-      if (i === selfIdx || ev[i].locked) continue;
-      var evilInReject = 0, evilInTotal = 0;
-      var noEvilReject = 0, noEvilTotal = 0;
-      for (var r = 0; r < completed.length; r++) {
-        var m = completed[r];
-        if (!m.votes || !m.team) continue;
-        var team = m.team || [];
-        var hasEvil = false;
-        for (var t = 0; t < team.length; t++) {
-          if (knownEvils.indexOf(team[t]) !== -1) { hasEvil = true; break; }
-        }
-        var iVote = m.votes[i];
-        if (!iVote) continue;
-        if (hasEvil) {
-          evilInTotal++;
-          if (iVote === 'reject') evilInReject++;
-        } else {
-          noEvilTotal++;
-          if (iVote === 'reject') noEvilReject++;
-        }
-      }
-      if (evilInTotal >= 2) {
-        var rateWhen = evilInReject / evilInTotal;
-        var rateNo = noEvilTotal > 0 ? noEvilReject / noEvilTotal : 0;
-        ev[i].merlin = Math.max(0, Math.min(95, (rateWhen - rateNo) * 100 + 10));
-      }
-    }
-  }
-
-  // Step 8: Lancelot flip awareness
-  var lancelotFlipped = state.lancelotFlipped;
-  if (lancelotFlipped) {
-    for (var i = 0; i < pc; i++) {
-      if (i === selfIdx || !ev[i] || ev[i].locked) continue;
-      var label = knownIdentities[i] || '';
-      if (label === '兰斯洛特' || label === '兰斯洛特(蓝)' || label === '兰斯洛特(红)' || label === '蓝兰斯洛特' || label === '红兰斯洛特') {
-        ev[i].good_ev = Math.floor((ev[i].good_ev - 10) * 0.5 + 10);
-        ev[i].evil_ev = Math.floor((ev[i].evil_ev - 10) * 0.5 + 10);
-        ev[i].reasons.push('兰斯洛特已翻转，信号减半');
-      }
-    }
-  }
-
-  // Step 9: Convert to scores
-  var list = [];
-  for (var i = 0; i < pc; i++) {
-    var e = ev[i];
-    var score;
-    if (e.locked) {
-      if (persp === 'evil') {
-        // Evil perspective: locked evil = 0, locked good = 0 (not Merlin target), locked Merlin = 100
-        score = (e.merlin === 100) ? 100 : 0;
-      } else {
-        score = e.evil_ev; // 0 or 100
-      }
-    } else {
-      if (persp === 'evil') {
-        // Evil perspective: use merlin hunting score, fall back to good probability
-        if (e.merlin > 0) {
-          score = e.merlin;
-        } else {
-          var total = e.good_ev + e.evil_ev;
-          score = total > 0 ? Math.round(e.good_ev / total * 100) : 50;
-        }
-      } else {
-        var total = e.good_ev + e.evil_ev;
-        score = total > 0 ? Math.round(e.evil_ev / total * 100) : 50;
-      }
-    }
-
-    list.push({
-      idx: i,
-      score: score,
-      evidence: e.reasons
-    });
-  }
-
-  list.sort(function(a, b) { return b.score - a.score; });
-
-  // Attach data quality metadata for progressive rendering
-  list._dataQuality = totalRounds <= 1 ? 'low' : (totalRounds === 2 ? 'medium' : 'high');
-  list._totalRounds = totalRounds;
-
-  _tendScoreCacheKey = cacheKey;
-  _tendScoreCacheValue = cloneTendScoreList(list);
-  return cloneTendScoreList(list);
-}
-
-/* ------- v7 Historical Record Analysis ------- */
-var _v7DetailRec = null;
-var _v7DetailHistIdx = -1;
-
-function computeRecordSuspectScores(rec, perspIdx) {
-  var pc = rec.playerCount;
-  if (perspIdx < 0 || perspIdx >= pc) return null;
-  if (!rec.missions || rec.missions.length === 0) return null;
-
-  // Build name-to-index lookup
-  var nameToIdx = {};
-  for (var i = 0; i < rec.identities.length; i++) {
-    var id = rec.identities[i];
-    nameToIdx[id.name] = id.index;
-    nameToIdx[(id.index + 1) + '号'] = id.index;
-  }
-
-  function labelToIdx(label) {
-    if (typeof label === 'number') return label;
-    if (nameToIdx[label] !== undefined) return nameToIdx[label];
-    var m = String(label).match(/^(\d+)号$/);
-    return m ? parseInt(m[1]) - 1 : -1;
-  }
-
-  function convertVotes(nameVotes) {
-    var idxVotes = {};
-    for (var key in nameVotes) {
-      if (nameVotes.hasOwnProperty(key)) {
-        var idx = labelToIdx(key);
-        if (idx >= 0 && idx < pc) idxVotes[idx] = nameVotes[key];
-      }
-    }
-    return idxVotes;
-  }
-
-  var savedState = window.state;
-
-  var tmpState = {
-    playerCount: pc,
-    selfIndex: perspIdx,
-    myRole: rec.identities[perspIdx].role,
-    playerNames: rec.identities.map(function(id) { return id.name; }),
-    knownIdentities: {},
-    ladyLakeChecks: (rec.ladyCheckHistory || []).map(function(h) {
-      return { holder: h.holder, target: h.target, result: h.result };
-    }),
-    excaliburHistory: (rec.excaliburHistory || []).map(function(e) {
-      return {
-        round: e.round, leader: e.leader, holder: e.holder,
-        used: e.used, target: e.target, feedbackRecorded: e.feedbackRecorded,
-        claimedDirection: e.claimedDirection || ''
-      };
-    }),
-    missions: (rec.missions || []).map(function(m) {
-      return {
-        round: m.round, size: m.size,
-        leader: labelToIdx(m.leader),
-        team: (m.team || []).map(function(t) { return labelToIdx(t); }),
-        result: m.result, failCount: m.failCount || 0,
-        launchFailures: m.launchFailures || 0,
-        votes: convertVotes(m.votes || {}),
-        launchAttempts: (m.launchAttempts || []).map(function(att) {
-          return {
-            team: (att.team || []).map(function(t) { return labelToIdx(t); }),
-            votes: convertVotes(att.votes || {}),
-            leader: labelToIdx(att.leader)
-          };
-        })
-      };
-    }),
-    lancelotFlipped: false,
-    lancelotFlipCount: 0
-  };
-
-  // Only the perspective player knows their own role
-  tmpState.knownIdentities[perspIdx] = rec.identities[perspIdx].role;
-
-  // Handle Lancelot flip for perspective player
-  var perspRole = rec.identities[perspIdx].role;
-  if (perspRole.indexOf('兰斯洛特') >= 0 && rec.lancelotFlips) {
-    var name = rec.identities[perspIdx].name;
-    tmpState.lancelotFlipCount = rec.lancelotFlips[name] || 0;
-    tmpState.lancelotFlipped = tmpState.lancelotFlipCount % 2 === 1;
-  }
-
-  // Clear cache so we get fresh computation
-  _tendScoreCacheKey = '';
-  _tendScoreCacheValue = null;
-
-  window.state = tmpState;
-  try {
-    return computeSuspectScores();
-  } finally {
-    window.state = savedState;
-  }
-}
-
-function refreshV7DetailAnalysis() {
-  if (!_v7DetailRec) return;
-  var selEl = document.getElementById('v7-detail-persp');
-  if (!selEl) return;
-  var sel = parseInt(selEl.value);
-
-  // Use stored scores if available
-  var scores = null;
-  if (_v7DetailRec.v7Scores && _v7DetailRec.v7Scores[sel]) {
-    scores = _v7DetailRec.v7Scores[sel].scores;
-    scores._dataQuality = _v7DetailRec.v7Scores[sel].quality;
-    scores._totalRounds = _v7DetailRec.v7Scores[sel].totalRounds || 0;
-  } else {
-    scores = computeRecordSuspectScores(_v7DetailRec, sel);
-  }
-
-  var t = document.getElementById('v7-detail-table');
-  if (!t) return;
-
-  if (!scores || scores.length === 0) {
-    t.innerHTML = '<p style="color:var(--text-dim);font-size:11px;padding:8px">该视角下暂无足够数据进行分析</p>';
-    return;
-  }
-
-  var perspRole = _v7DetailRec.identities[sel].role;
-  var isGoodPersp = (perspRole.indexOf('梅林') >= 0 || perspRole === '派西维尔' || perspRole === '忠臣' || perspRole === '兰斯洛特(蓝)');
-
-  var quality = scores._dataQuality || 'unknown';
-  var totalRounds = scores._totalRounds || 0;
-  var qualityNote = '';
-  if (quality === 'low') qualityNote = ' <span style="font-size:10px;color:#ff9800">（数据不足，谨慎参考）</span>';
-  else if (quality === 'medium') qualityNote = ' <span style="font-size:10px;color:#ffc107">（中等置信度）</span>';
-  else if (quality === 'high') qualityNote = ' <span style="font-size:10px;color:#4caf50">（高置信度）</span>';
-
-  var h = '<p style="font-size:10px;color:var(--text-dim);margin-bottom:4px">';
-  if (isGoodPersp) {
-    h += '好人视角 · 分数越高 = 反方嫌疑越大' + qualityNote;
-  } else {
-    h += '反方视角 · 分数越高 = 梅林概率越大' + qualityNote;
-  }
-  h += '</p>';
-
-  h += '<table style="font-size:11px;width:100%;border-collapse:collapse">';
-  h += '<tr style="border-bottom:1px solid var(--border)"><th style="padding:2px 4px;text-align:left">玩家</th><th style="padding:2px 4px;text-align:center;width:60px">v7评分</th><th style="padding:2px 4px;text-align:left">证据链</th></tr>';
-  for (var i = 0; i < scores.length; i++) {
-    var item = scores[i];
-    var realRole = _v7DetailRec.identities[item.idx].role;
-    var isGoodReal = (realRole.indexOf('梅林') >= 0 || realRole === '派西维尔' || realRole === '忠臣' || realRole === '兰斯洛特(蓝)');
-    var isEvilReal = (realRole === '莫甘娜' || realRole === '刺客' || realRole === '莫德雷德' || realRole === '奥伯伦' || realRole === '爪牙' || realRole === '兰斯洛特(红)');
-
-    var isAccurate = false;
-    if (isGoodPersp) {
-      isAccurate = (isGoodReal && item.score < 50) || (isEvilReal && item.score >= 50);
-    } else {
-      isAccurate = (realRole === '梅林' && item.score >= 50) || (realRole !== '梅林' && item.score < 50);
-    }
-    var badge = isAccurate ? '<span style="color:#4caf50" title="判断正确">✓</span>' : '<span style="color:#f44336" title="判断偏差">✗</span>';
-
-    var scoreColor = item.score >= 65 ? 'var(--red-bright)' : item.score < 40 ? 'var(--green-bright)' : 'var(--gold-light)';
-    var isSelf = item.idx === sel;
-    var selfTag = isSelf ? ' <span style="font-size:9px;color:var(--gold-light)">☆</span>' : '';
-
-    var evidenceHtml = item.evidence.length > 0 ? item.evidence.map(function(ev) { return escapeHtml(ev); }).join('<br>') : '<span style="color:var(--text-dim)">（无证据，默认中性）</span>';
-
-    h += '<tr style="border-bottom:1px solid var(--border)">';
-    h += '<td style="padding:2px 4px;font-weight:600;white-space:nowrap">' + (item.idx + 1) + '号 ' + _v7DetailRec.identities[item.idx].name + selfTag + ' ' + badge + ' <span style="font-size:10px;color:var(--text-dim)">(' + realRole + ')</span></td>';
-    h += '<td style="padding:2px 4px;text-align:center;font-weight:700;color:' + scoreColor + '">' + item.score + '</td>';
-    h += '<td style="padding:2px 4px;font-size:10px;color:var(--text-dim)">' + evidenceHtml + '</td>';
-    h += '</tr>';
-  }
-  h += '</table>';
-
-  var accCount = 0;
-  for (var i = 0; i < scores.length; i++) {
-    var item = scores[i];
-    if (item.idx === sel) continue;
-    var rRole = _v7DetailRec.identities[item.idx].role;
-    var rGood = (rRole.indexOf('梅林') >= 0 || rRole === '派西维尔' || rRole === '忠臣' || rRole === '兰斯洛特(蓝)');
-    var rEvil = (rRole === '莫甘娜' || rRole === '刺客' || rRole === '莫德雷德' || rRole === '奥伯伦' || rRole === '爪牙' || rRole === '兰斯洛特(红)');
-    if (isGoodPersp) {
-      if ((rGood && item.score < 50) || (rEvil && item.score >= 50)) accCount++;
-    } else {
-      if ((rRole === '梅林' && item.score >= 50) || (rRole !== '梅林' && item.score < 50)) accCount++;
-    }
-  }
-  var totalJudged = pc - 1;
-  var accPct = totalJudged > 0 ? Math.round(accCount / totalJudged * 100) : 0;
-  h += '<p style="font-size:10px;color:var(--text-dim);margin-top:4px">准确率：' + accCount + '/' + totalJudged + '（' + accPct + '%）</p>';
-
-  t.innerHTML = h;
-}
-
-function saveV7AnalysisToHistory() {
-  if (!_v7DetailRec || _v7DetailHistIdx < 0) return;
-  var history = loadHistory();
-  var v2 = history[_v7DetailHistIdx];
-  if (!v2) return;
-  var rec = normalizeRecord(v2);
-
-  var v7Scores = {};
-  var totalPersp = rec.playerCount;
-  for (var p = 0; p < totalPersp; p++) {
-    var scores = computeRecordSuspectScores(rec, p);
-    if (!scores || scores.length === 0) continue;
-    v7Scores[p] = {
-      scores: scores.map(function(s) { return { idx: s.idx, score: s.score, evidence: s.evidence }; }),
-      quality: scores._dataQuality || 'unknown',
-      totalRounds: scores._totalRounds || 0,
-      savedAt: _bjTimestamp()
-    };
-  }
-
-  v2.v7s = v7Scores;
-  // Persist
-  var raw = JSON.parse(localStorage.getItem('avalon_history_v2') || '[]');
-  raw[_v7DetailHistIdx].v7s = v7Scores;
-  localStorage.setItem('avalon_history_v2', JSON.stringify(raw));
-  _historyRawCache = null;
-  _normalizedHistoryRawCache = null;
-  _normalizedHistoryCache = null;
-
-  _v7DetailRec.v7Scores = v7Scores;
-  toast('v7分析已保存到历史记录（' + totalPersp + '个视角）', 'ok');
-  refreshV7DetailAnalysis();
-}
-
-/* ------- v7 Engine Info Panel (v102: 9-step visualizer) ------- */
-function renderV7EngineInfo() {
-  var statusEl = document.getElementById('v7-engine-status');
-  var stepsEl = document.getElementById('v7-engine-steps');
-  if (!statusEl || !stepsEl) return;
-
-  var pc = state.playerCount;
-  var persp = getPerspective();
-  var selfIdx = state.selfIndex;
-  var missions = state.missions || [];
-  var completed = [];
-  for (var m = 0; m < missions.length; m++) {
-    if (missions[m].result) completed.push(missions[m]);
-  }
-  var totalRounds = completed.length;
-  var knownIdentities = state.knownIdentities || {};
-  var knownCount = Object.keys(knownIdentities).length;
-
-  // === 全局状态 ===
-  var perspText = persp === 'good'
-    ? '<span style="color:#4caf50">好人视角</span>（找反方）'
-    : (persp === 'evil' ? '<span style="color:#f44336">反方视角</span>（找梅林）' : '<span style="color:var(--text-dim)">未设置</span>');
-  var quality = totalRounds <= 1 ? '<span class="warn">低（仅' + totalRounds + '轮）</span>'
-              : (totalRounds === 2 ? '<span class="warn">中（2轮）</span>'
-              : '<span class="ok">高（' + totalRounds + '轮）</span>');
-
-  statusEl.innerHTML =
-    '<span class="v7-stat">视角：<strong>' + perspText + '</strong></span>' +
-    '<span class="v7-stat">已完成：<strong>' + totalRounds + ' / ' + (missions.length || 5) + ' 轮</strong></span>' +
-    '<span class="v7-stat">数据置信度：<strong>' + quality + '</strong></span>' +
-    '<span class="v7-stat">已知身份锚点：<strong>' + knownCount + ' 人</strong></span>';
-
-  // === 计算各步骤激活情况 ===
-  // Step 1: 已知身份锁定
-  var lockedGood = 0, lockedEvil = 0;
-  for (var k in knownIdentities) {
-    var lab = knownIdentities[k];
-    if (isGoodRole(lab) || lab === '正方' || lab === '好人') lockedGood++;
-    else if (isEvilRole(lab) || lab === '反方' || lab === '坏人') lockedEvil++;
-  }
-
-  // Step 2: 声明类信息（湖中女神 / 王者之剑）
-  var ladyChecks = (state.ladyLakeChecks || []).filter(function(c){ return c && c.target !== undefined && c.target !== selfIdx; });
-  var exTotal = (state.excaliburHistory || []).length;
-  var exUsed = (state.excaliburHistory || []).filter(function(e){ return e && e.used === true; }).length;
-  var exPending = (state.excaliburHistory || []).filter(function(e){ return e && e.used === true && !e.feedbackRecorded; }).length;
-
-  // Step 3: 任务结果硬约束
-  var failRounds = 0, succRounds = 0, dualFail = 0;
-  for (var r = 0; r < completed.length; r++) {
-    if (completed[r].result === 'fail') {
-      failRounds++;
-      if ((completed[r].team || []).length >= 5 && (completed[r].failCount || 0) >= 2) dualFail++;
-    } else if (completed[r].result === 'success') succRounds++;
-  }
-  var recencyText = totalRounds <= 2 ? 'R1×0.95' : 'R1×0.7 / R2×0.85 / R3+×1.0';
-
-  // Step 4: 多轮交叉分析
-  var failThreshold = totalRounds <= 2 ? 1 : 2;
-  var successThreshold = totalRounds <= 2 ? 2 : 3;
-  var crossActive = totalRounds >= 1;
-
-  // Step 5: 发车失败
-  var leaderLF = {};
-  for (var r = 0; r < completed.length; r++) {
-    var lf = completed[r].launchFailures || 0;
-    var ld = completed[r].leader;
-    if (!ld || lf <= 0) continue;
-    try {
-      var li = parseInt(ld.split('号')[0]) - 1;
-      leaderLF[li] = (leaderLF[li] || 0) + lf;
-    } catch(e) {}
-  }
-  var lfTriggered = 0;
-  for (var li in leaderLF) if (leaderLF[li] >= 3) lfTriggered++;
-  var lfTotal = 0;
-  for (var li in leaderLF) lfTotal += leaderLF[li];
-
-  // Step 6: 投票分析
-  var voteRoundsHasData = 0;
-  for (var r = 0; r < completed.length; r++) {
-    if (completed[r].votes && Object.keys(completed[r].votes).length >= 2) voteRoundsHasData++;
-  }
-  var voteAnchorTotal = lockedGood + lockedEvil;
-  var voteActive = voteRoundsHasData >= 1 && voteAnchorTotal >= 1;
-
-  // Step 7: 梅林猎杀
-  var merlinActive = persp === 'evil' && lockedEvil > 0 && totalRounds >= 2;
-
-  // Step 8: 兰斯洛特翻转
-  var lancFlipped = !!state.lancelotFlipped;
-  var lancInGame = (state.activeRoles || []).some(function(r){ return r && r.indexOf('兰斯洛特') !== -1; });
-
-  // Step 9: 始终运行
-  // === 渲染 9 步 ===
-  function step(num, name, active, meta) {
-    var cls = active ? 'active' : (totalRounds === 0 ? 'idle' : 'idle');
-    return '<div class="v7-step ' + cls + '">' +
-      '<div class="v7-step-num">' + num + '</div>' +
-      '<div class="v7-step-body">' +
-      '<div class="v7-step-name">' + name + '</div>' +
-      '<div class="v7-step-meta">' + meta + '</div>' +
-      '</div></div>';
-  }
-
-  var s1Meta = knownCount > 0
-    ? '<span class="ok">已锁定 ' + knownCount + ' 人</span>（好' + lockedGood + ' / 坏' + lockedEvil + '）硬锚点 0 或 100'
-    : '<span>暂无标注</span>，可在下方「已知身份」标记';
-
-  var s2Meta = '湖中女神声明 <span class="hl">' + ladyChecks.length + '</span> 次（±20）';
-  s2Meta += '；王者之剑 <span class="hl">' + exTotal + '</span> 轮，已使用 <span class="hl">' + exUsed + '</span> 次';
-  if (exPending > 0) s2Meta += '，<span class="warn">待反馈 ' + exPending + ' 次</span>';
-  s2Meta += '；声明不等于事实';
-
-  var s3Meta;
-  if (totalRounds === 0) {
-    s3Meta = '等待首轮任务，' + recencyText;
-  } else {
-    s3Meta = '失败 <span class="hl">' + failRounds + '</span> 轮 / 成功 <span class="hl">' + succRounds + '</span> 轮';
-    if (dualFail > 0) s3Meta += '，<span class="warn">双失败 ' + dualFail + ' 轮</span>';
-    s3Meta += '；衰减：' + recencyText;
-  }
-
-  var s4Meta = totalRounds === 0
-    ? '待数据，门槛：失败≥' + failThreshold + ' / 成功≥' + successThreshold
-    : '失败门槛 <span class="hl">≥' + failThreshold + '</span>，成功门槛 <span class="hl">≥' + successThreshold + '</span>（R1-2 自适应放宽）';
-
-  var s5Meta = lfTotal === 0
-    ? '<span>暂无发车失败</span>，触发门槛 ≥3 次'
-    : (lfTriggered > 0
-      ? '<span class="warn">已触发 ' + lfTriggered + ' 名队长</span>（累计 ' + lfTotal + ' 次） +3'
-      : '累计 <span class="hl">' + lfTotal + '</span> 次未达门槛 (<3)');
-
-  var s6Meta;
-  if (!voteActive) {
-    s6Meta = voteAnchorTotal === 0 ? '需先标注已知身份才能比对' : '等待投票数据';
-  } else {
-    s6Meta = '<span class="ok">' + voteRoundsHasData + ' 轮投票</span>，跳过全票一致；与坏人 >75%→+12，与好人 >70%→+10';
-  }
-
-  var s7Meta;
-  if (persp !== 'evil') {
-    s7Meta = '仅<span class="hl">反方视角</span>启用';
-  } else if (lockedEvil === 0) {
-    s7Meta = '需标注 ≥1 名已知坏人';
-  } else if (totalRounds < 2) {
-    s7Meta = '需 ≥2 轮数据';
-  } else {
-    s7Meta = '<span class="ok">运行中</span>：条件拒绝率差 = P(拒|含坏)-P(拒|无坏)';
-  }
-
-  var s8Meta;
-  if (!lancInGame) {
-    s8Meta = '本局未启用兰斯洛特';
-  } else if (lancFlipped) {
-    s8Meta = '<span class="warn">已翻转</span>，兰斯洛特玩家信号 <span class="hl">×0.5</span>';
-  } else {
-    s8Meta = '兰斯洛特<span>未翻转</span>，正常计分';
-  }
-
-  var s9Meta;
-  if (totalRounds === 0) {
-    s9Meta = '所有未知玩家分数：50（先验 10:10）';
-  } else {
-    s9Meta = '<span class="ok">分数 = 好人证据 / (好人+坏人证据) × 100</span>';
-  }
-
-  stepsEl.innerHTML =
-    step(1, '已知身份锁定（硬锚点）', knownCount > 0, s1Meta) +
-    step(2, '声明类信息（湖中女神 / 王者之剑）', ladyChecks.length > 0 || exTotal > 0, s2Meta) +
-    step(3, '任务结果硬约束（轮次衰减+双失败）', totalRounds > 0, s3Meta) +
-    step(4, '多轮交叉分析（自适应门槛）', crossActive && totalRounds > 0, s4Meta) +
-    step(5, '发车失败分析（≥3 次）', lfTriggered > 0, s5Meta) +
-    step(6, '投票行为分析（跳过全票一致）', voteActive, s6Meta) +
-    step(7, '梅林猎杀（条件拒绝率差）', merlinActive, s7Meta) +
-    step(8, '兰斯洛特翻转感知（信号减半）', lancInGame, s8Meta) +
-    step(9, '证据累积 → 分数转换', true, s9Meta);
-}
-
-
-/* ------- Result rendering ------- */
-function renderTendResult() {
-  var persp = getPerspective();
-  var titleEl = document.getElementById('tend-result-title');
-  var descEl = document.getElementById('tend-result-desc');
-  var listEl = document.getElementById('tend-result-list');
-
-  if (!state.myRole) {
-    titleEl.textContent = '分析结果';
-    descEl.textContent = '';
-    listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">请在上方「我的身份」卡片中选择你的角色</p>';
-    return;
-  }
-
-  if (persp === 'good') {
-    titleEl.textContent = '反方嫌疑排行';
-    descEl.textContent = '分数越高，是反方的概率越大。绿色=低嫌疑 黄色=中等 红色=高嫌疑';
-  } else {
-    titleEl.textContent = '梅林概率排行';
-    descEl.textContent = '分数越高，是梅林的概率越大。绿色=低概率 黄色=中等 红色=高概率';
-  }
-
-  var list = computeSuspectScores();
-
-  // v7 Progressive Data Quality Badge
-  var quality = list._dataQuality || 'unknown';
-  var totalRounds = list._totalRounds || 0;
-  var qualityLabel = '';
-  var qualityColor = '';
-  var qualityBg = '';
-  if (quality === 'low') {
-    qualityLabel = '&#9888; 数据不足（仅' + totalRounds + '轮），谨慎参考';
-    qualityColor = '#ff9800';
-    qualityBg = 'rgba(255,152,0,0.1)';
-  } else if (quality === 'medium') {
-    qualityLabel = '&#9889; 中等置信度（' + totalRounds + '轮数据）';
-    qualityColor = '#ffc107';
-    qualityBg = 'rgba(255,193,7,0.1)';
-  } else if (quality === 'high') {
-    qualityLabel = '&#10004; 高置信度（' + totalRounds + '轮数据）';
-    qualityColor = '#4caf50';
-    qualityBg = 'rgba(76,175,80,0.1)';
-  }
-  if (qualityLabel) {
-    descEl.innerHTML = '<div style="display:inline-block;font-size:11px;color:' + qualityColor + ';background:' + qualityBg + ';padding:3px 10px;border-radius:4px;border:1px solid ' + qualityColor + ';margin-left:8px;vertical-align:middle">' + qualityLabel + '</div>';
-  } else {
-    descEl.innerHTML = '';
-  }
-
-  if (list.length === 0) {
-    listEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">暂无数据</p>';
-    renderEvidencePanel(list);
-    return;
-  }
-
-  var h = '';
-  for (var i = 0; i < list.length; i++) {
-    var item = list[i];
-    var cls = 'suspect';
-    if (item.score < 40) cls = 'trust';
-    else if (item.score < 65) cls = 'neutral';
-
-    var label = getKnownLabel(item.idx);
-    var labeled = label ? ' <span style="font-size:11px;color:var(--accent);background:rgba(201,168,76,0.15);padding:1px 6px;border-radius:3px">' + escapeHtml(label) + '</span>' : '';
-
-    h += '<div class="tend-result-item">';
-    var selfTag = (item.idx === state.selfIndex) ? ' <span style="color:var(--gold-light);font-size:10px">&#9733;&#25105;</span>' : '';
-    h += '<span class="tend-result-name">' + escapeHtml(state.playerNames[item.idx]) + labeled + selfTag + '</span>';
-    h += '<div class="tend-bar-wrap">';
-    h += '<div class="tend-bar-fill ' + cls + '" style="width:' + item.score + '%"></div>';
-    h += '</div>';
-    h += '<span class="tend-score ' + cls + '">' + item.score + '</span>';
-    h += '<button class="btn tiny" onclick="toggleEvidence(' + item.idx + ')" style="font-size:11px;margin-left:8px;min-width:24px">▼</button>';
-    h += '</div>';
-    h += '<div id="ev-' + item.idx + '" class="evidence-panel" style="display:none">';
-    if (item.evidence.length === 0) {
-      h += '<p style="font-size:11px;color:var(--text-dim);padding:4px 20px">暂无具体证据</p>';
-    } else {
-      for (var e = 0; e < item.evidence.length; e++) {
-        h += '<p style="font-size:11px;color:var(--text-dim);margin:0;padding:2px 20px">• ' + escapeHtml(item.evidence[e]) + '</p>';
-      }
-    }
-    h += '</div>';
-  }
-
-  listEl.innerHTML = h;
-  renderEvidencePanel(list);
-}
-
-function renderEvidencePanel(list) {
-  var panel = document.getElementById('tend-evidence-list');
-  if (!panel) return;
-
-  var allEvidence = [];
-  for (var i = 0; i < list.length; i++) {
-    if (list[i].evidence.length > 0) {
-      allEvidence.push({
-        player: state.playerNames[list[i].idx],
-        idx: list[i].idx,
-        score: list[i].score,
-        evidence: list[i].evidence
-      });
-    }
-  }
-
-  if (allEvidence.length === 0) {
-    panel.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:12px">随游戏推进，关键证据将在此汇总</p>';
-    return;
-  }
-
-  var h = '';
-  for (var i = 0; i < allEvidence.length; i++) {
-    var e = allEvidence[i];
-    h += '<div class="evidence-item">';
-    h += '<strong style="color:var(--text-bright)">' + escapeHtml(e.player) + '（分数：' + e.score + '）</strong>';
-    h += '<ul style="margin:4px 0 0 16px;padding:0">';
-    for (var j = 0; j < e.evidence.length; j++) {
-      h += '<li style="font-size:12px;color:var(--text-dim)">' + escapeHtml(e.evidence[j]) + '</li>';
-    }
-    h += '</ul></div>';
-  }
-  panel.innerHTML = h;
-}
-
-function toggleEvidence(idx) {
-  var el = document.getElementById('ev-' + idx);
-  if (!el) return;
-  el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
-}
 
 /* ==================== FEATURE 4: NIGHT MODE ==================== */
 function initNightMode() {
@@ -10183,8 +9009,8 @@ function buildNightVoiceLines() {
   var lines = [];
   function push(step, text) { lines.push({ step: step, text: text }); }
 
-  // 1) 天黑请闭眼
-  push('天黑请闭眼', '天黑请闭眼，请所有玩家闭上眼睛。');
+  // 1) 天黑请闭上眼睛
+  push('天黑请闭上眼睛', '天黑请闭上眼睛，请所有玩家闭上眼睛。');
 
   var openEvil = pick(NV_EVIL_OPEN);   // 互相认识、需要睁眼的红色方（莫甘娜/刺客/莫德雷德/爪牙）
   var thumbs = pick(NV_EVIL_THUMB);    // 第4句给梅林竖拇指的红色方（含奥伯伦）
@@ -10195,16 +9021,14 @@ function buildNightVoiceLines() {
     var openText;
     if (hasRedLancelot && openEvil.length) {
       openText = '请红色方红色兰斯洛特竖起大拇指，请'
-        + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
+        + nvJoinNames(openEvil) + '睁开眼睛，互相确认你们的同伴。';
     } else if (hasRedLancelot) {
       // 本场没有需要睁眼互认的红色方，只念红色兰斯洛特竖大拇指
       openText = '请红色方红色兰斯洛特竖起大拇指。';
     } else {
-      openText = '请红色方' + nvJoinNames(openEvil) + '睁眼，互相确认你们的同伴。';
+      openText = '请红色方' + nvJoinNames(openEvil) + '睁开眼睛，互相确认你们的同伴。';
     }
-    push('红色方请睁眼', openText);
-    // 3) 红色方闭眼
-    push('红色方请闭眼', '红色方请闭眼。');
+    push('红色方请睁开眼睛', openText);
   }
 
   // 4) 红色方竖大拇指（v178："除莫德雷德以外"仅在本场存在莫德雷德时出现）
@@ -10215,11 +9039,21 @@ function buildNightVoiceLines() {
     push('红色方竖大拇指', thumbText);
   }
 
+  // 4.5) v185：本场有红色兰斯洛特时，竖完大拇指立刻收回（无兰斯洛特则整句零出现）
+  if (hasRedLancelot) {
+    push('请红色兰斯洛特收回大拇指', '请红色兰斯洛特收回大拇指。');
+  }
+
+  // 3) 红色方闭上眼睛（v185：顺序改为 睁开眼睛 → 竖大拇指 → 兰斯洛特收回大拇指 → 闭上眼睛）
+  if (openEvil.length || hasRedLancelot) {
+    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
+  }
+
   // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
   if (has('梅林')) {
     push('梅林请睁眼', '梅林请睁眼，请看竖着大拇指的玩家并记住他们。');
-    // 6) 梅林闭眼、所有人放下大拇指
-    push('梅林请闭眼', '梅林请闭眼，所有人请放下大拇指。');
+    // 6) 梅林闭上眼睛、所有人放下大拇指
+    push('梅林请闭上眼睛', '梅林请闭上眼睛，所有人请放下大拇指。');
   }
 
   // 7) 梅林和莫甘娜竖起大拇指（无莫甘娜只念梅林）
@@ -10241,8 +9075,8 @@ function buildNightVoiceLines() {
       ? '派西维尔请睁眼，请派西维尔确认两个梅林身份。'
       : '派西维尔请睁眼，请派西维尔确认你看到的那两个身份。';
     push('派西维尔请睁眼', percText);
-    // 9) 派西维尔闭眼
-    push('派西维尔请闭眼', '派西维尔请闭眼。');
+    // 9) 派西维尔闭上眼睛
+    push('派西维尔请闭上眼睛', '派西维尔请闭上眼睛。');
   }
 
   // 10) 天亮了（v184：原「天亮请睁眼」改为「天亮了」；v178：队长与人数信息仅界面展示，不再朗读）
@@ -10334,14 +9168,7 @@ function nvRenderPanel() {
     +   '<div class="nv-gaps-body" id="nv-gaps-body" style="display:none">'
     +     gapsHTML
     +     '<div class="nv-gap-actions">'
-    +       '<span class="nv-gap-all-label">统一设为</span>'
-    +       '<input type="number" id="nv-gap-all" class="nv-gap-input" min="' + NV_GAP_MIN + '" max="' + NV_GAP_MAX + '" step="' + NV_GAP_STEP + '" value="' + NV.gap + '" oninput="nvSyncAllBtn()">'
-    +       '<span class="nv-gap-unit">秒</span>'
-    +       '<button class="btn small" id="nv-gap-all-btn" onclick="nvApplyAllGaps()">统一设为 ' + NV.gap + ' 秒</button>'
-    +     '</div>'
-    +     '<div class="nv-gap-actions">'
     +       '<button class="btn small primary" onclick="nvSaveGaps()">保存停顿设置</button>'
-    +       '<button class="btn small" onclick="nvResetGaps()">恢复默认 3 秒</button>'
     +     '</div>'
     +   '</div>'
     + '</div>'
@@ -10676,11 +9503,30 @@ function nvClampGap(v) {
   return g;
 }
 
+// v185：播报句子措辞改为「闭上眼睛」并调整红色方顺序后，兼容旧版保存的停顿配置（旧键名用转义写法，避免源码出现旧措辞）
+var NV_STEP_ALIAS = {
+  '天黑请\u95ed\u773c': '天黑请闭上眼睛',
+  '红色方请睁眼': '红色方请睁开眼睛',
+  '红色方请\u95ed\u773c': '红色方请闭上眼睛',
+  '梅林请\u95ed\u773c': '梅林请闭上眼睛',
+  '派西维尔请\u95ed\u773c': '派西维尔请闭上眼睛'
+};
+function nvStepAlias(k) {
+  if (!k) return k;
+  return NV_STEP_ALIAS[k] || k;
+}
+
 // 取某一句的停顿秒数：优先逐句配置，缺项回退默认值
 function nvGapOf(step) {
-  if (step && Object.prototype.hasOwnProperty.call(NV.gaps, step)) {
-    var v = parseFloat(NV.gaps[step]);
+  var sk = nvStepAlias(step);
+  if (sk && Object.prototype.hasOwnProperty.call(NV.gaps, sk)) {
+    var v = parseFloat(NV.gaps[sk]);
     if (!isNaN(v)) return v;
+  }
+  // 兼容旧版 step 名
+  if (step && Object.prototype.hasOwnProperty.call(NV.gaps, step)) {
+    var v2 = parseFloat(NV.gaps[step]);
+    if (!isNaN(v2)) return v2;
   }
   return NV.gap;
 }
@@ -10703,28 +9549,6 @@ function nvSetGapFor(el) {
   if (step) NV.gaps[step] = g;
 }
 
-function nvSyncAllBtn() {
-  var inp = document.getElementById('nv-gap-all');
-  var btn = document.getElementById('nv-gap-all-btn');
-  if (!inp || !btn) return;
-  var g = nvClampGap(inp.value);
-  btn.textContent = '统一设为 ' + g + ' 秒';
-}
-
-function nvApplyAllGaps() {
-  var inp = document.getElementById('nv-gap-all');
-  var g = nvClampGap(inp ? inp.value : NV_GAP_DEFAULT);
-  if (inp) inp.value = g;
-  NV.gap = g;
-  var rows = document.querySelectorAll('.nv-gap-input[data-step]');
-  for (var i = 0; i < rows.length; i++) {
-    rows[i].value = g;
-    NV.gaps[rows[i].getAttribute('data-step')] = g;
-  }
-  nvSyncAllBtn();
-  toast('所有句子停顿已统一为 ' + g + ' 秒，点「保存停顿设置」长期生效', 'ok');
-}
-
 function nvSaveGaps() {
   try {
     var obj = {};
@@ -10742,24 +9566,6 @@ function nvSaveGaps() {
   } catch (e) {
     toast('保存失败：浏览器本地存储不可用', 'warn');
   }
-}
-
-function nvResetGaps() {
-  NV.gaps = {};
-  NV.gap = NV_GAP_DEFAULT;
-  var rows = document.querySelectorAll('.nv-gap-input[data-step]');
-  for (var i = 0; i < rows.length; i++) rows[i].value = NV_GAP_DEFAULT;
-  var inp = document.getElementById('nv-gap-all');
-  if (inp) inp.value = NV_GAP_DEFAULT;
-  nvSyncBtnSafe();
-  try {
-    localStorage.setItem('avalon_voice_gaps', '{}');
-    localStorage.setItem('avalon_voice_gap', String(NV_GAP_DEFAULT));
-  } catch (e) {}
-  var rsPushed = nvCloudPushGaps(function (ok) {   // v184：恢复默认同样同步云端
-    toast(ok ? '已恢复默认停顿 3 秒，云端已同步' : '已恢复默认停顿 3 秒（本机，云端同步失败）', ok ? 'ok' : 'warn');
-  });
-  if (!rsPushed) toast('已恢复默认停顿 3 秒（本机）', 'ok');
 }
 
 /* ---------- v184：逐句停顿跨设备云端同步（复用 Supabase key_value 表，key = avalon_voice_gaps） ----------
@@ -10786,7 +9592,7 @@ function nvApplyGapsPayload(payload) {
     for (var k in payload.gaps) {
       if (!Object.prototype.hasOwnProperty.call(payload.gaps, k)) continue;
       var gv = parseFloat(payload.gaps[k]);
-      if (!isNaN(gv)) ng[k] = nvClampGap(gv);
+      if (!isNaN(gv)) ng[nvStepAlias(k)] = nvClampGap(gv);
     }
     NV.gaps = ng;
     changed = true;
@@ -10811,9 +9617,7 @@ function nvRefreshGapUI() {
     for (var i = 0; i < rows.length; i++) {
       rows[i].value = nvGapOf(rows[i].getAttribute('data-step'));
     }
-    var all = document.getElementById('nv-gap-all');
-    if (all) all.value = NV.gap;
-    nvSyncBtnSafe();
+    /* v185：已删除「统一设为 X 秒」预设控件，无需同步该输入框 */
   } catch (e) {}
 }
 
@@ -10921,10 +9725,6 @@ function nvRefreshRateBtns() {
     if (Math.abs(rv - NV.rate) < 0.001) btns[i].classList.add('active');
     else btns[i].classList.remove('active');
   }
-}
-
-function nvSyncBtnSafe() {
-  try { nvSyncAllBtn(); } catch (e) {}
 }
 
 /* ---------- v180：背景乐（Web Audio 程序化合成「F 轻快拨弦」，零外部依赖、无版权音频） ---------- */
@@ -11438,6 +10238,11 @@ function ldrPickConfirm() {
   // v183：确认后只写入队长并停在队长页（播报卡片保留），不跳组队页
   NV_PROMPT = 'confirmed';
   selectLeader(idx);
+  // v185：追加压栈「队长已确认 + 队伍为空 + 播报未决定」，使组队阶段的撤销能回到本停留界面
+  try {
+    state._nvDecided = false;
+    saveUndo();
+  } catch (e) {}
   try { toast('队长已确定：' + playerLabel(idx) + '，请选择是否进行开局播报'); } catch (e) {}
 }
 
