@@ -1380,3 +1380,46 @@ main::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+/* ==================== v175: 夜间身份语音播报 ==================== */
+.nv-overlay{position:fixed;inset:0;z-index:400;background:rgba(4,3,2,0.9);display:flex;align-items:center;justify-content:center;padding:14px;animation:nvFade .18s ease}
+@keyframes nvFade{from{opacity:0}to{opacity:1}}
+.nv-panel{width:100%;max-width:560px;max-height:calc(100vh - 28px);display:flex;flex-direction:column;background:linear-gradient(175deg,#221d14 0%,#151209 100%);border:2px solid var(--gold);border-radius:var(--radius);box-shadow:0 10px 40px rgba(0,0,0,0.7);overflow:hidden}
+.nv-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(201,168,76,0.14),transparent);flex-shrink:0}
+.nv-title{font-size:16px;font-weight:700;color:var(--gold-light);letter-spacing:1px;font-family:var(--font-display)}
+.nv-close{background:transparent;border:none;color:var(--text-dim);font-size:20px;line-height:1;cursor:pointer;padding:4px 8px}
+.nv-close:hover{color:var(--red-bright)}
+.nv-stage{padding:14px;text-align:center;border-bottom:1px solid var(--border);background:radial-gradient(circle at 50% 0%,rgba(74,144,217,0.10),transparent 70%);flex-shrink:0}
+.nv-step-name{font-size:12px;color:var(--gold);letter-spacing:1px;margin-bottom:8px}
+.nv-caption{font-size:17px;line-height:1.6;color:var(--text-bright);font-weight:600;min-height:56px;display:flex;align-items:center;justify-content:center}
+.nv-badge{display:inline-block;margin-top:8px;padding:2px 10px;border-radius:20px;font-size:12px;color:var(--gold-light);border:1px solid var(--border);background:rgba(201,168,76,0.08)}
+.nv-list{flex:1;overflow-y:auto;padding:8px 10px;min-height:110px;-webkit-overflow-scrolling:touch}
+.nv-line{display:flex;gap:8px;padding:7px 9px;border-radius:var(--radius-sm);font-size:13px;color:var(--text-dim);border-left:3px solid transparent;cursor:pointer;transition:background .15s,color .15s}
+.nv-line:hover{background:rgba(201,168,76,0.06)}
+.nv-line.done{color:var(--text-dim);opacity:.55}
+.nv-line.active{color:var(--text-bright);background:rgba(201,168,76,0.14);border-left-color:var(--gold);font-weight:600}
+.nv-line-step{flex:0 0 auto;color:var(--gold);font-size:12px;white-space:nowrap}
+.nv-line.active .nv-line-step{color:var(--gold-light)}
+.nv-line-text{flex:1}
+.nv-ctrl{display:flex;gap:8px;padding:10px 14px;flex-wrap:wrap;border-top:1px solid var(--border);flex-shrink:0}
+.nv-ctrl .btn{flex:1;min-width:74px;justify-content:center}
+.nv-setting{display:flex;align-items:center;gap:10px;padding:2px 14px 10px;font-size:12px;color:var(--text-dim);flex-shrink:0}
+.nv-setting-label{white-space:nowrap}
+.nv-setting input[type=range]{flex:1;accent-color:var(--gold);height:22px}
+.nv-gap-val{color:var(--gold-light);min-width:44px;text-align:right}
+.nv-tip{padding:0 14px 12px;font-size:11px;line-height:1.5;color:var(--text-dim);flex-shrink:0}
+@media (max-width:480px){
+  .nv-caption{font-size:15px;min-height:48px}
+  .nv-panel{max-height:calc(100vh - 12px)}
+  .nv-overlay{padding:6px}
+  .nv-ctrl .btn{min-width:64px;font-size:12px;padding:7px 8px}
+}
+/* 摇骰子选队长动画 */
+.nv-dice-overlay{position:fixed;inset:0;z-index:410;background:rgba(4,3,2,0.88);display:flex;align-items:center;justify-content:center;padding:20px;animation:nvFade .15s ease}
+.nv-dice-panel{width:100%;max-width:320px;text-align:center;padding:22px 18px;border-radius:var(--radius);border:2px solid var(--gold);background:linear-gradient(175deg,#2b2415,#171309);box-shadow:0 10px 36px rgba(0,0,0,0.7)}
+.nv-dice-title{font-size:15px;color:var(--gold-light);font-weight:700;letter-spacing:1px;margin-bottom:14px}
+.nv-dice{width:92px;height:92px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:700;color:var(--gold-light);border:3px solid var(--gold);border-radius:18px;background:radial-gradient(circle at 35% 30%,rgba(201,168,76,0.22),rgba(0,0,0,0.35));box-shadow:inset 0 0 18px rgba(201,168,76,0.25);animation:nvDiceShake .28s infinite}
+.nv-dice-done .nv-dice{animation:nvDicePop .45s ease 1;border-color:var(--gold-light);box-shadow:0 0 24px rgba(232,212,139,0.55),inset 0 0 18px rgba(201,168,76,0.35)}
+@keyframes nvDiceShake{0%,100%{transform:rotate(-4deg) scale(1)}50%{transform:rotate(4deg) scale(1.04)}}
+@keyframes nvDicePop{0%{transform:scale(1)}55%{transform:scale(1.16)}100%{transform:scale(1)}}
+.nv-dice-name{font-size:18px;font-weight:700;color:var(--text-bright);min-height:26px}
+.nv-dice-sub{margin-top:6px;font-size:11px;color:var(--text-dim)}

@@ -1272,6 +1272,8 @@ function setAllTimerSeconds(sec) {
 /* ==================== GAME START ==================== */
 function startGame() {
   ensureAudioContext();
+  // v175：在用户点击手势链内解锁语音合成（iOS 首次播报必须由手势触发）
+  try { nvUnlockSpeech(); } catch (e) {}
   if (!MISSION_COUNTS[state.playerCount]) { toast('请选择玩家人数', 'warn'); return; }
   if (state.activeRoles.length === 0) { toast('请至少选择一个本局角色', 'warn'); return; }
   for (var i = 0; i < state.playerCount; i++) {
@@ -1338,6 +1340,8 @@ function doStartGame() {
   var msg = '游戏开始！共 ' + state.playerCount + ' 名玩家，5 轮任务';
   if (state.myRole) msg += '（你的身份：' + state.myRole + '）';
   toast(msg);
+  // v175：开局流程 —— 先摇骰子随机选出第一轮队长，随后自动进入夜间身份语音播报
+  try { startNightOpeningSequence(); } catch (e) { console.warn('夜间播报启动失败', e); }
 }
 
 /* ==================== GAME RENDER ==================== */
@@ -9845,5 +9849,616 @@ function pad2(n) {
   return n < 10 ? '0' + n : '' + n;
 }
 
+/* ==================== v175: 夜间动态身份语音播报（Web Speech API） ==================== */
+/* 说明：不打包任何音频，全部由浏览器 window.speechSynthesis 实时朗读；
+   播报台词按本场实际角色池（state.activeRoles / state.playerRoles / state.myRole）动态拼装，
+   角色不存在则整段跳过。变量与函数统一使用 NV / nv 前缀，避免与既有 speech* 发言阶段逻辑冲突。 */
 
+var NV_EVIL_OPEN = ['莫甘娜', '刺客', '莫德雷德', '爪牙'];     // 睁眼互认的坏人
+var NV_EVIL_THUMB = ['莫甘娜', '刺客', '爪牙', '奥伯伦', '兰斯洛特(红)']; // 给梅林竖拇指（= 坏人 - 莫德雷德）
+var NV_GAP_MIN = 0;
+var NV_GAP_MAX = 8;
+var NV_GAP_DEFAULT = 3;
 
+var NV = {
+  lines: [],
+  idx: -1,
+  playing: false,
+  paused: false,
+  finished: false,
+  gap: NV_GAP_DEFAULT,
+  timer: null,
+  utter: null,
+  seq: 0,
+  supported: false,
+  open: false
+};
+
+(function nvInitEnv() {
+  try {
+    NV.supported = !!(window && window.speechSynthesis && window.SpeechSynthesisUtterance);
+  } catch (e) {
+    NV.supported = false;
+  }
+  try {
+    var g = parseFloat(localStorage.getItem('avalon_voice_gap'));
+    if (!isNaN(g) && g >= NV_GAP_MIN && g <= NV_GAP_MAX) NV.gap = g;
+  } catch (e) {}
+  // 语音列表在部分浏览器是异步加载的，提前预热一次
+  if (NV.supported) {
+    try {
+      window.speechSynthesis.getVoices();
+      if (typeof window.speechSynthesis.addEventListener === 'function') {
+        window.speechSynthesis.addEventListener('voiceschanged', function () {});
+      }
+    } catch (e) {}
+  }
+})();
+
+/* ---------- iOS / 移动端首次手势解锁 ---------- */
+function nvUnlockSpeech() {
+  if (!NV.supported) return;
+  try {
+    var u = new SpeechSynthesisUtterance(' ');
+    u.lang = 'zh-CN';
+    u.volume = 0;
+    u.rate = 1;
+    window.speechSynthesis.speak(u);
+    setTimeout(function () {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+    }, 220);
+  } catch (e) {}
+}
+
+/* ---------- 语音选择 ---------- */
+function nvPickVoice() {
+  if (!NV.supported) return null;
+  var vs = [];
+  try { vs = window.speechSynthesis.getVoices() || []; } catch (e) { vs = []; }
+  if (!vs.length) return null;
+  var i, v, best = null, zh = null;
+  for (i = 0; i < vs.length; i++) {
+    v = vs[i];
+    if (!v || !v.lang) continue;
+    if (/^zh/i.test(v.lang)) {
+      if (zh === null) zh = v;
+      if (/^zh[-_]CN/i.test(v.lang)) {
+        if (!best) best = v;
+        if (/Tingting|Xiaoxiao|Yaoyao|Huihui|Mandarin|China/i.test(v.name || '')) best = v;
+      }
+    }
+  }
+  return best || zh || null;
+}
+
+/* ---------- 本场角色集合 ---------- */
+function nvRoleSet() {
+  var set = {};
+  function add(r) {
+    if (!r || typeof r !== 'string') return;
+    if (r === '不明' || r === '正方' || r === '反方') return;
+    if (ALL_ROLES.indexOf(r) === -1) return;
+    set[r] = true;
+  }
+  var i;
+  var ar = state.activeRoles || [];
+  for (i = 0; i < ar.length; i++) add(ar[i]);
+  var pr = state.playerRoles || [];
+  for (i = 0; i < pr.length; i++) add(pr[i]);
+  add(state.myRole);
+  return set;
+}
+
+/* ---------- 台词动态拼装 ---------- */
+function buildNightVoiceLines() {
+  var R = nvRoleSet();
+  function has(r) { return !!R[r]; }
+  function pick(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) if (has(list[i])) out.push(list[i]);
+    return out;
+  }
+  var lines = [];
+  function push(step, text) { lines.push({ step: step, text: text }); }
+
+  // 1) 天黑请闭眼
+  push('天黑请闭眼', '天黑请闭眼，请所有玩家闭上眼睛。');
+
+  var openEvil = pick(NV_EVIL_OPEN);
+  var hasOberon = has('奥伯伦');
+  var hasRedLancelot = has('兰斯洛特(红)');
+
+  // 2) 坏人请睁眼（仅互相认识的坏人）
+  if (openEvil.length) {
+    push('坏人请睁眼', '坏人请睁眼。本局坏人是：' + openEvil.join('、') + '，请互相确认你们的同伴。');
+    push('坏人请闭眼', '坏人请闭眼。');
+  }
+
+  // 3) 不睁眼、只竖大拇指的坏人
+  if (hasOberon) {
+    push('奥伯伦竖拇指', '奥伯伦不要睁眼，请竖起大拇指。');
+  }
+  if (hasRedLancelot) {
+    push('红色兰斯洛特竖拇指', '红色兰斯洛特不要睁眼，请竖起大拇指。');
+  }
+
+  // 4) 梅林请睁眼（竖拇指名单 = 本场所有坏人 - 莫德雷德，不点名莫德雷德）
+  if (has('梅林')) {
+    var thumbs = pick(NV_EVIL_THUMB);
+    var melinText;
+    if (thumbs.length) {
+      melinText = '梅林请睁眼。竖起大拇指的玩家中，包括' + thumbs.join('、') + '。';
+    } else {
+      melinText = '梅林请睁眼。';
+    }
+    push('梅林请睁眼', melinText);
+    push('梅林请闭眼', '梅林请闭眼，所有人请放下大拇指。');
+  }
+
+  // 5) 派西维尔请睁眼（无派西维尔整段跳过）
+  if (has('派西维尔')) {
+    var perText = has('莫甘娜')
+      ? '派西维尔请睁眼。梅林和莫甘娜竖起了大拇指。'
+      : '派西维尔请睁眼。梅林竖起了大拇指。';
+    push('派西维尔请睁眼', perText);
+    push('派西维尔请闭眼', '派西维尔请闭眼。');
+  }
+
+  // 6) 天亮请睁眼
+  var leader = null;
+  if (state.missions && state.missions.length) leader = state.missions[0].leader;
+  var counts = MISSION_COUNTS[state.playerCount];
+  var firstSize = counts ? counts[0] : 2;
+  var dawn = '天亮请睁眼。';
+  if (leader !== null && leader !== undefined && state.playerNames && state.playerNames[leader]) {
+    dawn += '本局第一轮队长是' + playerLabel(leader) + '，';
+  }
+  dawn += '请开始第一轮组队，需要' + firstSize + '人出任务。游戏开始。';
+  push('天亮请睁眼', dawn);
+
+  return lines;
+}
+
+/* ---------- 台词文案清单（供外部查看，不改状态） ---------- */
+function getNightVoiceLineTexts() {
+  var ls = buildNightVoiceLines();
+  var out = [];
+  for (var i = 0; i < ls.length; i++) out.push({ step: ls[i].step, text: ls[i].text });
+  return out;
+}
+
+/* ---------- 面板渲染 ---------- */
+function nvRenderPanel() {
+  var old = document.getElementById('nv-overlay');
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+
+  var ov = document.createElement('div');
+  ov.className = 'nv-overlay';
+  ov.id = 'nv-overlay';
+
+  var listHTML = '';
+  for (var i = 0; i < NV.lines.length; i++) {
+    listHTML += '<div class="nv-line" id="nv-line-' + i + '" onclick="nvJump(' + i + ')">'
+      + '<span class="nv-line-step">' + (i + 1) + '. ' + escAttr(NV.lines[i].step) + '</span>'
+      + '<span class="nv-line-text">' + escAttr(NV.lines[i].text) + '</span>'
+      + '</div>';
+  }
+
+  var myRoleHTML = '';
+  if (state.myRole && state.myRole !== '不明') {
+    myRoleHTML = '<span class="nv-badge">我的身份：' + escAttr(state.myRole) + '</span>';
+  }
+
+  ov.innerHTML =
+    '<div class="nv-panel">'
+    + '<div class="nv-head">'
+    +   '<div class="nv-title">🌙 夜间行动语音播报</div>'
+    +   '<button class="nv-close" onclick="nvClose()" aria-label="关闭">✕</button>'
+    + '</div>'
+    + '<div class="nv-stage">'
+    +   '<div class="nv-step-name" id="nv-step-name">准备开始</div>'
+    +   '<div class="nv-caption" id="nv-caption">点击「开始播报」开始夜间流程</div>'
+    +   myRoleHTML
+    + '</div>'
+    + '<div class="nv-list" id="nv-list">' + listHTML + '</div>'
+    + '<div class="nv-ctrl">'
+    +   '<button class="btn small primary" id="nv-btn-play" onclick="nvTogglePlay()">开始播报</button>'
+    +   '<button class="btn small" onclick="nvReplay()">重播</button>'
+    +   '<button class="btn small" onclick="nvNext()">下一句</button>'
+    +   '<button class="btn small" onclick="nvSkip()">跳过</button>'
+    + '</div>'
+    + '<div class="nv-setting">'
+    +   '<span class="nv-setting-label">句间停顿</span>'
+    +   '<input type="range" id="nv-gap" min="' + NV_GAP_MIN + '" max="' + NV_GAP_MAX + '" step="1" value="' + NV.gap + '" oninput="nvSetGap(this.value)">'
+    +   '<span class="nv-gap-val" id="nv-gap-val">' + NV.gap + ' 秒</span>'
+    + '</div>'
+    + '<div class="nv-tip" id="nv-tip">' + (NV.supported
+        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转。'
+        : '当前浏览器不支持语音合成（speechSynthesis），已降级为纯文字播报，可手动逐句推进。') + '</div>'
+    + '</div>';
+
+  document.body.appendChild(ov);
+  NV.open = true;
+  nvUpdateHighlight(NV.idx);
+  nvRefreshPlayBtn();
+}
+
+function nvRefreshPlayBtn() {
+  var btn = document.getElementById('nv-btn-play');
+  if (!btn) return;
+  if (NV.finished) btn.textContent = '重新播报';
+  else if (NV.paused) btn.textContent = '继续播报';
+  else if (NV.playing) btn.textContent = '暂停';
+  else btn.textContent = '开始播报';
+}
+
+function nvUpdateHighlight(i) {
+  var list = document.getElementById('nv-list');
+  if (list) {
+    var nodes = list.querySelectorAll('.nv-line');
+    for (var k = 0; k < nodes.length; k++) {
+      nodes[k].classList.remove('active', 'done');
+      if (k < i) nodes[k].classList.add('done');
+      if (k === i) nodes[k].classList.add('active');
+    }
+    if (i >= 0 && nodes[i] && nodes[i].scrollIntoView) {
+      try { nodes[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    }
+  }
+  var sn = document.getElementById('nv-step-name');
+  var cap = document.getElementById('nv-caption');
+  if (i >= 0 && NV.lines[i]) {
+    if (sn) sn.textContent = '第 ' + (i + 1) + ' 句 · ' + NV.lines[i].step;
+    if (cap) cap.textContent = NV.lines[i].text;
+  } else {
+    if (sn) sn.textContent = '准备开始';
+    if (cap) cap.textContent = '点击「开始播报」开始夜间流程';
+  }
+}
+
+/* ---------- 播放控制 ---------- */
+function nvClearTimer() {
+  if (NV.timer) {
+    clearTimeout(NV.timer);
+    NV.timer = null;
+  }
+}
+
+function nvStopSpeech() {
+  if (!NV.supported) return;
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+}
+
+// 语音不可用（无 TTS 引擎 / 触发 error）时，按文本长度模拟正常语速推进字幕
+function nvSimMs(text) {
+  var len = (text || '').length;
+  return Math.max(1800, Math.min(9000, len * 190));
+}
+
+function nvSimAdvance(mySeq, text) {
+  nvClearTimer();
+  NV.timer = setTimeout(function () {
+    if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
+    nvScheduleNext();
+  }, nvSimMs(text));
+}
+
+function nvMarkUnsupported() {
+  NV.supported = false;
+  var tip = document.getElementById('nv-tip');
+  if (tip) {
+    tip.textContent = '当前浏览器语音合成不可用，已切换为文字节奏播报（字幕自动推进，也可手动逐句）。';
+  }
+}
+
+function nvSpeakAt(i) {
+  nvClearTimer();
+  if (!NV.open) return;
+  if (i < 0) i = 0;
+  if (i >= NV.lines.length) { nvFinish(); return; }
+  NV.idx = i;
+  NV.finished = false;
+  NV._speakStart = 0;
+  NV._started = false;
+  var line = NV.lines[i];
+  nvUpdateHighlight(i);
+  var mySeq = ++NV.seq;
+
+  // 不支持语音：按文本长度模拟节奏，只做字幕推进
+  if (!NV.supported) {
+    nvSimAdvance(mySeq, line.text);
+    return;
+  }
+
+  var u;
+  try {
+    u = new SpeechSynthesisUtterance(line.text);
+  } catch (e) {
+    nvSimAdvance(mySeq, line.text);
+    return;
+  }
+  u.lang = 'zh-CN';
+  u.rate = 1;
+  u.pitch = 1;
+  u.volume = 1;
+  var v = nvPickVoice();
+  if (v) u.voice = v;
+  u.onstart = function () {
+    NV._started = true;
+  };
+  u.onend = function () {
+    if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
+    nvScheduleNext();
+  };
+  u.onerror = function () {
+    if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
+    NV._errCount = (NV._errCount || 0) + 1;
+    if (NV._errCount >= 2) nvMarkUnsupported();
+    nvSimAdvance(mySeq, line.text);
+  };
+  NV.utter = u;
+  NV.playing = true;
+  nvRefreshPlayBtn();
+
+  var needDelay = false;
+  try {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+      needDelay = true;
+    }
+  } catch (e) {}
+
+  var doSpeak = function () {
+    if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
+    try {
+      window.speechSynthesis.speak(u);
+    } catch (e) {
+      NV._errCount = (NV._errCount || 0) + 1;
+      if (NV._errCount >= 2) nvMarkUnsupported();
+      nvSimAdvance(mySeq, line.text);
+    }
+  };
+  if (needDelay) setTimeout(doSpeak, 90);
+  else doSpeak();
+
+  // 兜底：个别环境 onend 不触发，检测 speaking 状态后强行推进
+  var watchdog = function () {
+    if (mySeq !== NV.seq) return;
+    if (!NV.playing || NV.paused) { NV.timer = setTimeout(watchdog, 800); return; }
+    var speaking = false;
+    try { speaking = window.speechSynthesis.speaking || window.speechSynthesis.pending; } catch (e) {}
+    if (speaking) {
+      // 从未收到 onstart 且长时间 speaking 卡 true（典型无 TTS 引擎环境）→ 强制复位并走文字节奏
+      var stuckMs = Date.now() - (NV._speakStart || Date.now());
+      if (!NV._started && stuckMs > 6000) {
+        try { window.speechSynthesis.cancel(); } catch (e2) {}
+        NV._errCount = (NV._errCount || 0) + 1;
+        if (NV._errCount >= 2) nvMarkUnsupported();
+        nvSimAdvance(mySeq, line.text);
+        return;
+      }
+      NV.timer = setTimeout(watchdog, 700);
+      return;
+    }
+    NV._speakStart = 0;
+    nvScheduleNext();
+  };
+  NV._speakStart = Date.now();
+  NV.timer = setTimeout(watchdog, Math.max(3500, line.text.length * 260));
+}
+
+function nvScheduleNext() {
+  nvClearTimer();
+  if (!NV.open || !NV.playing || NV.paused) return;
+  var gapMs = Math.round(NV.gap * 1000);
+  if (gapMs <= 0) { nvSpeakAt(NV.idx + 1); return; }
+  NV.timer = setTimeout(function () {
+    if (!NV.open || !NV.playing || NV.paused) return;
+    nvSpeakAt(NV.idx + 1);
+  }, gapMs);
+}
+
+function nvFinish() {
+  NV.playing = false;
+  NV.paused = false;
+  NV.finished = true;
+  nvClearTimer();
+  nvRefreshPlayBtn();
+  var sn = document.getElementById('nv-step-name');
+  var cap = document.getElementById('nv-caption');
+  if (sn) sn.textContent = '播报结束';
+  if (cap) cap.textContent = '夜间流程播报完毕，请开始第一轮组队。';
+}
+
+function nvTogglePlay() {
+  if (!NV.open) { openNightVoice(false); return; }
+  nvUnlockSpeech();
+  if (NV.finished) { nvStartFrom(0); return; }
+  if (NV.playing && !NV.paused) { nvPause(); return; }
+  if (NV.paused) { nvResume(); return; }
+  nvStartFrom(NV.idx >= 0 ? NV.idx : 0);
+}
+
+function nvStartFrom(i) {
+  NV.lines = buildNightVoiceLines();
+  if (!NV.lines.length) { toast('本场没有可播报的夜间流程', 'warn'); return; }
+  NV.playing = true;
+  NV.paused = false;
+  NV.finished = false;
+  NV.seq++;
+  nvRefreshPlayBtn();
+  nvSpeakAt(i || 0);
+}
+
+function nvPause() {
+  NV.paused = true;
+  NV.seq++;
+  nvClearTimer();
+  nvStopSpeech();
+  nvRefreshPlayBtn();
+  var sn = document.getElementById('nv-step-name');
+  if (sn && NV.idx >= 0) sn.textContent = '已暂停 · 第 ' + (NV.idx + 1) + ' 句';
+}
+
+function nvResume() {
+  NV.paused = false;
+  NV.playing = true;
+  nvUnlockSpeech();
+  nvRefreshPlayBtn();
+  var at = NV.idx >= 0 ? NV.idx : 0;
+  NV.seq++;
+  nvSpeakAt(at);
+}
+
+function nvReplay() {
+  if (!NV.open) return;
+  nvUnlockSpeech();
+  NV.seq++;
+  nvClearTimer();
+  nvStopSpeech();
+  NV.idx = -1;
+  NV.paused = false;
+  NV.finished = false;
+  NV.playing = true;
+  nvRefreshPlayBtn();
+  nvSpeakAt(0);
+}
+
+function nvNext() {
+  if (!NV.open) return;
+  if (!NV.playing && !NV.paused && !NV.finished && NV.idx < 0) { nvStartFrom(0); return; }
+  NV.paused = false;
+  NV.playing = true;
+  NV.finished = false;
+  nvUnlockSpeech();
+  NV.seq++;
+  nvClearTimer();
+  nvStopSpeech();
+  nvSpeakAt(NV.idx + 1);
+}
+
+function nvJump(i) {
+  if (!NV.open) return;
+  if (!NV.lines[i]) return;
+  NV.paused = false;
+  NV.playing = true;
+  NV.finished = false;
+  nvUnlockSpeech();
+  NV.seq++;
+  nvClearTimer();
+  nvStopSpeech();
+  nvSpeakAt(i);
+}
+
+function nvSkip() {
+  NV.playing = false;
+  NV.paused = false;
+  NV.seq++;
+  nvClearTimer();
+  nvStopSpeech();
+  nvClose();
+  toast('已跳过夜间语音播报，可随时点「夜间播报」重新打开');
+}
+
+function nvSetGap(v) {
+  var g = parseInt(v, 10);
+  if (isNaN(g)) g = NV_GAP_DEFAULT;
+  if (g < NV_GAP_MIN) g = NV_GAP_MIN;
+  if (g > NV_GAP_MAX) g = NV_GAP_MAX;
+  NV.gap = g;
+  var lab = document.getElementById('nv-gap-val');
+  if (lab) lab.textContent = g + ' 秒';
+  try { localStorage.setItem('avalon_voice_gap', String(g)); } catch (e) {}
+}
+
+function nvClose() {
+  NV.seq++;
+  nvClearTimer();
+  nvStopSpeech();
+  NV.playing = false;
+  NV.paused = false;
+  NV.open = false;
+  var ov = document.getElementById('nv-overlay');
+  if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+}
+
+/* ---------- 打开夜间播报 ---------- */
+function openNightVoice(autoStart) {
+  if (!state.missions || !state.missions.length) {
+    toast('请先开始游戏', 'warn');
+    return;
+  }
+  NV.lines = buildNightVoiceLines();
+  NV.idx = -1;
+  NV.playing = false;
+  NV.paused = false;
+  NV.finished = false;
+  NV._errCount = 0;
+  nvRenderPanel();
+  if (!NV.supported) {
+    // 降级为纯文字：不报错，仍可手动逐句推进
+    NV.playing = false;
+    nvRefreshPlayBtn();
+    return;
+  }
+  if (autoStart) {
+    // 自动流程（骰子动画之后）稍作延迟再开口
+    NV.timer = setTimeout(function () {
+      if (!NV.open) return;
+      nvStartFrom(0);
+    }, 420);
+  }
+}
+
+/* ---------- 骰子随机选队长动画 ---------- */
+function playLeaderDiceRoll(cb) {
+  var pc = state.playerCount;
+  var target = Math.floor(Math.random() * pc);
+  var old = document.getElementById('nv-dice-overlay');
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+
+  var ov = document.createElement('div');
+  ov.className = 'nv-dice-overlay';
+  ov.id = 'nv-dice-overlay';
+  ov.innerHTML =
+    '<div class="nv-dice-panel">'
+    + '<div class="nv-dice-title">🎲 随机决定首发队长</div>'
+    + '<div class="nv-dice" id="nv-dice-face">?</div>'
+    + '<div class="nv-dice-name" id="nv-dice-name">摇骰子中…</div>'
+    + '<div class="nv-dice-sub">结果将直接作为第 1 轮队长</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+
+  var face = document.getElementById('nv-dice-face');
+  var nameEl = document.getElementById('nv-dice-name');
+  var ticks = 0;
+  var total = 16;
+  var iv = setInterval(function () {
+    ticks++;
+    var n = 1 + Math.floor(Math.random() * pc);
+    if (face) face.textContent = String(n);
+    if (nameEl) nameEl.textContent = (state.playerNames[n - 1] || ('玩家' + n));
+    if (ticks >= total) {
+      clearInterval(iv);
+      if (face) face.textContent = String(target + 1);
+      if (nameEl) nameEl.textContent = playerLabel(target);
+      if (ov) ov.classList.add('nv-dice-done');
+      setTimeout(function () {
+        if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+        if (typeof cb === 'function') cb(target);
+      }, 1150);
+    }
+  }, 95);
+}
+
+/* ---------- 开局序列：骰子选队长 → 夜间播报 ---------- */
+function startNightOpeningSequence() {
+  if (!state.missions || !state.missions.length) return;
+  var m0 = state.missions[0];
+  playLeaderDiceRoll(function (idx) {
+    if (state.missions[0] && state.missions[0].leader === null) {
+      selectLeader(idx);
+    }
+    setTimeout(function () { openNightVoice(true); }, 280);
+  });
+}
