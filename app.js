@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v188';
+var SW_VERSION = 'v189';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -1871,7 +1871,7 @@ function generateLiveScreenshot() {
       if (!m.result) roundLabel += ' · 进行中';
       dt(roundLabel, cx, qy + 10, 13, TXT_SEC, 'left');
       if (m.result) {
-        var tagText = isShielded ? ('✓ 成功（含' + m.shieldedFails + '张失败票）') : isPureSuc ? '✓ 成功（全票通过）' : isSuc ? '✓ 成功' : '✗ 失败';
+        var tagText = isShielded ? ('✓ 成功（含' + m.shieldedFails + '张失败票）') : isPureSuc ? '✓ 成功（全票通过）' : isSuc ? '✓ 成功' : ('✗ ' + missionFailLabel(m));
         var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
         ctx.fillStyle = isSuc ? 'rgba(30,142,62,0.14)' : 'rgba(211,47,47,0.14)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
         dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');
@@ -1922,7 +1922,7 @@ function generateLiveScreenshot() {
       }
       if (m.result) {
         if (m.result === 'fail') {
-          var fs = '任务结果：✗ 失败'; if (m.failCount) fs += '（' + m.failCount + '张失败卡）';
+          var fs = '任务结果：✗ ' + missionFailLabel(m);
           dt(fs, cx, ay, 12, RED, 'left');
         } else if (isShielded) {
           dt('任务结果：✓ 成功（含' + m.shieldedFails + '张失败票，保护轮抵消）', cx, ay, 12, '#e65100', 'left');
@@ -2194,8 +2194,7 @@ function renderStepPanel() {
     } else if (m.result === 'success') {
       h += '任务成功';
     } else {
-      h += '任务失败';
-      if (m.failCount) h += '（' + m.failCount + '张失败票）';
+      h += '任务' + missionFailLabel(m);
     }
     h += '</div>';
     if (state.winner) {
@@ -3661,7 +3660,7 @@ function buildReviewHTML() {
 
     h += '<div class="review-card">';
     h += '<div class="rc-header" onclick="toggleReviewCard(this)">';
-    h += '<span class="rc-title">第' + (r + 1) + '轮 · ' + (m.result ? (m.result === 'success' ? '任务成功' : '任务失败') : '进行中') + '</span>';
+    h += '<span class="rc-title">第' + (r + 1) + '轮 · ' + (m.result ? (m.result === 'success' ? '任务成功' : '任务' + missionFailLabel(m)) : '进行中') + '</span>';
     h += '<span class="rc-toggle">&#9654;</span>';
     h += '</div>';
     h += '<div class="rc-body">';
@@ -3715,8 +3714,7 @@ function buildReviewHTML() {
       } else if (m.result === 'success') {
         h += '成功';
       } else {
-        h += '失败';
-        if (m.failCount) h += '（' + m.failCount + '张失败票）';
+        h += missionFailLabel(m);
       }
       h += '</span></div>';
     }
@@ -4372,7 +4370,19 @@ function renderEnd() {
 
   var sc = state.missions.filter(function(m) { return m.result === 'success'; }).length;
   var fc = state.missions.filter(function(m) { return m.result === 'fail'; }).length;
-  $('end-round-summary').textContent = sc + '轮成功 / ' + fc + '轮失败';
+  // v189：结束页复盘摘要补充失败票总数（缺失时标注未记录轮数）
+  var failTickets = 0, unrecRounds = 0;
+  for (var fr = 0; fr < state.missions.length; fr++) {
+    var frm = state.missions[fr];
+    if (!frm || frm.result !== 'fail') continue;
+    if (failTicketText(frm) === '票数未记录') unrecRounds++;
+    else failTickets += (parseInt(frm.failCount, 10) || 0);
+  }
+  var endSumText = sc + '轮成功 / ' + fc + '轮失败';
+  if (fc > 0) {
+    endSumText += '（失败票共 ' + failTickets + ' 张' + (unrecRounds > 0 ? '，' + unrecRounds + ' 轮票数未记录' : '') + '）';
+  }
+  $('end-round-summary').textContent = endSumText;
 
   renderEndIdentityDropdowns();
   // 强制结束按钮：始终隐藏（v104：单机模式下不需要）
@@ -4963,6 +4973,7 @@ function renderStats() {
     h += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + oneLiner + '</span>';
 
     h += '</div></div>';
+    h += missionChipsHTML(rec);
     h += '</div>';
   }
   cl.innerHTML = h;
@@ -5495,7 +5506,7 @@ function renderPlayerProfile() {
     ph += '<div class="hci-right">';
     ph += '<span class="hci-result" style="color:' + (gRec && gRec.winner === 'good' ? 'var(--green-bright)' : 'var(--red-bright)') + '">' + gWinner + '</span>';
     ph += '<span style="font-size:11px;color:var(--text-dim);margin:0 6px">' + (gw ? '&#9989;' : '&#10060;') + '</span>';
-    ph += '</div></div></div>';
+    ph += '</div></div>' + missionChipsHTML(gRec) + '</div>';
   }
   ph += '</div></div>';
 
@@ -5506,6 +5517,44 @@ function renderPlayerProfile() {
 function switchProfileTab(tab) {
   state._profileRoleTab = tab;
   renderPlayerProfile();
+}
+
+/* ==================== v189：历史对局「任务失败票数」统一表述 ==================== */
+// 失败票数：有记录返回「×N」，缺失或 0（旧记录兜底值）返回「票数未记录」
+function failTicketText(m) {
+  if (!m) return '票数未记录';
+  var n = m.failCount;
+  if (n === null || n === undefined || n === '') return '票数未记录';
+  n = parseInt(n, 10);
+  if (isNaN(n) || n <= 0) return '票数未记录';
+  return '×' + n;
+}
+
+// 单轮任务失败描述，例「失败 ×2」/「失败（票数未记录）」
+function missionFailLabel(m) {
+  var t = failTicketText(m);
+  return (t === '票数未记录') ? '失败（票数未记录）' : '失败 ' + t;
+}
+
+// 对局列表逐轮任务筹码条（按轮次顺序，成功轮只写「成功」，不标失败数）
+function missionChipsHTML(rec) {
+  if (!rec || !rec.missions || !rec.missions.length) return '';
+  var parts = [];
+  for (var i = 0; i < rec.missions.length; i++) {
+    var m = rec.missions[i];
+    if (!m || !m.result) continue;
+    var cls, txt;
+    if (m.result === 'success') {
+      cls = 'ok';
+      txt = '成功';
+    } else {
+      cls = (failTicketText(m) === '票数未记录') ? 'na' : 'fail';
+      txt = missionFailLabel(m);
+    }
+    parts.push('<span class="ms-chip ' + cls + '">第' + (i + 1) + '轮 · ' + txt + '</span>');
+  }
+  if (!parts.length) return '';
+  return '<div class="ms-chips">' + parts.join('') + '</div>';
 }
 
 /* ==================== v187：参赛记录钻取（统计概览格 / 今日胜率卡 / 身份条目） ==================== */
@@ -5520,6 +5569,7 @@ function recItemHTML(idx, rec, badgeText, badgeCls, extraMeta) {
   h += '<span class="rec-item-meta">' + escAttr(meta) + '</span></div>';
   h += '<span class="rec-item-badge ' + (badgeCls || '') + '">' + escAttr(badgeText || '') + '</span>';
   h += '<span class="rec-item-arrow">&#8250;</span>';
+  h += missionChipsHTML(rec);
   h += '</div>';
   return h;
 }
@@ -5781,7 +5831,7 @@ function showGameDetail(idx) {
           var isLastAttempt = (la === m.launchAttempts.length - 1);
           var isSucceeded = isLastAttempt && m.result === 'success';
           var isFailed = isLastAttempt && m.result === 'fail';
-          var label = isSucceeded ? '组队成功，任务执行成功' : (isFailed ? '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '') : '组队未通过');
+          var label = isSucceeded ? '组队成功，任务执行成功' : (isFailed ? '组队成功，任务执行' + missionFailLabel(m) : '组队未通过');
           var bg = isSucceeded ? 'rgba(153,255,153,0.06)' : 'rgba(255,153,153,0.06)';
           var borderColor = isSucceeded ? 'rgba(153,255,153,0.25)' : 'rgba(255,153,153,0.25)';
           var labelColor = isSucceeded ? 'var(--green-bright)' : 'var(--red-bright)';
@@ -5856,7 +5906,7 @@ function showGameDetail(idx) {
         var color2 = isSuccess ? 'var(--green-bright)' : 'var(--red-bright)';
         h += '<div style="margin-bottom:3px;padding:6px 10px;background:' + bg2 + ';border:1px solid ' + border2 + ';border-radius:var(--radius-sm);font-size:14px">';
         h += '<span style="font-weight:700">第' + (i + 1) + '轮</span> ';
-        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行失败' + (m.failCount ? '（' + m.failCount + '张失败票）' : '')) + '</span>';
+        h += '<span style="font-weight:700;color:' + color2 + '">' + (isSuccess ? '组队成功，任务执行成功' : '组队成功，任务执行' + missionFailLabel(m)) + '</span>';
         h += ' | 队长 ' + evilSpan(nameByIndex[m.leader] || m.leader) + ' | 队伍 ' + m.team.map(function(idx) { return evilSpan(nameByIndex[idx] || idx); }).join('、');
         // Vote details for legacy data
         if (m.votes && (lgc + lbc > 0)) {
@@ -6912,9 +6962,8 @@ function buildReplayTimeline() {
       h += '<div class="replay-event-body">';
       h += '<p>队伍：' + (m.team || []).map(function(i) { return playerLabel(i); }).join('、') + '</p>';
       var resultColor = m.result === 'success' ? 'var(--green-bright)' : 'var(--red-bright)';
-      var resultText = m.result === 'success' ? '成功' : '失败';
+      var resultText = m.result === 'success' ? '成功' : missionFailLabel(m);
       h += '<p>结果：<strong style="color:' + resultColor + '">' + resultText + '</strong>';
-      if (m.result === 'fail' && m.failCount) h += '（' + m.failCount + '张失败票）';
       if (m.result === 'success' && m.shieldedFails) h += '（含' + m.shieldedFails + '张失败票）';
       if (m.result === 'success' && !m.shieldedFails && !m.failCount) h += '（全票通过）';
       h += '</p>';
@@ -7302,7 +7351,7 @@ function openHistoryModal(idx) {
         } else if (m.result === 'success') {
           h += ' <span style="color:var(--green-bright)">&#10003; 成功</span>';
         } else {
-          h += ' <span style="color:var(--red-bright)">&#10007; 失败</span>';
+          h += ' <span style="color:var(--red-bright)">&#10007; ' + missionFailLabel(m) + '</span>';
         }
       }
       h += '</div>';
@@ -7788,7 +7837,7 @@ function generateGameScreenshot(idx) {
       ctx.fillStyle = isSuc ? GOLD : RED; rr(PAD, qy + 10, 3, cardH - 20, 1.5); ctx.fill();
       if (isSuc) { ctx.strokeStyle = 'rgba(201,168,76,0.35)'; ctx.lineWidth = 1; rr(PAD, qy, contentW, cardH, 8); ctx.stroke(); }
       dt('\u4efb\u52a1 ' + (qi + 1) + ' \u00b7 ' + m.size + '\u4eba\u51fa\u6218', cx, qy + 10, 13, TXT_SEC, 'left');
-      var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : '\u2717 \u5931\u8d25';
+      var tagText = isShielded ? ('\u2713 \u6210\u529f\uff08\u542b' + m.shieldedFails + '\u5f20\u5931\u8d25\u7968\uff09') : isPureSuc ? '\u2713 \u6210\u529f\uff08\u5168\u7968\u901a\u8fc7\uff09' : isSuc ? '\u2713 \u6210\u529f' : ('\u2717 ' + missionFailLabel(m));
       var tagW = tw(tagText, 11) + 16, tagX = PAD + contentW - 16 - tagW;
       ctx.fillStyle = isSuc ? 'rgba(30,142,62,0.14)' : 'rgba(211,47,47,0.14)'; rr(tagX, qy + 9, tagW, 18, 9); ctx.fill();
       dt(tagText, PAD + contentW - 16 - tagW / 2, qy + 11, 11, isSuc ? GREEN_BRIGHT : RED, 'center');

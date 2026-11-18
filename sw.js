@@ -1,14 +1,14 @@
-/* ==================== Service Worker v188 ==================== */
-// v188 策略：
+/* ==================== Service Worker v189 ==================== */
+// v189 策略：
 //  - 导航请求(HTML)：network-first（1.2s 超时回落缓存），保证新版本立即生效且弱网可用
 //  - 其它同源静态资源：cache-first（有缓存直取，不再回源，最大程度省流量）
 //  - 跨域接口（Supabase REST / Realtime）：完全不接管，避免读到陈旧数据
-var CACHE_NAME = 'avalon-pwa-v188';
+var CACHE_NAME = 'avalon-pwa-v189';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v188',
-  './app-v188.js',
+  './style.css?v=v189',
+  './app-v189.js',
   './images/parchment-texture.webp',
   './manifest.json'
 ];

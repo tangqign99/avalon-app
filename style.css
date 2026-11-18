@@ -1309,3 +1309,13 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 .profile-role-row:hover{background:rgba(201,168,76,.1)}
 .profile-role-name{font-size:14px;color:var(--text-bright);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .profile-role-arrow{color:var(--gold);font-size:16px;flex-shrink:0}
+
+/* ==================== v189：历史对局逐轮任务失败票数 ==================== */
+.ms-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;min-width:0;max-width:100%}
+.ms-chip{display:inline-block;max-width:100%;padding:1px 8px;border-radius:10px;font-size:11px;line-height:18px;white-space:nowrap;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text-dim);box-sizing:border-box}
+.ms-chip.ok{color:var(--green-bright);border-color:rgba(74,201,74,.32);background:rgba(74,201,74,.08)}
+.ms-chip.fail{color:var(--red-bright);border-color:rgba(255,153,153,.38);background:rgba(255,153,153,.1);font-weight:700}
+.ms-chip.na{color:var(--text-dim);border-color:rgba(201,168,76,.22);background:rgba(255,255,255,.03)}
+.rec-item{flex-wrap:wrap}
+.rec-item .ms-chips{flex:0 0 100%;margin-top:2px}
+.history-compact-item>.ms-chips{padding:4px 12px 8px;margin-top:0}

@@ -18,15 +18,15 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v188">
+<link rel="stylesheet" href="./style.css?v=v189">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
 <link rel="dns-prefetch" href="//nzbpopxrxniixnhnqktw.supabase.co">
 
-<!-- v186：Supabase SDK 不再随首屏加载，由 app-v188.js 在首屏空闲后按需注入 -->
+<!-- v186：Supabase SDK 不再随首屏加载，由 app-v189.js 在首屏空闲后按需注入 -->
 
-<script defer src="./app-v188.js"></script>
+<script defer src="./app-v189.js"></script>
 
 </head>
 
@@ -192,7 +192,7 @@
 
   </div>
 
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v188</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v189</div>
 
 </section>
 
@@ -479,7 +479,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v188</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v189</div>
 
 
 
@@ -701,12 +701,12 @@
 
 <script>
 
-// PWA Service Worker 注册 - v188
+// PWA Service Worker 注册 - v189
 
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义（原实现会在注册成功时抛 ReferenceError）
-  var SW_VERSION = 'v188';
+  var SW_VERSION = 'v189';
 
   navigator.serviceWorker.getRegistrations().then(function(regs){
 
