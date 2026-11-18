@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v186';
+var SW_VERSION = 'v187';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -4868,26 +4868,29 @@ function renderStats() {
   var evilWins = history.filter(function(h) { return h.winner === 'evil'; }).length;
   var winRate = total > 0 ? Math.round(goodWins / total * 100) : 0;
 
-  var h = '<div class="stat-card"><div class="stat-value">' + total + '</div><div class="stat-label">总对局</div></div>';
-  h += '<div class="stat-card"><div class="stat-value" style="color:#99ff99">' + goodWins + '</div><div class="stat-label">好人胜场</div>';
+  // v187：战绩概览每格可单独点击，进入对应参赛记录
+  var h = '<div class="stat-card stat-card-tap" role="button" tabindex="0" onclick="openStatCellRecords(0)"><div class="stat-value">' + total + '</div><div class="stat-label">总对局</div></div>';
+  h += '<div class="stat-card stat-card-tap" role="button" tabindex="0" onclick="openStatCellRecords(1)"><div class="stat-value" style="color:#99ff99">' + goodWins + '</div><div class="stat-label">好人胜场</div>';
   h += '<div class="stat-sub">' + winRate + '%</div></div>';
-  h += '<div class="stat-card"><div class="stat-value" style="color:#ff9999">' + evilWins + '</div><div class="stat-label">反方胜场</div>';
+  h += '<div class="stat-card stat-card-tap" role="button" tabindex="0" onclick="openStatCellRecords(2)"><div class="stat-value" style="color:#ff9999">' + evilWins + '</div><div class="stat-label">反方胜场</div>';
   h += '<div class="stat-sub">' + (total > 0 ? Math.round(evilWins / total * 100) : 0) + '%</div></div>';
 
   // Merlin assassination rate: count all games except evil won by 3 mission failures
   var merlinGames = 0, merlinKilled = 0;
+  var merlinIdxs = [];   // v187：被刺对局索引，供概览格点击
   for (var i = 0; i < history.length; i++) {
     var rec = history[i];
     if (!rec.missions) continue;
     var failCount = rec.missions.filter(function(m) { return m.result === 'fail'; }).length;
     if (!(failCount >= 3 && rec.winner === 'evil')) {
       merlinGames++;
-      if (rec.assassinSuccess === true) merlinKilled++;
+      if (rec.assassinSuccess === true) { merlinKilled++; merlinIdxs.push(i); }
     }
   }
+  state._merlinKilledIdxs = merlinIdxs;
   if (merlinGames > 0) {
     var maRate = Math.round(merlinKilled / merlinGames * 100);
-    h += '<div class="stat-card"><div class="stat-value" style="color:#ff6666">' + maRate + '%</div><div class="stat-label">梅林被刺率</div>';
+    h += '<div class="stat-card stat-card-tap" role="button" tabindex="0" onclick="openStatCellRecords(3)"><div class="stat-value" style="color:#ff6666">' + maRate + '%</div><div class="stat-label">梅林被刺率</div>';
     h += '<div class="stat-sub" style="font-size:11px">' + merlinKilled + '次被刺 / ' + merlinGames + '局</div></div>';
   }
 
@@ -4945,8 +4948,9 @@ function renderStats() {
       oneLiner += '，刺' + rec.assassinTarget + (rec.assassinSuccess ? '命中' : '未中');
     }
 
-    h += '<div class="history-compact-item">';
-    h += '<div class="hci-header" onclick="openHistoryModal(' + i + ')">';
+    // v187：整条预览格可单独点击进入该局详细参赛记录
+    h += '<div class="history-compact-item hci-tap" role="button" tabindex="0" onclick="openHistoryModal(' + i + ')">';
+    h += '<div class="hci-header">';
     var timeStr = rec.startTime ? rec.startTime.slice(11, 16) : '';
     h += '<span class="hci-date">' + rec.date + (timeStr ? ' ' + timeStr : '') + '</span>';
     h += '<span class="hci-players">' + rec.playerCount + '人</span>';
@@ -5056,6 +5060,7 @@ function renderStats() {
     todayDates[todayDateStr] = true;
     todayDates[tomorrowDateStr] = true;
   }
+  state._todayDates = todayDates;   // v187：供今日胜率卡片点击筛选用
 
   // 按玩家汇总今日数据
   var todayPlayerSet = {};
@@ -5098,6 +5103,7 @@ function renderStats() {
   lb.sort(function(a, b) { return b.rate - a.rate || b.total - a.total; });
 
   var showAll = state._showAllLeaderboard || false;
+  state._todayLb = lb;   // v187：供今日胜率卡片点击查看参赛记录
   var maxShow = showAll ? lb.length : Math.min(10, lb.length);
   var lh = '';
   for (var r = 0; r < maxShow; r++) {
@@ -5106,7 +5112,7 @@ function renderStats() {
     if (r === 0) topClass = ' top1';
     else if (r === 1) topClass = ' top2';
     else if (r === 2) topClass = ' top3';
-    lh += '<div class="win-rate-card' + topClass + '">';
+    lh += '<div class="win-rate-card win-rate-tap' + topClass + '" role="button" tabindex="0" onclick="openTodayPlayerRecords(' + r + ')">';
     var rateColor = p.rate >= 0.6 ? '#4caf50' : p.rate >= 0.4 ? '#ff9800' : '#f44336';
     lh += '<span class="wc-rank">' + (r + 1) + '</span>';
     lh += '<span class="wc-name">' + p.name + '</span>';
@@ -5455,9 +5461,10 @@ function renderPlayerProfile() {
       var t = tabRoles[tr];
       var tRate = Math.round(t.wins / t.total * 100);
       var tColor = tRate >= 60 ? 'var(--green-bright)' : tRate >= 40 ? 'var(--gold-light)' : 'var(--red-bright)';
-      ph += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm)">';
-      ph += '<span>' + t.role + ' <span style="font-size:11px;color:var(--text-dim)">' + t.wins + '/' + t.total + '</span></span>';
-      ph += '<span style="font-weight:700;color:' + tColor + '">' + tRate + '%</span>';
+      // v187：每个身份条目可单独点击，进入该身份的参赛记录列表
+      ph += '<div class="profile-role-row" role="button" tabindex="0" data-role="' + escAttr(t.role) + '" data-faction="' + activeTab + '" onclick="profileOpenRoleGames(this)">';
+      ph += '<span class="profile-role-name">' + t.role + ' <span style="font-size:11px;color:var(--text-dim)">' + t.wins + '胜 ' + (t.total - t.wins) + '负 / ' + t.total + '场</span></span>';
+      ph += '<span style="display:flex;align-items:center;gap:6px"><span style="font-weight:700;color:' + tColor + '">' + tRate + '%</span><span class="profile-role-arrow">›</span></span>';
       ph += '</div>';
     }
   }
@@ -5480,8 +5487,8 @@ function renderPlayerProfile() {
     var gPlayerCount = gRec ? gRec.playerCount : '?';
     var gWinner = gRec ? (gRec.winner === 'good' ? '好人方' : '反方') : '?';
     var gRoleColor = gf === 'evil' ? 'var(--red-bright)' : gf === 'good' ? 'var(--green-bright)' : 'var(--gold-light)';
-    ph += '<div class="history-compact-item">';
-    ph += '<div class="hci-header" onclick="closeModal();openHistoryModal(' + gd.recIndex + ')">';
+    ph += '<div class="history-compact-item hci-tap" role="button" tabindex="0" onclick="openHistoryModal(' + gd.recIndex + ')">';
+    ph += '<div class="hci-header">';
     ph += '<span class="hci-date">' + gDate + '</span>';
     ph += '<span class="hci-players">' + gPlayerCount + '人</span>';
     ph += '<span style="font-size:12px;color:' + gRoleColor + ';font-weight:600;margin-left:6px">' + gd.role + '</span>';
@@ -5498,6 +5505,161 @@ function renderPlayerProfile() {
 
 function switchProfileTab(tab) {
   state._profileRoleTab = tab;
+  renderPlayerProfile();
+}
+
+/* ==================== v187：参赛记录钻取（统计概览格 / 今日胜率卡 / 身份条目） ==================== */
+// 单条参赛记录行：点击进入该局详细参赛记录
+function recItemHTML(idx, rec, badgeText, badgeCls, extraMeta) {
+  var dateStr = rec ? ((rec.date || '--') + (rec.startTime ? ' ' + rec.startTime.slice(11, 16) : '')) : '--';
+  var meta = rec ? ((rec.playerCount || '?') + '人') : '该局数据缺失';
+  if (rec && rec.winner) meta += ' · ' + (rec.winner === 'good' ? '好人方胜' : '反方胜');
+  if (extraMeta) meta += ' · ' + extraMeta;
+  var h = '<div class="rec-item" role="button" tabindex="0" onclick="openHistoryModal(' + (idx | 0) + ')">';
+  h += '<div class="rec-item-main"><span class="rec-item-date">' + escAttr(dateStr) + '</span>';
+  h += '<span class="rec-item-meta">' + escAttr(meta) + '</span></div>';
+  h += '<span class="rec-item-badge ' + (badgeCls || '') + '">' + escAttr(badgeText || '') + '</span>';
+  h += '<span class="rec-item-arrow">&#8250;</span>';
+  h += '</div>';
+  return h;
+}
+
+function openRecordListModal(cfg) {
+  cfg = cfg || {};
+  var rows = cfg.rows || [];
+  var h = '<h2 style="margin-bottom:6px">' + escAttr(cfg.title || '参赛记录') + '</h2>';
+  if (cfg.sub) h += '<div class="rec-list-sub">' + escAttr(cfg.sub) + '</div>';
+  if (cfg.summary) h += '<div class="rec-list-summary">' + cfg.summary + '</div>';
+  if (!rows.length) {
+    h += '<div class="rec-list-empty">' + escAttr(cfg.empty || '暂无参赛记录') + '</div>';
+  } else {
+    h += '<div class="rec-list">' + rows.join('') + '</div>';
+  }
+  h += '<div class="modal-actions"><button class="btn primary" onclick="closeModal()">关闭</button></div>';
+  showModal(h);
+}
+
+// 统计页「战绩概览」每个格子：0=总对局 1=好人胜场 2=反方胜场 3=梅林被刺
+function openStatCellRecords(n) {
+  n = parseInt(n, 10) || 0;
+  var history = loadNormalizedHistory() || [];
+  var merlinSet = {};
+  var killed = state._merlinKilledIdxs || [];
+  for (var mk = 0; mk < killed.length; mk++) merlinSet[killed[mk]] = true;
+
+  var titles = ['全部对局参赛记录', '好人方胜 · 参赛记录', '反方胜 · 参赛记录', '梅林被刺 · 参赛记录'];
+  var empties = ['暂无对局记录', '暂无好人方胜的对局', '暂无反方胜的对局', '暂无梅林被刺的对局'];
+  var rows = [];
+  var goodCnt = 0, evilCnt = 0;
+  for (var i = history.length - 1; i >= 0; i--) {
+    var rec = history[i];
+    if (!rec) continue;
+    var keep = true;
+    if (n === 1) keep = rec.winner === 'good';
+    else if (n === 2) keep = rec.winner === 'evil';
+    else if (n === 3) keep = !!merlinSet[i];
+    if (!keep) continue;
+    if (rec.winner === 'good') goodCnt++;
+    else if (rec.winner === 'evil') evilCnt++;
+    rows.push(recItemHTML(i, rec, rec.winner === 'good' ? '好人胜' : (rec.winner === 'evil' ? '反方胜' : '--'),
+      rec.winner === 'good' ? 'good' : 'evil', n === 3 ? '梅林被刺' : ''));
+  }
+  openRecordListModal({
+    title: titles[n] || '参赛记录',
+    sub: '点击任意一局查看该局详细参赛记录',
+    summary: '共 ' + rows.length + ' 局' + (rows.length ? '（好人胜 ' + goodCnt + ' / 反方胜 ' + evilCnt + '）' : ''),
+    empty: empties[n] || '暂无参赛记录',
+    rows: rows
+  });
+}
+
+// 统计页「今日胜率」卡片：查看该玩家今日参赛记录
+function openTodayPlayerRecords(rank) {
+  var lb = state._todayLb || [];
+  var p = lb[parseInt(rank, 10)];
+  if (!p) {
+    openRecordListModal({ title: '今日参赛记录', empty: '今日暂无参赛记录', rows: [] });
+    return;
+  }
+  var history = loadNormalizedHistory() || [];
+  var todayDates = state._todayDates || {};
+  var rows = [];
+  var wins = 0, total = 0;
+  for (var i = history.length - 1; i >= 0; i--) {
+    var rec = history[i];
+    if (!rec || !todayDates[rec.date]) continue;
+    var hit = false, isWin = false, roleText = '';
+    for (var j = 0; j < rec.identities.length; j++) {
+      var id = rec.identities[j];
+      if (id.name !== p.name) continue;
+      hit = true;
+      var ff = getFinalFaction(id.role, rec.lancelotFlips && rec.lancelotFlips[id.index != null ? id.index : j]);
+      if (id.role === '混子' && rec.huntFollow != null) ff = resolveHuntFaction(rec, rec.huntFollow);
+      isWin = rec.winner === ff;
+      roleText = id.role || '';
+      break;
+    }
+    if (!hit) continue;
+    total++;
+    if (isWin) wins++;
+    rows.push(recItemHTML(i, rec, isWin ? '胜' : '负', isWin ? 'good' : 'evil', roleText));
+  }
+  var rate = total > 0 ? Math.round(wins / total * 100) : 0;
+  openRecordListModal({
+    title: p.name + ' · 今日参赛记录',
+    sub: '点击任意一局查看该局详细参赛记录',
+    summary: '今日 ' + total + ' 场 · ' + wins + ' 胜 ' + (total - wins) + ' 负 · 胜率 ' + rate + '%',
+    empty: '今日暂无参赛记录',
+    rows: rows
+  });
+}
+
+// 个人主页「各身份胜负情况」条目：进入该身份参赛记录列表
+function profileOpenRoleGames(el) {
+  if (!el) return;
+  var role = el.getAttribute('data-role') || '';
+  var faction = el.getAttribute('data-faction') || '';
+  var sel = document.getElementById('profile-player-sel');
+  var name = sel ? sel.value : '';
+  var contentEl = document.getElementById('profile-content');
+  if (!contentEl) return;
+  var playerSet = state._playerSetCache || {};
+  var data = playerSet[name] || [];
+  var history = loadNormalizedHistory() || [];
+  var rows = [];
+  var wins = 0, total = 0;
+  for (var i = data.length - 1; i >= 0; i--) {
+    var d = data[i];
+    if (!d || d.role !== role) continue;
+    var ff = getFinalFaction(d.role, d.flipped || false);
+    if (d.role === '混子' && d.huntFollow != null && d.recIndex >= 0 && d.recIndex < history.length) {
+      ff = resolveHuntFaction(history[d.recIndex], d.huntFollow);
+    }
+    if (faction && ff !== faction) continue;
+    total++;
+    var isWin = d.winner === ff;
+    if (isWin) wins++;
+    var rec = (d.recIndex >= 0 && d.recIndex < history.length) ? history[d.recIndex] : null;
+    rows.push(recItemHTML(d.recIndex, rec, isWin ? '胜' : '负', isWin ? 'good' : 'evil', ff === 'good' ? '蓝方' : (ff === 'evil' ? '红方' : '中立')));
+  }
+  var rate = total > 0 ? Math.round(wins / total * 100) : 0;
+  var factionLabel = faction === 'evil' ? '红方' : (faction === 'good' ? '蓝方' : '中立');
+  var out = '';
+  out += '<div class="rec-head">';
+  out += '<button class="btn small rec-back-btn" onclick="profileBackFromRoleGames()">&#8592; 返回个人主页</button>';
+  out += '<span class="rec-head-title">' + escAttr(role) + ' · ' + factionLabel + '</span>';
+  out += '</div>';
+  out += '<div class="rec-list-summary">' + escAttr(name) + ' 使用「' + escAttr(role) + '」共 ' + total + ' 场：' + wins + ' 胜 ' + (total - wins) + ' 负，胜率 ' + rate + '%</div>';
+  if (!rows.length) {
+    out += '<div class="rec-list-empty">该身份暂无参赛记录</div>';
+  } else {
+    out += '<div class="rec-list">' + rows.join('') + '</div>';
+  }
+  contentEl.innerHTML = out;
+}
+
+// 从身份参赛记录返回个人主页原视图（保留选中玩家与身份 Tab）
+function profileBackFromRoleGames() {
   renderPlayerProfile();
 }
 
@@ -9080,7 +9242,13 @@ function buildNightVoiceLines() {
     push('红色方请睁开眼睛', openText);
   }
 
-  // 4) 红色方竖大拇指（v178："除莫德雷德以外"仅在本场存在莫德雷德时出现）
+  // 3) 红色方闭上眼睛（v187：顺序修正为 睁开眼睛 → 闭上眼睛 → 竖大拇指 → 兰斯洛特收回大拇指）
+  if (openEvil.length || hasRedLancelot) {
+    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
+  }
+
+  // 4) 红色方竖大拇指（v187：移到「红色方请闭上眼睛」之后、「梅林请睁眼」之前）
+  //    v178："除莫德雷德以外"仅在本场存在莫德雷德时出现
   if (thumbs.length) {
     var thumbText = has('莫德雷德')
       ? '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。'
@@ -9091,11 +9259,6 @@ function buildNightVoiceLines() {
   // 4.5) v185：本场有红色兰斯洛特时，竖完大拇指立刻收回（无兰斯洛特则整句零出现）
   if (hasRedLancelot) {
     push('请红色兰斯洛特收回大拇指', '请红色兰斯洛特收回大拇指。');
-  }
-
-  // 3) 红色方闭上眼睛（v185：顺序改为 睁开眼睛 → 竖大拇指 → 兰斯洛特收回大拇指 → 闭上眼睛）
-  if (openEvil.length || hasRedLancelot) {
-    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
   }
 
   // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
@@ -9186,7 +9349,8 @@ function nvRenderPanel() {
       + ' data-rate="' + rev + '" onclick="nvSetRate(' + rev + ')">×' + rev + '</button>';
   }
 
-  var myRoleHTML = '';
+  var myRoleHTML = '';
+
   if (state.myRole && state.myRole !== '不明') {
     myRoleHTML = '<span class="nv-badge">我的身份：' + escAttr(state.myRole) + '</span>';
   }
