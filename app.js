@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v190';
+var SW_VERSION = 'v191';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -9050,10 +9050,15 @@ var NV_RATE_OPTS = [0.5, 0.75, 1, 1.25, 1.5];   // v184：删除 ×2，仅保留
 var NV_RATE_DEFAULT = 1;
 
 /* v190：真人感策略（默认开启，可在面板内关闭）
-   - 角色名字片段单独朗读，语速乘 NV_NAME_RATE（只作用于名字，其余不变）
+   - 角色名字片段单独朗读，语速乘名字放慢系数（只作用于名字，其余不变）
    - 句内按标点做短停顿（不改逐句停顿秒数）
-   - 音高轻微下压到更自然区间 */
-var NV_NAME_RATE = 0.82;      // 名字片段系数（与五档倍速相乘叠加）
+   - 音高轻微下压到更自然区间
+   v191：名字放慢仅作用于「红色方请睁开眼睛」「红色方竖大拇指」两个环节，且系数可调 */
+var NV_NAME_RATE_DEFAULT = 0.82;                              // 名字放慢默认系数（1.00 = 正常语速）
+var NV_NAME_RATES = [0.6, 0.7, 0.8, 0.82, 0.9, 1.0];          // 可选档位：0.60 明显放慢 → 1.00 正常语速
+// v191：按 step 键名判定是否命中名字放慢（不按序号，避免有/无红兰斯洛特两种局错位）
+var NV_NAME_STEPS = { '红色方请睁开眼睛': 1, '红色方竖大拇指': 1 };
+var NV_NAME_RATE = NV_NAME_RATE_DEFAULT;   // 兼容旧引用（面板只读展示用）
 var NV_PITCH = 0.95;          // 真人感开启时的音高
 var NV_HUMAN_DEFAULT = true;
 // 句内标点微停顿（毫秒），仅句内使用，与 NV.gaps 的逐句停顿互不影响
@@ -9071,6 +9076,7 @@ var NV = {
   gap: NV_GAP_DEFAULT,   // 默认停顿（统一值）
   rate: NV_RATE_DEFAULT, // v183：播报倍速（1 = 原速，只影响 utterance.rate）
   human: NV_HUMAN_DEFAULT, // v190：真人感（名字减速 + 句内标点微停顿 + 音高微调）
+  nameRate: NV_NAME_RATE_DEFAULT, // v191：名字放慢系数（仅两个目标环节生效，1.00 = 正常语速）
   gaps: {},              // v179：按步骤名索引的逐句停顿时长
   timer: null,
   utter: null,
@@ -9124,6 +9130,14 @@ var NV_PENDING_ENTER = false;
     var rawHuman = localStorage.getItem('avalon_voice_human');
     if (rawHuman === '0') NV.human = false;
     else if (rawHuman === '1') NV.human = true;
+  } catch (e) {}
+  // v191：名字放慢系数（持久化，非法值回退默认 0.82）
+  try {
+    var rawNameRate = localStorage.getItem('avalon_voice_name_rate');
+    NV.nameRate = nvClampNameRate(rawNameRate === null ? NV_NAME_RATE_DEFAULT : parseFloat(rawNameRate));
+    if (rawNameRate !== null && !nvNameRateEqual(parseFloat(rawNameRate), NV.nameRate)) {
+      localStorage.setItem('avalon_voice_name_rate', String(NV.nameRate));
+    }
   } catch (e) {}
   // 语音列表在部分浏览器是异步加载的，提前预热一次
   if (NV.supported) {
@@ -9465,6 +9479,14 @@ function nvRenderPanel() {
       + ' data-rate="' + rev + '" onclick="nvSetRate(' + rev + ')">×' + rev + '</button>';
   }
 
+  // v191：名字放慢档位按钮（0.60 最慢 → 1.00 正常语速）
+  var nameRateBtnsHTML = '';
+  for (var ni = 0; ni < NV_NAME_RATES.length; ni++) {
+    var nrv = NV_NAME_RATES[ni];
+    nameRateBtnsHTML += '<button class="nv-name-rate-btn' + (nvNameRateEqual(nrv, NV.nameRate) ? ' active' : '') + '"'
+      + ' data-name-rate="' + nrv + '" onclick="nvSetNameRate(' + nrv + ')">' + nrv.toFixed(2) + '</button>';
+  }
+
   var myRoleHTML = '';
 
   if (state.myRole && state.myRole !== '不明') {
@@ -9508,7 +9530,15 @@ function nvRenderPanel() {
     + '<div class="nv-setting nv-human-wrap">'
     +   '<span class="nv-setting-label">真人感</span>'
     +   '<button class="btn small nv-human-btn" id="nv-human-toggle" onclick="nvHumanToggle()">' + (NV.human ? '已开启' : '已关闭') + '</button>'
-    +   '<span class="nv-gap-val">名字放慢 ' + NV_NAME_RATE + '×</span>'
+    +   '<span class="nv-gap-val">按标点自然停顿</span>'
+    + '</div>'
+    + '<div class="nv-setting nv-name-rate-wrap">'
+    +   '<div class="nv-name-rate-head">'
+    +     '<span class="nv-setting-label">名字放慢</span>'
+    +     '<span class="nv-gap-val" id="nv-name-rate-val">' + nvNameRateText(NV.nameRate) + '</span>'
+    +   '</div>'
+    +   '<div class="nv-name-rate-btns">' + nameRateBtnsHTML + '</div>'
+    +   '<div class="nv-name-rate-hint">仅「红色方请睁开眼睛」「红色方竖大拇指」两个环节的名字放慢；1.00 = 正常语速</div>'
     + '</div>'
     + '<div class="nv-setting">'
     +   '<span class="nv-setting-label">背景乐</span>'
@@ -9517,7 +9547,7 @@ function nvRenderPanel() {
     +   '<span class="nv-gap-val" id="nv-bgm-val">' + Math.round(NVM.vol * 100) + '%</span>'
     + '</div>'
     + '<div class="nv-tip" id="nv-tip">' + (NV.supported
-        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转；倍速与停顿可分别调整，互不影响。真人感（角色名字放慢、按标点自然停顿）默认开启，可随时关闭。'
+        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转；倍速与停顿可分别调整，互不影响。真人感（按标点自然停顿）默认开启；名字放慢仅作用于「红色方请睁开眼睛」「红色方竖大拇指」两个环节，可调 0.60～1.00（1.00 = 正常语速）。关闭真人感时名字放慢一并暂停、恢复原速。'
         : '当前浏览器不支持语音合成（speechSynthesis），已降级为纯文字播报，可手动逐句推进。') + '</div>'
     + '</div>';
 
@@ -9664,26 +9694,37 @@ function nvSplitByNames(text, words) {
   return out;
 }
 
-// 生成一句话的朗读片段：名字段减速；非名字段按标点再切；标点并入前段并带微停顿
+// 生成一句话的朗读片段：命中名字放慢的两个环节才把角色名单独切出并减速；其余句子正常语速
+// v191：是否名字放慢由 line.step（step 键名）判定，不依赖句子序号
+function nvLineNameSlow(line) {
+  return !!(line && NV_NAME_STEPS[line.step]);
+}
+
 function nvBuildSpeechSegments(line) {
   var text = (line && line.text) || '';
   var human = nvHumanActive();
   if (!human || !text) return [{ text: text, rateFactor: 1, pauseAfter: 0 }];
-  var toks = nvSplitByNames(text, nvNameWords());
+  var nameSlow = nvLineNameSlow(line);          // v191：非目标环节不切名字段，保持原速与原节奏
+  var nameFactor = nameSlow ? nvNameRateFactor() : 1;
+  var toks = nvSplitByNames(text, nameSlow ? nvNameWords() : []);
   var cut = [], i, k;
   for (i = 0; i < toks.length; i++) {
     var t = toks[i];
-    if (t.name) { cut.push({ text: t.text, name: true }); continue; }
-    var s = t.text, buf = '';
+    if (t.name && nameSlow) { cut.push({ text: t.text, name: true }); continue; }
+    var s = typeof t.text === 'string' ? t.text : '';
+    var buf = '';
     for (k = 0; k < s.length; k++) {
       buf += s.charAt(k);
       if (NV_PAUSE_CHARS[s.charAt(k)] && k < s.length - 1) { cut.push({ text: buf, name: false }); buf = ''; }
     }
-    if (buf) cut.push({ text: buf, name: false });
+    if (buf) {
+      // 非名字段内部连续文本在原实现中是逐字累积的，这里同样合并且不与已切出的名字段混淆
+      cut.push({ text: buf, name: false });
+    }
   }
   var segs = [];
   for (i = 0; i < cut.length; i++) {
-    var cur = { text: cut[i].text, rateFactor: cut[i].name ? NV_NAME_RATE : 1, pauseAfter: 0, name: !!cut[i].name };
+    var cur = { text: cut[i].text, rateFactor: cut[i].name ? nameFactor : 1, pauseAfter: 0, name: !!cut[i].name };
     // 紧随的纯标点片段并入本段（名字段不并入，保证只放慢名字本身）
     while (!cur.name && i + 1 < cut.length && !cut[i + 1].name && /^[，、；：。！？,;:.!?…]+$/.test(cut[i + 1].text)) {
       cur.text += cut[++i].text;
@@ -10193,7 +10234,61 @@ function nvHumanToggle() {
   try { localStorage.setItem('avalon_voice_human', NV.human ? '1' : '0'); } catch (e) {}
   var btn = document.getElementById('nv-human-toggle');
   if (btn) btn.textContent = NV.human ? '已开启' : '已关闭';
-  toast(NV.human ? '已开启真人感：角色名字放慢、按标点自然停顿' : '已关闭真人感：恢复原速朗读');
+  nvRefreshNameRateBtns();
+  toast(NV.human ? '已开启真人感：角色名字放慢、按标点自然停顿' : '已关闭真人感：恢复原速朗读（名字放慢同时暂停）');
+}
+
+/* ---------- v191：名字放慢系数（仅「红色方请睁开眼睛」「红色方竖大拇指」两个环节的名字片段） ---------- */
+// 合法档位：命中 NV_NAME_RATES 取该档，否则按 0.6~1.0 夹取并保留两位小数
+function nvClampNameRate(v) {
+  var r = parseFloat(v);
+  if (isNaN(r)) return NV_NAME_RATE_DEFAULT;
+  for (var i = 0; i < NV_NAME_RATES.length; i++) {
+    if (Math.abs(NV_NAME_RATES[i] - r) < 0.001) return NV_NAME_RATES[i];
+  }
+  if (r < 0.6) return 0.6;
+  if (r > 1.0) return 1.0;
+  return Math.round(r * 100) / 100;
+}
+
+function nvNameRateEqual(a, b) {
+  return Math.abs(parseFloat(a) - parseFloat(b)) < 0.001;
+}
+
+// 当前生效的名字放慢系数：真人感关闭或音色不达标时不放慢（与原速一致）
+function nvNameRateFactor() {
+  var c = nvClampNameRate(NV.nameRate);
+  if (!nvHumanActive()) return 1;
+  return c;
+}
+
+// 切换名字放慢档位：立即持久化，作用于下一句
+function nvSetNameRate(v) {
+  NV.nameRate = nvClampNameRate(v);
+  try { localStorage.setItem('avalon_voice_name_rate', String(NV.nameRate)); } catch (e) {}
+  nvRefreshNameRateBtns();
+  nvRefreshNameRateLabel();
+  toast('名字放慢已设为 ' + nvNameRateText(NV.nameRate));
+}
+
+function nvNameRateText(v) {
+  var r = parseFloat(v);
+  if (Math.abs(r - 1) < 0.001) return '1.00（正常语速）';
+  return r.toFixed(2);
+}
+
+function nvRefreshNameRateBtns() {
+  var btns = document.querySelectorAll('.nv-name-rate-btn');
+  for (var i = 0; i < btns.length; i++) {
+    var rv = parseFloat(btns[i].getAttribute('data-name-rate'));
+    if (nvNameRateEqual(rv, NV.nameRate)) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+}
+
+function nvRefreshNameRateLabel() {
+  var el = document.getElementById('nv-name-rate-val');
+  if (el) el.textContent = nvNameRateText(NV.nameRate);
 }
 
 /* ---------- v180：背景乐（Web Audio 程序化合成「F 轻快拨弦」，零外部依赖、无版权音频） ---------- */
