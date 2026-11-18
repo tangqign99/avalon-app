@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v189';
+var SW_VERSION = 'v190';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -9049,6 +9049,19 @@ var NV_GAP_DEFAULT = 3;
 var NV_RATE_OPTS = [0.5, 0.75, 1, 1.25, 1.5];   // v184：删除 ×2，仅保留五档
 var NV_RATE_DEFAULT = 1;
 
+/* v190：真人感策略（默认开启，可在面板内关闭）
+   - 角色名字片段单独朗读，语速乘 NV_NAME_RATE（只作用于名字，其余不变）
+   - 句内按标点做短停顿（不改逐句停顿秒数）
+   - 音高轻微下压到更自然区间 */
+var NV_NAME_RATE = 0.82;      // 名字片段系数（与五档倍速相乘叠加）
+var NV_PITCH = 0.95;          // 真人感开启时的音高
+var NV_HUMAN_DEFAULT = true;
+// 句内标点微停顿（毫秒），仅句内使用，与 NV.gaps 的逐句停顿互不影响
+var NV_PAUSE_CHARS = {
+  '，': 120, '、': 100, '；': 130, '：': 130, ',': 120, ';': 130, ':': 130,
+  '。': 240, '！': 240, '？': 240, '!': 240, '?': 240, '.': 240, '…': 200
+};
+
 var NV = {
   lines: [],
   idx: -1,
@@ -9057,6 +9070,7 @@ var NV = {
   finished: false,
   gap: NV_GAP_DEFAULT,   // 默认停顿（统一值）
   rate: NV_RATE_DEFAULT, // v183：播报倍速（1 = 原速，只影响 utterance.rate）
+  human: NV_HUMAN_DEFAULT, // v190：真人感（名字减速 + 句内标点微停顿 + 音高微调）
   gaps: {},              // v179：按步骤名索引的逐句停顿时长
   timer: null,
   utter: null,
@@ -9105,6 +9119,12 @@ var NV_PENDING_ENTER = false;
       localStorage.setItem('avalon_voice_rate', String(NV.rate));
     }
   } catch (e) {}
+  // v190：真人感开关（默认开启；旧用户无该键时按默认开启）
+  try {
+    var rawHuman = localStorage.getItem('avalon_voice_human');
+    if (rawHuman === '0') NV.human = false;
+    else if (rawHuman === '1') NV.human = true;
+  } catch (e) {}
   // 语音列表在部分浏览器是异步加载的，提前预热一次
   if (NV.supported) {
     try {
@@ -9134,7 +9154,10 @@ function nvUnlockSpeech() {
 }
 
 /* ---------- 语音选择（v177：严格 zh-CN 标准普通话，排除港台/粤语音色） ---------- */
-var NV_VOICE_PREF = ['Natural', 'Xiaoxiao', 'Yunxi', 'Yunxia', 'Huihui'];
+// v190：偏好名单扩充到微软主流中文神经音色（Natural / Neural 家族）
+var NV_VOICE_PREF = ['Xiaoxiao', 'Yunxi', 'Yunyang', 'Yunxia', 'Xiaoyi', 'Yunjian', 'Huihui'];
+// v190：高质量音色门槛，低于该分数即视为「无高质量音色」，回落最佳可用 zh-CN 音色但不再做音高/语速美化
+var NV_VOICE_GOOD = 18;
 // 港台 / 粤语音色黑名单（名称或 voiceURI 命中即排除）
 var NV_VOICE_BLOCK = /粤|粵|Cantonese|Hong\s*Kong|香港|Taiwan|台灣|台湾|Hant/i;
 
@@ -9158,14 +9181,56 @@ function nvIsZhCN(v) {
 }
 
 function nvScoreVoice(v) {
-  var name = (v.name || '') + ' ' + (v.voiceURI || '');
-  var score = 0, i;
-  if (/Microsoft/i.test(name)) score += 5;          // 优先 Microsoft 中文音色
-  if (/Natural/i.test(name)) score += 8;            // 优先神经网络自然音色
+  return nvVoiceScoreDetail(v).score;
+}
+
+// v190：音色评分明细（供选择与评分表展示；分数越高越接近真人）
+function nvVoiceScoreDetail(v) {
+  var name = (v && v.name) || '';
+  var uri = (v && v.voiceURI) || '';
+  var all = name + ' ' + uri;
+  var score = 0, notes = [], i;
+  if (/Microsoft/i.test(all)) { score += 5; notes.push('Microsoft+5'); }
+  if (/Natural/i.test(all)) { score += 10; notes.push('Natural+10'); }
+  else if (/Neural/i.test(all)) { score += 8; notes.push('Neural+8'); }
+  if (/Online/i.test(all)) { score += 3; notes.push('Online+3'); }         // 云端神经音色（仍在浏览器内置范围内）
   for (i = 0; i < NV_VOICE_PREF.length; i++) {
-    if (new RegExp(NV_VOICE_PREF[i], 'i').test(name)) { score += 10; break; }
+    if (new RegExp(NV_VOICE_PREF[i], 'i').test(all)) { score += 10; notes.push(NV_VOICE_PREF[i] + '+10'); break; }
   }
-  return score;
+  if (/Desktop/i.test(all)) { score -= 8; notes.push('LegacyDesktop-8'); } // 老 SAPI5 机械音色降权
+  if (/eSpeak|Festival|Pico|compact|Compact/i.test(all)) { score -= 6; notes.push('Synth-6'); }
+  return { score: score, notes: notes };
+}
+
+// v190：生成候选音色评分表（含被排除的港台/粤语候选，便于核对）
+function nvVoiceReport() {
+  var vs = nvGetVoices(), rows = [], i, d;
+  for (i = 0; i < vs.length; i++) {
+    var v = vs[i];
+    var cand = nvIsZhCN(v);
+    d = nvVoiceScoreDetail(v);
+    rows.push({
+      name: v.name || '',
+      lang: v.lang || '',
+      uri: v.voiceURI || '',
+      candidate: cand,
+      score: cand ? d.score : -1,
+      notes: cand ? d.notes.join(' ') : '非 zh-CN 普通话（已排除）'
+    });
+  }
+  rows.sort(function (a, b) { return b.score - a.score; });
+  var picked = NV._voice ? NV._voice.name : null;
+  var ps = 0;
+  for (i = 0; i < rows.length; i++) if (rows[i].name === picked) ps = rows[i].score;
+  return {
+    total: vs.length,
+    zhcnCount: rows.filter(function (r) { return r.candidate; }).length,
+    threshold: NV_VOICE_GOOD,
+    picked: picked,
+    pickedScore: ps,
+    pickedHighQuality: !!picked && ps >= NV_VOICE_GOOD,
+    rows: rows
+  };
 }
 
 function nvPickVoice() {
@@ -9180,6 +9245,8 @@ function nvPickVoice() {
     if (s > bestScore) { bestScore = s; best = v; }
   }
   // 绝不回退到 zh-HK / zh-TW / 粤语音色：无 zh-CN 候选时返回 null
+  NV._voiceScore = best ? bestScore : 0;
+  NV._voiceGood = !!best && bestScore >= NV_VOICE_GOOD;
   return best;
 }
 
@@ -9291,23 +9358,23 @@ function buildNightVoiceLines() {
     push('红色方请睁开眼睛', openText);
   }
 
-  // 3) 红色方竖大拇指（v188：顺序为 睁开眼睛 → 竖大拇指 → 兰斯洛特收回大拇指 → 红色方闭上眼睛）
+  // 3) v190：本场有红色兰斯洛特时，睁眼互认后立刻收回大拇指（无兰斯洛特则整句零出现）
+  if (hasRedLancelot) {
+    push('请红色兰斯洛特收回大拇指', '请红色兰斯洛特收回大拇指。');
+  }
+
+  // 4) 红色方闭上眼睛（v190：收回大拇指 → 红色方闭眼）
+  if (openEvil.length || hasRedLancelot) {
+    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
+  }
+
+  // 5) v190：红色方竖大拇指（含红色兰斯洛特）移到「红色方闭眼」之后、「梅林请睁眼」之前
   //    v178："除莫德雷德以外"仅在本场存在莫德雷德时出现
   if (thumbs.length) {
     var thumbText = has('莫德雷德')
       ? '请除莫德雷德以外的红色方竖起大拇指：' + nvJoinNames(thumbs) + '。'
       : '请红色方竖起大拇指：' + nvJoinNames(thumbs) + '。';
     push('红色方竖大拇指', thumbText);
-  }
-
-  // 4) v185/v188：本场有红色兰斯洛特时，竖完大拇指立刻收回，位置在「红色方请闭上眼睛」之前（无兰斯洛特则整句零出现）
-  if (hasRedLancelot) {
-    push('请红色兰斯洛特收回大拇指', '请红色兰斯洛特收回大拇指。');
-  }
-
-  // 5) 红色方闭上眼睛（v188：移到收回大拇指之后、「梅林请睁眼」之前）
-  if (openEvil.length || hasRedLancelot) {
-    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
   }
 
   // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
@@ -9438,6 +9505,11 @@ function nvRenderPanel() {
     +   '<span class="nv-setting-label">播报倍速</span>'
     +   '<div class="nv-rate-btns">' + rateBtnsHTML + '</div>'
     + '</div>'
+    + '<div class="nv-setting nv-human-wrap">'
+    +   '<span class="nv-setting-label">真人感</span>'
+    +   '<button class="btn small nv-human-btn" id="nv-human-toggle" onclick="nvHumanToggle()">' + (NV.human ? '已开启' : '已关闭') + '</button>'
+    +   '<span class="nv-gap-val">名字放慢 ' + NV_NAME_RATE + '×</span>'
+    + '</div>'
     + '<div class="nv-setting">'
     +   '<span class="nv-setting-label">背景乐</span>'
     +   '<button class="btn small nv-bgm-btn" id="nv-bgm-toggle" onclick="nvmToggle()">' + (NVM.enabled ? '已开启' : '已关闭') + '</button>'
@@ -9445,7 +9517,7 @@ function nvRenderPanel() {
     +   '<span class="nv-gap-val" id="nv-bgm-val">' + Math.round(NVM.vol * 100) + '%</span>'
     + '</div>'
     + '<div class="nv-tip" id="nv-tip">' + (NV.supported
-        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转；倍速与停顿可分别调整，互不影响。'
+        ? '支持开始 / 暂停 / 继续 / 重播 / 跳过，也可点列表任意一句直接跳转；倍速与停顿可分别调整，互不影响。真人感（角色名字放慢、按标点自然停顿）默认开启，可随时关闭。'
         : '当前浏览器不支持语音合成（speechSynthesis），已降级为纯文字播报，可手动逐句推进。') + '</div>'
     + '</div>';
 
@@ -9550,28 +9622,194 @@ function nvSpeakAt(i) {
   });
 }
 
+/* ---------- v190：真人感切句（角色名字片段单独放慢，句内按标点做微停顿） ---------- */
+// 角色名可读名（长词优先，保证「红色兰斯洛特」不被切成「兰斯洛特」）
+function nvNameWords() {
+  if (NV._nameWords) return NV._nameWords;
+  var raw = [], i;
+  try {
+    for (i = 0; i < ALL_ROLES.length; i++) raw.push(nvRoleName(ALL_ROLES[i]));
+  } catch (e) {}
+  raw = raw.concat(['红色兰斯洛特', '蓝色兰斯洛特', '莫甘娜', '莫德雷德', '奥伯伦', '派西维尔', '刺客', '爪牙', '梅林', '忠臣']);
+  var seen = {}, out = [];
+  raw.sort(function (a, b) { return b.length - a.length; });
+  for (i = 0; i < raw.length; i++) {
+    var w = raw[i];
+    if (!w || seen[w]) continue;
+    seen[w] = 1;
+    out.push(w);
+  }
+  NV._nameWords = out;
+  return out;
+}
+
+// 按角色名切成 [{text, name}]，名字片段 rate 系数 = NV_NAME_RATE
+function nvSplitByNames(text, words) {
+  var out = [], i = 0, k;
+  while (i < text.length) {
+    var hit = null;
+    for (k = 0; k < words.length; k++) {
+      if (text.substr(i, words[k].length) === words[k]) { hit = words[k]; break; }
+    }
+    if (hit) {
+      out.push({ text: hit, name: true });
+      i += hit.length;
+    } else {
+      var ch = text.charAt(i);
+      if (out.length && !out[out.length - 1].name) out[out.length - 1].text += ch;
+      else out.push({ text: ch, name: false });
+      i++;
+    }
+  }
+  return out;
+}
+
+// 生成一句话的朗读片段：名字段减速；非名字段按标点再切；标点并入前段并带微停顿
+function nvBuildSpeechSegments(line) {
+  var text = (line && line.text) || '';
+  var human = nvHumanActive();
+  if (!human || !text) return [{ text: text, rateFactor: 1, pauseAfter: 0 }];
+  var toks = nvSplitByNames(text, nvNameWords());
+  var cut = [], i, k;
+  for (i = 0; i < toks.length; i++) {
+    var t = toks[i];
+    if (t.name) { cut.push({ text: t.text, name: true }); continue; }
+    var s = t.text, buf = '';
+    for (k = 0; k < s.length; k++) {
+      buf += s.charAt(k);
+      if (NV_PAUSE_CHARS[s.charAt(k)] && k < s.length - 1) { cut.push({ text: buf, name: false }); buf = ''; }
+    }
+    if (buf) cut.push({ text: buf, name: false });
+  }
+  var segs = [];
+  for (i = 0; i < cut.length; i++) {
+    var cur = { text: cut[i].text, rateFactor: cut[i].name ? NV_NAME_RATE : 1, pauseAfter: 0, name: !!cut[i].name };
+    // 紧随的纯标点片段并入本段（名字段不并入，保证只放慢名字本身）
+    while (!cur.name && i + 1 < cut.length && !cut[i + 1].name && /^[，、；：。！？,;:.!?…]+$/.test(cut[i + 1].text)) {
+      cur.text += cut[++i].text;
+    }
+    var tail = cur.text.slice(-1);
+    cur.pauseAfter = NV_PAUSE_CHARS[tail] || (cur.name ? 60 : 0);
+    segs.push(cur);
+  }
+  if (!segs.length) segs.push({ text: text, rateFactor: 1, pauseAfter: 0 });
+  return segs;
+}
+
+// 片段实际语速 = 五档倍速 × 片段系数（名字段 0.82，其余 1）
+// 真人感实际生效条件：开关打开且当前音色达到高质量门槛（否则回落 v189 现有逻辑）
+function nvHumanActive() {
+  return !!NV.human && NV._voiceGood !== false;
+}
+
+function nvSegRate(seg) {
+  var base = NV.rate || 1;
+  var f = (nvHumanActive() && seg && seg.rateFactor) ? seg.rateFactor : 1;
+  var r = Math.round(base * f * 100) / 100;
+  if (r < 0.1) r = 0.1;
+  if (r > 2) r = 2;
+  return r;
+}
+
+function nvPitch() {
+  return nvHumanActive() ? NV_PITCH : 1;
+}
+
 function nvStartUtterance(line, mySeq, voice) {
+  NV._seg = nvBuildSpeechSegments(line);
+  NV._segI = 0;
+  NV._lineDone = 0;
+  NV._idleChecks = 0;
+  if (!NV._seg.length) { nvSimAdvance(mySeq, line.text); return; }
+  var needDelay = false;
+  try {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+      needDelay = true;
+    }
+  } catch (e) {}
+  var start = function () { nvSpeakSeg(line, mySeq, voice, 0); };
+  NV.playing = true;
+  nvRefreshPlayBtn();
+  if (needDelay) setTimeout(start, 90);
+  else start();
+
+  // 兜底：个别环境 onend 不触发，检测 speaking 状态后强行推进（v190：先判本句是否已读完）
+  var tick = function () {
+    if (mySeq !== NV.seq) return;
+    if (NV._lineDone === mySeq) return;                  // 本句片段已全部读完，停止看门狗
+    if (!NV.playing || NV.paused) { NV._wdTimer = setTimeout(tick, 800); return; }
+    var speaking = false;
+    try { speaking = window.speechSynthesis.speaking || window.speechSynthesis.pending; } catch (e) {}
+    if (speaking) {
+      var stuckMs = Date.now() - (NV._speakStart || Date.now());
+      if (!NV._started && stuckMs > 6000) {
+        try { window.speechSynthesis.cancel(); } catch (e2) {}
+        NV._errCount = (NV._errCount || 0) + 1;
+        if (NV._errCount >= 2) nvMarkUnsupported();
+        nvSimAdvance(mySeq, line.text);
+        return;
+      }
+      NV._wdTimer = setTimeout(tick, 700);
+      return;
+    }
+    // 片段之间的微停顿期间 speaking 为 false：若本句还有后续片段，稍后再看，不能提前跳句
+    var last = NV._seg ? NV._seg.length - 1 : 0;
+    if ((NV._segI || 0) < last) { NV._wdTimer = setTimeout(tick, 160); return; }
+    // 最后一段刚结束、onend 尚未回调时也别抢跑：连续两次探测空闲才判定本句读完
+    NV._idleChecks = (NV._idleChecks || 0) + 1;
+    if (NV._idleChecks < 2) { NV._wdTimer = setTimeout(tick, 260); return; }
+    NV._speakStart = 0;
+    nvmDuck(false);
+    NV._lineDone = mySeq;
+    nvScheduleNext();
+  };
+  NV._speakStart = Date.now();
+  if (NV._wdTimer) { clearTimeout(NV._wdTimer); NV._wdTimer = null; }
+  NV._wdTimer = setTimeout(tick, Math.max(3500, line.text.length * 260 + 900));
+}
+
+// 朗读单个片段；片段结束按 pauseAfter 微停顿后继续下一个，全部读完再进入句间停顿
+function nvSpeakSeg(line, mySeq, voice, si) {
+  var segs = NV._seg || [];
+  if (si >= segs.length) {
+    if (mySeq !== NV.seq) return;
+    NV._lineDone = mySeq;
+    nvmDuck(false);
+    if (!NV.playing || NV.paused) return;
+    nvScheduleNext();
+    return;
+  }
+  if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
+  NV._segI = si;
+  var seg = segs[si];
   var u;
   try {
-    u = new SpeechSynthesisUtterance(line.text);
+    u = new SpeechSynthesisUtterance(seg.text);
   } catch (e) {
     nvSimAdvance(mySeq, line.text);
     return;
   }
-  u.lang = 'zh-CN';   // 每个 Utterance 显式指定普通话，避免跟随系统默认语言
-  u.rate = NV.rate;   // v183：倍速只作用于语音本身（原基准 1），不改音色/音量，也不影响句间停顿
-  u.pitch = 1;
+  u.lang = 'zh-CN';             // 每个 Utterance 显式指定普通话，避免跟随系统默认语言
+  u.rate = nvSegRate(seg);      // v190：档位 × 片段系数（名字 0.82 / 其余 1）
+  u.pitch = nvPitch();          // v190：真人感开启时轻微下压到 0.95
   u.volume = 1;
   if (voice) u.voice = voice;
-  else nvWarnNoCnVoice();
+  else if (si === 0) nvWarnNoCnVoice();
   u.onstart = function () {
     NV._started = true;
     nvmDuck(true);    // v179：语音朗读时把背景乐压低到约六成
   };
   u.onend = function () {
-    nvmDuck(false);
     if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
-    nvScheduleNext();
+    if (si === segs.length - 1) nvmDuck(false);
+    var next = function () {
+      if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
+      nvSpeakSeg(line, mySeq, voice, si + 1);
+    };
+    var pause = seg.pauseAfter || 0;
+    if (pause > 0) { nvClearTimer(); NV.timer = setTimeout(next, pause); }
+    else next();
   };
   u.onerror = function () {
     nvmDuck(false);
@@ -9583,53 +9821,13 @@ function nvStartUtterance(line, mySeq, voice) {
   NV.utter = u;
   NV.playing = true;
   nvRefreshPlayBtn();
-
-  var needDelay = false;
   try {
-    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-      window.speechSynthesis.cancel();
-      needDelay = true;
-    }
-  } catch (e) {}
-
-  var doSpeak = function () {
-    if (mySeq !== NV.seq || !NV.playing || NV.paused) return;
-    try {
-      window.speechSynthesis.speak(u);
-    } catch (e) {
-      NV._errCount = (NV._errCount || 0) + 1;
-      if (NV._errCount >= 2) nvMarkUnsupported();
-      nvSimAdvance(mySeq, line.text);
-    }
-  };
-  if (needDelay) setTimeout(doSpeak, 90);
-  else doSpeak();
-
-  // 兜底：个别环境 onend 不触发，检测 speaking 状态后强行推进
-  var watchdog = function () {
-    if (mySeq !== NV.seq) return;
-    if (!NV.playing || NV.paused) { NV.timer = setTimeout(watchdog, 800); return; }
-    var speaking = false;
-    try { speaking = window.speechSynthesis.speaking || window.speechSynthesis.pending; } catch (e) {}
-    if (speaking) {
-      // 从未收到 onstart 且长时间 speaking 卡 true（典型无 TTS 引擎环境）→ 强制复位并走文字节奏
-      var stuckMs = Date.now() - (NV._speakStart || Date.now());
-      if (!NV._started && stuckMs > 6000) {
-        try { window.speechSynthesis.cancel(); } catch (e2) {}
-        NV._errCount = (NV._errCount || 0) + 1;
-        if (NV._errCount >= 2) nvMarkUnsupported();
-        nvSimAdvance(mySeq, line.text);
-        return;
-      }
-      NV.timer = setTimeout(watchdog, 700);
-      return;
-    }
-    NV._speakStart = 0;
-    nvmDuck(false);
-    nvScheduleNext();
-  };
-  NV._speakStart = Date.now();
-  NV.timer = setTimeout(watchdog, Math.max(3500, line.text.length * 260));
+    window.speechSynthesis.speak(u);
+  } catch (e) {
+    NV._errCount = (NV._errCount || 0) + 1;
+    if (NV._errCount >= 2) nvMarkUnsupported();
+    nvSimAdvance(mySeq, line.text);
+  }
 }
 
 function nvScheduleNext() {
@@ -9987,6 +10185,15 @@ function nvRefreshRateBtns() {
     if (Math.abs(rv - NV.rate) < 0.001) btns[i].classList.add('active');
     else btns[i].classList.remove('active');
   }
+}
+
+// v190：真人感开关（默认开启）——角色名字放慢 + 句内标点微停顿 + 音高微调，立刻持久化并作用于下一句
+function nvHumanToggle() {
+  NV.human = !NV.human;
+  try { localStorage.setItem('avalon_voice_human', NV.human ? '1' : '0'); } catch (e) {}
+  var btn = document.getElementById('nv-human-toggle');
+  if (btn) btn.textContent = NV.human ? '已开启' : '已关闭';
+  toast(NV.human ? '已开启真人感：角色名字放慢、按标点自然停顿' : '已关闭真人感：恢复原速朗读');
 }
 
 /* ---------- v180：背景乐（Web Audio 程序化合成「F 轻快拨弦」，零外部依赖、无版权音频） ---------- */
