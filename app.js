@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v187';
+var SW_VERSION = 'v188';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -9220,8 +9220,8 @@ function buildNightVoiceLines() {
   var lines = [];
   function push(step, text) { lines.push({ step: step, text: text }); }
 
-  // 1) 天黑请闭上眼睛
-  push('天黑请闭上眼睛', '天黑请闭上眼睛，请所有玩家闭上眼睛。');
+  // 1) 天黑请闭眼（v188：首句文案改为「天黑请闭眼。」，全篇唯一出现「闭眼」二字的句子；step 键沿用旧名以保持停顿配置不错位）
+  push('天黑请闭上眼睛', '天黑请闭眼。');
 
   var openEvil = pick(NV_EVIL_OPEN);   // 互相认识、需要睁眼的红色方（莫甘娜/刺客/莫德雷德/爪牙）
   var thumbs = pick(NV_EVIL_THUMB);    // 第4句给梅林竖拇指的红色方（含奥伯伦）
@@ -9242,12 +9242,7 @@ function buildNightVoiceLines() {
     push('红色方请睁开眼睛', openText);
   }
 
-  // 3) 红色方闭上眼睛（v187：顺序修正为 睁开眼睛 → 闭上眼睛 → 竖大拇指 → 兰斯洛特收回大拇指）
-  if (openEvil.length || hasRedLancelot) {
-    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
-  }
-
-  // 4) 红色方竖大拇指（v187：移到「红色方请闭上眼睛」之后、「梅林请睁眼」之前）
+  // 3) 红色方竖大拇指（v188：顺序为 睁开眼睛 → 竖大拇指 → 兰斯洛特收回大拇指 → 红色方闭上眼睛）
   //    v178："除莫德雷德以外"仅在本场存在莫德雷德时出现
   if (thumbs.length) {
     var thumbText = has('莫德雷德')
@@ -9256,9 +9251,14 @@ function buildNightVoiceLines() {
     push('红色方竖大拇指', thumbText);
   }
 
-  // 4.5) v185：本场有红色兰斯洛特时，竖完大拇指立刻收回（无兰斯洛特则整句零出现）
+  // 4) v185/v188：本场有红色兰斯洛特时，竖完大拇指立刻收回，位置在「红色方请闭上眼睛」之前（无兰斯洛特则整句零出现）
   if (hasRedLancelot) {
     push('请红色兰斯洛特收回大拇指', '请红色兰斯洛特收回大拇指。');
+  }
+
+  // 5) 红色方闭上眼睛（v188：移到收回大拇指之后、「梅林请睁眼」之前）
+  if (openEvil.length || hasRedLancelot) {
+    push('红色方请闭上眼睛', '红色方请闭上眼睛。');
   }
 
   // 5) 梅林请睁眼（看谁竖了大拇指；不点名莫德雷德）
