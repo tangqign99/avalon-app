@@ -1379,3 +1379,60 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 .hce-lr{width:52px;text-align:center}
 .hce-lnum,.hce-arrow{color:var(--text-dim);font-size:12px}
 .hce-empty{font-size:12px;color:var(--text-dim);opacity:.7}
+
+/* ==================== v198：右上角关闭按钮统一放大（移动端可点） ====================
+   目标：所有弹窗 / 全屏面板右上角的关闭按钮统一走 .panel-close 类，
+   触控区 ≥ 46×46 CSS px（超过 44×44 可点标准），图标字号 24px，不遮挡标题、不与内容重叠。 */
+.panel-close,
+.panel-close.hci-modal-close,
+.panel-close.nv-close {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  min-height: 46px;
+  width: 46px;
+  height: 46px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.panel-close:hover,
+.panel-close.hci-modal-close:hover,
+.panel-close.nv-close:hover {
+  background: rgba(196, 74, 74, 0.22);
+  color: var(--red-bright);
+}
+.panel-close:active { transform: scale(0.92); }
+/* 弹窗头部：放大关闭按钮后仍保持单行，标题/日期超长时省略，不与按钮重叠 */
+.hci-modal-header { flex-wrap: nowrap; }
+.hci-modal-header .hci-modal-date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hci-modal-header > div { gap: 6px !important; }
+.nv-head { gap: 10px; }
+.nv-head .nv-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 420px) {
+  .panel-close,
+  .panel-close.hci-modal-close,
+  .panel-close.nv-close { min-width: 44px; min-height: 44px; width: 44px; height: 44px; font-size: 22px; }
+}
