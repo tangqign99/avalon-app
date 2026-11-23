@@ -1,18 +1,20 @@
-/* ==================== Service Worker v199 ==================== */
-// v199 策略（v199 新增：夜间语音播报改用预渲染神经音色音频 voice/xiaoxiao/*.mp3，离线预缓存 + 缺文件自动回退系统 TTS；沿用 v198 的关闭按钮放大、iOS 语音回退、各人数默认角色、首屏提速）：
+/* ==================== Service Worker v200 ==================== */
+// v200 策略（v200 新增：播报音色扩展为晓晓/云希/云扬三色，首装只预缓存默认音色晓晓，云希 voice/yunxi、云扬 voice/yunyang 由前端选中时按需下载并写入同一 Cache Storage，断网仍可播；
+//   v199 起：夜间语音播报改用预渲染神经音色音频 voice/xiaoxiao/*.mp3，离线预缓存 + 缺文件自动回退系统 TTS；沿用 v198 的关闭按钮放大、iOS 语音回退、各人数默认角色、首屏提速）：
 // v198 策略（v198 新增：关闭按钮统一放大、iOS 语音拟真自动回退系统中文音色、各人数局默认角色调整、首屏不得抢带宽加载云端 SDK；v192 起：失败票归属；v193 修正派西维尔台词；v194 保护轮成功也可记录失败票出票者；v195 失败票候选仅限该轮执行队伍；v196 历史全字段可改、点击历史记录改按唯一标识定位；v197 删除历史密码改为 123 并在提示中直接显示）：
 //  - 导航请求(HTML)：network-first（1.2s 超时回落缓存），保证新版本立即生效且弱网可用
 //  - 其它同源静态资源：cache-first（有缓存直取，不再回源，最大程度省流量）
 //  - 跨域接口（Supabase REST / Realtime）：完全不接管，避免读到陈旧数据
-var CACHE_NAME = 'avalon-pwa-v199';
+var CACHE_NAME = 'avalon-pwa-v200';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v199',
-  './app-v199.min.js',
+  './style.css?v=v200',
+  './app-v200.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
-  // v199：夜间播报音频（微软晓晓神经音色，129 段 / 4.0MB）+ manifest，全部预缓存保证离线可播
+  // v200：首装只预缓存默认音色晓晓（129 段 / 4.0MB）+ manifest；云希、云扬音频不在预缓存清单内，
+  // 由前端 nvStartVoiceDownload 选中时按需 fetch 并写入本 Cache Storage（见下方 /voice/ 分支）
   './voice/manifest.json',
   './voice/xiaoxiao/10dh0rc.mp3',
   './voice/xiaoxiao/11gazc2.mp3',
@@ -223,6 +225,7 @@ self.addEventListener('fetch', function(e) {
     return;
   }
   // v199：音频按路径忽略 Range 头命中预缓存（Safari 的 audio 请求带 Range，默认 cache.match 会 miss 而回落网络）
+  // v200：云希/云扬音频同样走这里——未缓存时回源并写入缓存，前端按需下载写入的条目也在此忽略搜索参数命中
   if (url.pathname.indexOf('/voice/') !== -1) {
     e.respondWith(caches.open(CACHE_NAME).then(function(cache) {
       return cache.match(url.pathname, { ignoreSearch: true }).then(function(hit) {

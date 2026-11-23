@@ -1260,7 +1260,11 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 .nv-voice-btn:hover{color:var(--text-bright);border-color:rgba(201,168,76,0.55)}
 .nv-voice-btn.active{border-color:var(--gold);color:var(--gold-light);background:rgba(201,168,76,0.18);font-weight:700}
 .nv-voice-btn.pending{opacity:.42;cursor:not-allowed}
-@media(max-width:520px){.nv-voice-btn{padding:5px 10px;font-size:11px;min-height:28px}}
+.nv-voice-btn.not-cached{opacity:.72;border-style:dashed}
+.nv-voice-btn.downloading{opacity:.62;cursor:progress;border-color:var(--gold);animation:nvVoicePulse 1.1s ease-in-out infinite}
+@keyframes nvVoicePulse{0%,100%{opacity:.45}50%{opacity:.9}}
+.nv-voice-hint{padding:0 14px 8px;font-size:11px;line-height:1.5;color:var(--text-dim);opacity:.82}
+@media(max-width:520px){.nv-voice-btn{padding:5px 10px;font-size:11px;min-height:28px}.nv-voice-hint{font-size:10px;padding:0 10px 6px}}
 .nv-tip{padding:0 14px 12px;font-size:11px;line-height:1.5;color:var(--text-dim);flex-shrink:0}
 @media (max-width:480px){
 .nv-caption{font-size:15px;min-height:48px}
