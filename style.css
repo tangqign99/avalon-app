@@ -1255,6 +1255,12 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 .nv-name-rate-btns{gap:4px}
 .nv-name-rate-btn{font-size:11px;min-height:26px;padding:4px 0}
 }
+.nv-voice-btns{display:flex;gap:6px;flex:1;min-width:0;flex-wrap:wrap}
+.nv-voice-btn{padding:5px 12px;min-height:30px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text-dim);font-size:12px;line-height:1.2;font-family:inherit;white-space:nowrap;cursor:pointer;transition:all .15s}
+.nv-voice-btn:hover{color:var(--text-bright);border-color:rgba(201,168,76,0.55)}
+.nv-voice-btn.active{border-color:var(--gold);color:var(--gold-light);background:rgba(201,168,76,0.18);font-weight:700}
+.nv-voice-btn.pending{opacity:.42;cursor:not-allowed}
+@media(max-width:520px){.nv-voice-btn{padding:5px 10px;font-size:11px;min-height:28px}}
 .nv-tip{padding:0 14px 12px;font-size:11px;line-height:1.5;color:var(--text-dim);flex-shrink:0}
 @media (max-width:480px){
 .nv-caption{font-size:15px;min-height:48px}

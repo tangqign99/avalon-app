@@ -18,17 +18,17 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v198">
+<link rel="stylesheet" href="./style.css?v=v199">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
 <link rel="dns-prefetch" href="//nzbpopxrxniixnhnqktw.supabase.co">
 
-<!-- v186：Supabase SDK 不再随首屏加载，由 app-v198.min.js 在首次交互后按需注入 -->
+<!-- v186：Supabase SDK 不再随首屏加载，由 app-v199.min.js 在首次交互后按需注入 -->
 
-<!-- v198：首屏只加载压缩后的 app-v198.min.js（体积 514KB → 356KB，gzip 132KB → 93KB），源文件 app-v198.js 仅留存于仓库不参与加载 -->
+<!-- v199：首屏只加载压缩后的 app-v199.min.js（体积 542KB → 332KB，gzip 89KB），源文件 app-v199.js 仅留存于仓库不参与加载；夜间播报改用预渲染神经音色音频（voice/xiaoxiao，129 段 4.0MB，SW 预缓存离线可用） -->
 
-<script defer src="./app-v198.min.js"></script>
+<script defer src="./app-v199.min.js"></script>
 
 </head>
 
@@ -194,7 +194,7 @@
 
   </div>
 
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v198</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v199</div>
 
 </section>
 
@@ -489,7 +489,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v198</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v199</div>
 
 
 
@@ -711,12 +711,12 @@
 
 <script>
 
-// PWA Service Worker 注册 - v198
+// PWA Service Worker 注册 - v199
 
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义（原实现会在注册成功时抛 ReferenceError）
-  var SW_VERSION = 'v198';
+  var SW_VERSION = 'v199';
 
   navigator.serviceWorker.getRegistrations().then(function(regs){
 
