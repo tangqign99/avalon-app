@@ -1,14 +1,14 @@
-/* ==================== Service Worker v191 ==================== */
-// v191 策略：
+﻿/* ==================== Service Worker v192 ==================== */
+// v192 策略：
 //  - 导航请求(HTML)：network-first（1.2s 超时回落缓存），保证新版本立即生效且弱网可用
 //  - 其它同源静态资源：cache-first（有缓存直取，不再回源，最大程度省流量）
 //  - 跨域接口（Supabase REST / Realtime）：完全不接管，避免读到陈旧数据
-var CACHE_NAME = 'avalon-pwa-v191';
+var CACHE_NAME = 'avalon-pwa-v192';
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v191',
-  './app-v191.js',
+  './style.css?v=v192',
+  './app-v192.js',
   './images/parchment-texture.webp',
   './manifest.json'
 ];

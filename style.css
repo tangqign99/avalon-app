@@ -1328,3 +1328,13 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 .rec-item{flex-wrap:wrap}
 .rec-item .ms-chips{flex:0 0 100%;margin-top:2px}
 .history-compact-item>.ms-chips{padding:4px 12px 8px;margin-top:0}
+
+/* ==================== v192：失败票归属者（结束页录入 + 历史展示） ==================== */
+.end-fv-round{margin-bottom:12px}
+.end-fv-round:last-child{margin-bottom:0}
+.end-fv-round-title{font-size:14px;font-weight:700;color:var(--text-bright);margin-bottom:6px}
+.end-fv-count{font-size:12px;font-weight:400;color:var(--text-dim);margin-left:6px}
+.end-fv-btns{display:flex;flex-wrap:wrap;gap:6px}
+.end-fv-btn.on{border-color:var(--red-bright);color:var(--red-bright);background:rgba(255,153,153,.14);font-weight:700}
+.end-fv-team{display:inline-block;margin-left:4px;padding:0 4px;border-radius:8px;font-size:10px;line-height:14px;color:var(--gold-light);border:1px solid rgba(201,168,76,.4);background:rgba(201,168,76,.12);vertical-align:middle}
+.hci-fail-voters{margin-top:4px;font-size:13px;color:var(--text-dim)}

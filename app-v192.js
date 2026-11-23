@@ -1,4 +1,4 @@
-/* ==================== DATA ==================== */
+﻿/* ==================== DATA ==================== */
 var MISSION_COUNTS = {5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
 var DEFAULT_NAME_POOL = ['振宁','鹭文','小小','菜头','阿弟','齐齐','延平','小吴','涛','小黄','淏文','宝强','小洪'];
 var ALL_ROLES = ['梅林','派西维尔','忠臣','莫甘娜','刺客','莫德雷德','奥伯伦','爪牙','兰斯洛特(蓝)','兰斯洛特(红)','混子'];
@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v191';
+var SW_VERSION = 'v192';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -796,6 +796,8 @@ function toRecordV2(record) {
   if (record.identityMarks) v2.im = record.identityMarks.map(function(m) { return { t: m.target, tn: m.targetName, l: m.level, ts: m.timestamp }; });
   if (record.missions) v2.ms = record.missions.map(function(m) {
     var vm = { r: m.round, s: m.size, ld: m.leader, t: m.team, res: m.result, fc: m.failCount, sf: m.shieldedFails };
+    // v192：失败票归属者（「N号 名字」数组，短键 fv）
+    if (m.failVoters && m.failVoters.length) vm.fv = m.failVoters;
     if (m.launchFailures !== undefined) vm.lf2 = m.launchFailures;
     if (m.launchAttempts) vm.la = m.launchAttempts.map(function(att) {
       return { t: att.team, v: att.votes, ld: att.leader };
@@ -853,6 +855,8 @@ function fromRecordV2(v2) {
   rec.identityMarks = (v2.im || []).map(function(m) { return { target: m.t, targetName: m.tn, level: m.l, timestamp: m.ts }; });
   rec.missions = (v2.ms || []).map(function(m) {
     var rm = { round: m.r, size: m.s, leader: m.ld, team: m.t || [], result: m.res, failCount: m.fc || 0, shieldedFails: m.sf || 0 };
+    // v192：失败票归属者；旧记录无该字段时为空数组，展示层统一兜底「—」
+    rm.failVoters = (m.fv && m.fv.length) ? m.fv.slice() : [];
     if (m.lf2 !== undefined) rm.launchFailures = m.lf2;
     if (m.la) rm.launchAttempts = m.la.map(function(att) { return { team: att.t || [], votes: att.v || {}, leader: att.ld }; });
     if (m.v) rm.votes = m.v;
@@ -1370,7 +1374,7 @@ function doStartGame() {
     if (!state.playerNames[pn]) state.playerNames[pn] = '玩家' + (pn + 1);
   }
   state.missions = MISSION_COUNTS[state.playerCount].map(function(size, i) {
-    return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, shieldedFails: 0, launchFailures: 0, launchAttempts: [] };
+    return { round: i, size: size, leader: null, team: [], votes: {}, result: null, failCount: 0, shieldedFails: 0, failVoters: [], launchFailures: 0, launchAttempts: [] };
   });
   state.currentRound = 0;
   state.winner = null;
@@ -2289,8 +2293,8 @@ function renderStepPanel() {
   } else {
     h += '<div style="margin-bottom:6px"><span class="leader-badge">♔ ' + leaderName + '</span>';
     h += ' <button class="btn small warn" onclick="reSelectLeader()">重选</button>';
-    // v183：首轮组队前始终保留开局播报入口，避免刷新/重进后没有播报入口的死路
-    if (state.currentRound === 0 && m.team.length === 0) {
+    // v192：开局播报入口只在尚未决定播报的首轮组队前保留；进入第一轮后不再显示
+    if (state.currentRound === 0 && m.team.length === 0 && !state._nvDecided) {
       h += ' <button class="btn small" onclick="openNightVoice(false)">&#127769; 开局播报</button>';
     }
     h += '<span style="color:var(--text-dim);margin-left:10px">已选 ' + m.team.length + '/' + reqSize + ' 人</span></div>';
@@ -3717,6 +3721,10 @@ function buildReviewHTML() {
         h += missionFailLabel(m);
       }
       h += '</span></div>';
+      // v192：失败轮展示「谁打的失败」（未录入显示「—」）
+      if (m.result === 'fail') {
+        h += '<div style="margin-top:4px">失败票：' + escAttr(failVotersText(m)) + '</div>';
+      }
     }
 
     h += buildReviewSpecialInfo(r);
@@ -3753,6 +3761,7 @@ function selectLeader(idx) {
   m.votes = {};
   m.result = null;
   m.failCount = 0;
+  m.failVoters = [];   // v192：换队长重开本轮时清空上一轮录入的失败票归属
   // 仅在首次选队长（无发车尝试记录）时重置计数器，避免丢失已记录的发车失败历史
   if (m.launchAttempts.length === 0) {
     m.launchFailures = 0;
@@ -4040,9 +4049,11 @@ function setMissionResult(result) {
   m.result = result;
   if (result === 'fail') {
     m.failCount = 0;
+    m.failVoters = [];   // v192：切换为失败时清空旧的失败票归属
     showFailCountSelector();
   } else {
     m.failCount = 0;
+    m.failVoters = [];
     document.getElementById('fail-count-row').style.display = 'none';
   }
   document.getElementById('btn-finalize').style.display = 'inline-flex';
@@ -4385,10 +4396,59 @@ function renderEnd() {
   $('end-round-summary').textContent = endSumText;
 
   renderEndIdentityDropdowns();
+  // v192：失败轮次录入「谁打的失败」（无失败轮时整卡隐藏）
+  renderEndFailVoterEntry();
   // 强制结束按钮：始终隐藏（v104：单机模式下不需要）
   var forceEndCard = $('end-force-end-card');
   if (forceEndCard) {
     forceEndCard.style.display = 'none';
+  }
+}
+
+/* ==================== v192：结束页失败票归属录入 ==================== */
+// 为每个「任务失败」的轮次列出全部玩家，点选标记该轮打失败的玩家（可多选）
+function renderEndFailVoterEntry() {
+  var card = document.getElementById('end-fail-voter-card');
+  var grid = document.getElementById('end-fail-voter-grid');
+  if (!card || !grid) return;
+  var ms = state.missions || [];
+  var anyFail = false;
+  for (var r = 0; r < ms.length; r++) {
+    if (ms[r] && ms[r].result === 'fail') { anyFail = true; break; }
+  }
+  if (!anyFail) { card.style.display = 'none'; grid.innerHTML = ''; return; }
+
+  card.style.display = 'block';
+  var h = '';
+  for (var r2 = 0; r2 < ms.length; r2++) {
+    var m = ms[r2];
+    if (!m || m.result !== 'fail') continue;
+    if (!Array.isArray(m.failVoters)) m.failVoters = [];
+    h += '<div class="end-fv-round">';
+    h += '<div class="end-fv-round-title">第' + (r2 + 1) + '轮 · ' + missionFailLabel(m);
+    h += ' <span class="end-fv-count">已选 ' + m.failVoters.length + ' 人' + (m.failCount ? '／失败票 ' + m.failCount + ' 张' : '') + '</span></div>';
+    h += '<div class="end-fv-btns">';
+    for (var i = 0; i < state.playerCount; i++) {
+      var on = m.failVoters.indexOf(i) !== -1;
+      var inTeam = m.team && m.team.indexOf(i) !== -1;
+      h += '<button type="button" class="btn small end-fv-btn' + (on ? ' on' : '') + '" onclick="toggleEndFailVoter(' + r2 + ',' + i + ')">'
+        + escAttr(playerLabel(i)) + (inTeam ? '<span class="end-fv-team">队</span>' : '') + '</button>';
+    }
+    h += '</div></div>';
+  }
+  grid.innerHTML = h;
+}
+
+function toggleEndFailVoter(round, idx) {
+  var m = state.missions[round];
+  if (!m) return;
+  if (!Array.isArray(m.failVoters)) m.failVoters = [];
+  var pos = m.failVoters.indexOf(idx);
+  if (pos === -1) m.failVoters.push(idx); else m.failVoters.splice(pos, 1);
+  m.failVoters.sort(function(a, b) { return a - b; });
+  renderEndFailVoterEntry();
+  if (m.failCount && m.failVoters.length > m.failCount) {
+    try { toast('已选人数超过该轮失败票数（' + m.failCount + ' 张），仅记录不清空', 'warn'); } catch (e) {}
   }
 }
 
@@ -4713,6 +4773,7 @@ function saveGameRecord() {
         result: m.result,
         failCount: m.failCount,
         shieldedFails: m.shieldedFails || 0,
+        failVoters: (m.failVoters || []).map(function(vi) { return playerLabel(vi); }),
         launchFailures: m.launchFailures,
         launchAttempts: (m.launchAttempts || []).map(function(att) {
           return {
@@ -5534,6 +5595,28 @@ function failTicketText(m) {
 function missionFailLabel(m) {
   var t = failTicketText(m);
   return (t === '票数未记录') ? '失败（票数未记录）' : '失败 ' + t;
+}
+
+/* ==================== v192：失败票归属者（谁打的失败） ==================== */
+// 取出该轮已录入的失败票归属者（「N号 名字」字符串数组）；旧记录/未录入返回空数组
+function failVotersArray(m) {
+  if (!m || !m.failVoters || !m.failVoters.length) return [];
+  var out = [];
+  for (var i = 0; i < m.failVoters.length; i++) {
+    var s = m.failVoters[i];
+    if (s === null || s === undefined) continue;
+    // 记录态存「N号 名字」字符串；对局态（state.missions）存玩家索引，统一转成「N号 名字」
+    if (typeof s === 'number') s = playerLabel(s);
+    s = String(s).trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+// 展示文本：已录入「3号 鹭文、5号 阿弟」，未录入统一「—」
+function failVotersText(m) {
+  var arr = failVotersArray(m);
+  return arr.length ? arr.join('、') : '—';
 }
 
 // 对局列表逐轮任务筹码条（按轮次顺序，成功轮只写「成功」，不标失败数）
@@ -7411,6 +7494,19 @@ function openHistoryModal(idx) {
         h += '结果：' + (m.result === 'success' ? '<span style="color:var(--green-bright)">&#10003;</span>' : '<span style="color:var(--red-bright)">&#10007;</span>');
         h += '</div>';
       }
+      // v192：失败轮展示「谁打的失败」，格式「3号 鹭文、5号 阿弟」；旧记录未录入显示「—」
+      if (m.result === 'fail') {
+        var fvArr = failVotersArray(m);
+        h += '<div class="hci-fail-voters">失败票：';
+        if (fvArr.length) {
+          h += fvArr.map(function(fv) {
+            return '<span style="color:var(--red-bright);font-weight:600">' + escAttr(fv) + '</span>';
+          }).join('、');
+        } else {
+          h += '<span style="color:var(--text-dim)">—</span>';
+        }
+        h += '</div>';
+      }
       if (m.result === 'success' && m.shieldedFails) {
         var lastAtt = m.launchAttempts && m.launchAttempts.length > 0 ? m.launchAttempts[m.launchAttempts.length - 1] : null;
         var evilNames = [];
@@ -8063,6 +8159,44 @@ function openHistoryEdit(idx) {
     h += '</select>';
     h += '</div>';
   }
+
+  // v192：失败轮的「谁打的失败」——按玩家编号点选，可多选
+  window._editFvSel = {};
+  var failRoundIdxs = [];
+  if (rec.missions) {
+    for (var fmi = 0; fmi < rec.missions.length; fmi++) {
+      if (rec.missions[fmi] && rec.missions[fmi].result === 'fail') failRoundIdxs.push(fmi);
+    }
+  }
+  for (var fdi = 0; fdi < failRoundIdxs.length; fdi++) {
+    var rIdx = failRoundIdxs[fdi];
+    var storedFv = failVotersArray(rec.missions[rIdx]);
+    var selNums = [];
+    for (var si = 0; si < storedFv.length; si++) {
+      var numMatch = /^(\d+)\s*号/.exec(storedFv[si]);
+      if (numMatch) selNums.push(parseInt(numMatch[1], 10) - 1);
+    }
+    window._editFvSel[rIdx] = selNums;
+  }
+  if (failRoundIdxs.length) {
+    h += '<div style="font-size:12px;color:var(--text-dim);margin:14px 0 6px">失败票归属（点选该轮打失败的玩家，可多选）</div>';
+    for (var fri2 = 0; fri2 < failRoundIdxs.length; fri2++) {
+      var rmIdx = failRoundIdxs[fri2];
+      var rm2 = rec.missions[rmIdx];
+      var rmSel = window._editFvSel[rmIdx] || [];
+      h += '<div class="edit-fv-round">';
+      h += '<div class="end-fv-round-title">第' + (rmIdx + 1) + '轮 · ' + missionFailLabel(rm2) + ' <span class="end-fv-count" id="edit-fv-count-' + rmIdx + '">已选 ' + rmSel.length + ' 人</span></div>';
+      h += '<div class="end-fv-btns">';
+      for (var pj = 0; pj < rec.identities.length; pj++) {
+        var pid = rec.identities[pj];
+        var pnum = pid.index != null ? pid.index : pj;
+        var pOn = rmSel.indexOf(pnum) !== -1;
+        h += '<button type="button" class="btn small end-fv-btn' + (pOn ? ' on' : '') + '" data-mi="' + rmIdx + '" data-num="' + pnum + '" onclick="toggleEditFailVoter(this)">'
+          + escAttr((pnum + 1) + '号 ' + (pid.name || '')) + '</button>';
+      }
+      h += '</div></div>';
+    }
+  }
   h += '</div>'; // body
   h += '<div class="hci-modal-footer" style="gap:8px">';
   h += '<button class="btn" onclick="closeHistoryEdit(' + idx + ')">取消</button>';
@@ -8078,6 +8212,21 @@ function openHistoryEdit(idx) {
 function closeHistoryEdit(idx) {
   closeHistoryModal();
   openHistoryModal(idx);
+}
+
+// v192：历史编辑中点选/取消某轮的失败票归属者
+function toggleEditFailVoter(btn) {
+  if (!window._editFvSel) return;
+  var mi = parseInt(btn.getAttribute('data-mi'), 10);
+  var pnum = parseInt(btn.getAttribute('data-num'), 10);
+  if (isNaN(mi) || isNaN(pnum)) return;
+  var arr = window._editFvSel[mi] || (window._editFvSel[mi] = []);
+  var pos = arr.indexOf(pnum);
+  if (pos === -1) { arr.push(pnum); btn.classList.add('on'); }
+  else { arr.splice(pos, 1); btn.classList.remove('on'); }
+  arr.sort(function(a, b) { return a - b; });
+  var cnt = document.getElementById('edit-fv-count-' + mi);
+  if (cnt) cnt.textContent = '已选 ' + arr.length + ' 人';
 }
 
 function saveHistoryEdit(idx) {
@@ -8175,6 +8324,27 @@ function saveHistoryEdit(idx) {
     for (var imi = 0; imi < updatedV2.im.length; imi++) {
       var im = updatedV2.im[imi];
       if (im.tn) im.tn = remapName(im.tn);
+    }
+  }
+
+  // v192：把编辑页勾选的失败票归属写回（按新名字重建「N号 名字」）
+  if (window._editFvSel && updatedV2.ms) {
+    for (var qmi = 0; qmi < updatedV2.ms.length; qmi++) {
+      var qm = updatedV2.ms[qmi];
+      if (!qm) continue;
+      if (window._editFvSel[qmi] === undefined) {
+        if (qm.res === 'fail') qm.fv = [];
+        continue;
+      }
+      var qNums = window._editFvSel[qmi].slice().sort(function(a, b) { return a - b; });
+      var qLabels = [];
+      for (var qni = 0; qni < qNums.length; qni++) {
+        for (var qpi = 0; qpi < newIdentities.length; qpi++) {
+          var qnum = newIdentities[qpi].index != null ? newIdentities[qpi].index : qpi;
+          if (qnum === qNums[qni]) { qLabels.push((qnum + 1) + '号 ' + newIdentities[qpi].name); break; }
+        }
+      }
+      if (qLabels.length) qm.fv = qLabels; else delete qm.fv;
     }
   }
 
@@ -9417,6 +9587,10 @@ function buildNightVoiceLines() {
       ? '派西维尔请睁眼，请派西维尔确认两个梅林身份。'
       : '派西维尔请睁眼，请派西维尔确认你看到的那两个身份。';
     push('派西维尔请睁眼', percText);
+    // 8.5) v192：派西维尔闭眼前，先让梅林、莫甘娜闭上眼睛（不点名、不启用名字放慢）
+    if (has('梅林') || has('莫甘娜')) {
+      push('梅林莫甘娜请闭上眼睛', '请梅林、莫甘娜闭上眼睛。');
+    }
     // 9) 派西维尔闭上眼睛
     push('派西维尔请闭上眼睛', '派西维尔请闭上眼睛。');
   }
