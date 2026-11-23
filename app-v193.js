@@ -168,7 +168,7 @@ function loadSupabaseSDK(cb) {
   document.head.appendChild(s);
 }
 
-var SW_VERSION = 'v192';
+var SW_VERSION = 'v193';
 /* ---- v186：云端历史同步结果短期缓存（避免同一会话内重复发起同步 XHR） ---- */
 var _cloudHistCache = null;
 var _cloudHistCacheRaw = null;
@@ -9587,9 +9587,9 @@ function buildNightVoiceLines() {
       ? '派西维尔请睁眼，请派西维尔确认两个梅林身份。'
       : '派西维尔请睁眼，请派西维尔确认你看到的那两个身份。';
     push('派西维尔请睁眼', percText);
-    // 8.5) v192：派西维尔闭眼前，先让梅林、莫甘娜闭上眼睛（不点名、不启用名字放慢）
+    // 8.5) v192：派西维尔闭眼前，先让梅林、莫甘娜收回大拇指（v193 修正：由「闭上眼睛」改为「收回大拇指」，不启用名字放慢）
     if (has('梅林') || has('莫甘娜')) {
-      push('梅林莫甘娜请闭上眼睛', '请梅林、莫甘娜闭上眼睛。');
+      push('梅林莫甘娜请收回大拇指', '请梅林、莫甘娜收回大拇指。');
     }
     // 9) 派西维尔闭上眼睛
     push('派西维尔请闭上眼睛', '派西维尔请闭上眼睛。');
