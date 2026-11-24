@@ -1,20 +1,20 @@
-/* ==================== Service Worker v202 ==================== */
-// v202 策略（根因修复：iOS/Android 卡顿白屏）
+/* ==================== Service Worker v203 ==================== */
+// v203 策略（根因修复：iOS/Android 卡顿白屏）
 //  ① install 只预缓存核心壳（HTML / JS / CSS / manifest），不再预缓存 voice 目录下的 mp3
 //     —— v201 在 install 阶段硬编码 258 段音频（约 8MB），github.io 实测 39KB/s，等于每次访问先等十几分钟才出首屏
 //  ② 音频改为运行时 cache-first：本局念到哪段下哪段，下过的段永久复用（毫秒命中），不再整包下载
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v202';
+var CACHE_NAME = 'avalon-pwa-v203';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v202',
-  './app-v202.min.js',
+  './style.css?v=v203',
+  './app-v203.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'
