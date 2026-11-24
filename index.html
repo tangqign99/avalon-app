@@ -18,17 +18,17 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v200">
+<link rel="stylesheet" href="./style.css?v=v201">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
 <link rel="dns-prefetch" href="//nzbpopxrxniixnhnqktw.supabase.co">
 
-<!-- v186：Supabase SDK 不再随首屏加载，由 app-v200.min.js 在首次交互后按需注入 -->
+<!-- v186：Supabase SDK 不再随首屏加载，由 app-v201.min.js 在首次交互后按需注入 -->
 
-<!-- v200：首屏只加载压缩后的 app-v200.min.js（体积 582KB → 372KB，gzip 约 98KB），源文件 app-v200.js 仅留存于仓库不参与加载；夜间播报三音色（晓晓/云希/云扬）预渲染神经音色音频，首装只预缓存晓晓 129 段 4.0MB，云希/云扬选中时按需下载并缓存，离线可用 -->
+<!-- v201：首屏只加载压缩后的 app-v201.min.js，源文件 app-v201.js 仅留存于仓库不参与加载；夜间播报收敛为晓晓 + 云扬两音色（云希已下线），SD 两套预渲染音频（各 129 段，合计约 8MB）均进 Service Worker 预缓存，音色按钮点击即时生效、正在播报时用新音色从当前句重播，离线可用 -->
 
-<script defer src="./app-v200.min.js"></script>
+<script defer src="./app-v201.min.js"></script>
 
 </head>
 
@@ -194,7 +194,7 @@
 
   </div>
 
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v200</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v201</div>
 
 </section>
 
@@ -489,7 +489,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v200</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v201</div>
 
 
 
@@ -711,12 +711,12 @@
 
 <script>
 
-// PWA Service Worker 注册 - v200
+// PWA Service Worker 注册 - v201
 
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义（原实现会在注册成功时抛 ReferenceError）
-  var SW_VERSION = 'v200';
+  var SW_VERSION = 'v201';
 
   navigator.serviceWorker.getRegistrations().then(function(regs){
 
