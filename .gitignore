@@ -1,2 +1,15 @@
-﻿*.bat
+*.bat
 __pycache__/
+
+# build/debug leftovers, do not commit
+node_modules/
+package.json
+package-lock.json
+temp/
+output/
+_h_*.html
+_harness_*.html
+smoke.cjs
+smoke.mjs
+app-v???_*.js
+app-v???_*.min.js

@@ -18,17 +18,17 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v201">
+<link rel="stylesheet" href="./style.css?v=v202">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
 <link rel="dns-prefetch" href="//nzbpopxrxniixnhnqktw.supabase.co">
 
-<!-- v186：Supabase SDK 不再随首屏加载，由 app-v201.min.js 在首次交互后按需注入 -->
+<!-- v186：Supabase SDK 不再随首屏加载，由 app-v202.min.js 在首次交互后按需注入 -->
 
-<!-- v201：首屏只加载压缩后的 app-v201.min.js，源文件 app-v201.js 仅留存于仓库不参与加载；夜间播报收敛为晓晓 + 云扬两音色（云希已下线），SD 两套预渲染音频（各 129 段，合计约 8MB）均进 Service Worker 预缓存，音色按钮点击即时生效、正在播报时用新音色从当前句重播，离线可用 -->
+<!-- v202：首屏只加载 app-v202.min.js；Service Worker 不再预缓存 voice 音频（v201 曾硬编码 258 段约 8MB），改为开局按本局台词按需下载缺段、运行时 cache-first 永久复用；SW 注册去掉全量 unregister，改为标准注册 + 更新提示刷新 -->
 
-<script defer src="./app-v201.min.js"></script>
+<script defer src="./app-v202.min.js"></script>
 
 </head>
 
@@ -160,7 +160,16 @@
 
     </p>
 
-    <button class="btn primary" onclick="startGame()" style="font-size:20px;padding:15px 48px">开始游戏</button>
+    <div class="nv-setup-actions">
+
+      <button class="btn nv-deal-open-btn" onclick="nvDealOpen()">发牌</button>
+
+      <button class="btn primary nv-start-btn" onclick="startGame()">开始游戏</button>
+
+    </div>
+
+    <!-- v202 P2：断点续发入口（仅存在未完成发牌会话时显示） -->
+    <div class="nv-deal-resume-row" id="nv-deal-resume-row" style="display:none"></div>
 
   </div>
 
@@ -194,7 +203,7 @@
 
   </div>
 
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v201</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v202</div>
 
 </section>
 
@@ -210,7 +219,17 @@
 
   </div>
 
+  <div class="nv-game-topbar">
+
+    <button class="btn small nv-peek-btn" id="nv-peek-btn" style="display:none">看我的牌</button>
+
+    <button class="btn small nv-big-toggle" id="nv-big-toggle" onclick="nvBigToggle()">大屏模式</button>
+
+  </div>
+
   <div class="round-tracker" id="round-tracker"></div>
+
+  <div class="nv-vote-board" id="nv-vote-board" style="display:none"></div>
 
   <div class="lancelot-flip-tracker" id="lancelot-flip-tracker" style="display:none"></div>
 
@@ -455,6 +474,18 @@
 
 
 
+<!-- v202 P1：发牌向导浮层（全屏，逐人传阅） -->
+
+<div class="nv-fullscreen" id="nv-deal-overlay" style="display:none"></div>
+
+<!-- v202 P2：看我的牌浮层（按住显示，松手收起，只显示本机身份） -->
+
+<div class="nv-fullscreen nv-peek-overlay" id="nv-peek-overlay" style="display:none"></div>
+
+<!-- v202 P1：公共大屏 / 桌面模式浮层（只读公开信息） -->
+
+<div class="nv-fullscreen nv-bigscreen-overlay" id="nv-big-overlay" style="display:none"></div>
+
 <!-- 复盘弹窗（全局） -->
 
 <div class="modal-overlay" id="replay-modal-overlay" style="display:none" onclick="closeReplayModal(event)">
@@ -489,7 +520,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v201</div>
+<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v202</div>
 
 
 
@@ -711,31 +742,47 @@
 
 <script>
 
-// PWA Service Worker 注册 - v201
-
+// PWA Service Worker 注册 - v202
 if('serviceWorker' in navigator){
 
-  // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义（原实现会在注册成功时抛 ReferenceError）
-  var SW_VERSION = 'v201';
+  // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义
+  var SW_VERSION = 'v202';
 
-  navigator.serviceWorker.getRegistrations().then(function(regs){
+  // v202：根因修复 —— 删除「每次加载先全量 unregister 再 register」的旧逻辑
+  // （旧逻辑导致每次访问都重装 SW、缓存整体重建、全量资源重下，配合慢网直接白屏几十秒）
+  // 改为标准注册：register → 检测更新 → 有新版本时提示并只自动刷新一次
+  function swReloadOnce(tip){
+    try{
+      if(sessionStorage.getItem('avalon_sw_reloaded') === SW_VERSION) return;
+      sessionStorage.setItem('avalon_sw_reloaded', SW_VERSION);
+    }catch(e){}
+    try{ if(typeof toast === 'function') toast(tip, 'ok'); }catch(e){}
+    setTimeout(function(){ location.reload(); }, 500);
+  }
 
-    return Promise.all(regs.map(function(r){ return r.unregister(); }));
+  function swNoticeWaiting(reg, worker){
+    if(!worker) return;
+    if(!navigator.serviceWorker.controller) return;   // 首次安装：不刷新
+    console.log('[SW] ' + SW_VERSION + ' 已就绪，即将刷新一次');
+    swReloadOnce('已更新到 ' + SW_VERSION + '，正在刷新…');
+  }
 
-  }).then(function(){
-
-    return navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'});
-
-  }).then(function(reg){
-
+  navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
-
+    if(reg.waiting) swNoticeWaiting(reg, reg.waiting);
+    reg.addEventListener('updatefound', function(){
+      var nw = reg.installing;
+      if(!nw) return;
+      nw.addEventListener('statechange', function(){
+        if(nw.state === 'installed') swNoticeWaiting(reg, reg.waiting || nw);
+        if(nw.state === 'activated') swNoticeWaiting(reg, nw);
+      });
+    });
+    // 后台检测更新，不阻塞首屏
+    setTimeout(function(){ try{ reg.update(); }catch(e){} }, 3000);
   }).catch(function(e){
-
-    console.warn('[SW] operation failed:', e);
-
+    console.warn('[SW] register failed:', e);
   });
-
 }
 
 </script>
