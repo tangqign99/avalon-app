@@ -18,7 +18,7 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v204">
+<link rel="stylesheet" href="./style.css?v=v205">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
@@ -28,7 +28,7 @@
 
 <!-- v202：首屏只加载 app-v202.min.js；Service Worker 不再预缓存 voice 音频（v201 曾硬编码 258 段约 8MB），改为开局按本局台词按需下载缺段、运行时 cache-first 永久复用；SW 注册去掉全量 unregister，改为标准注册 + 更新提示刷新 -->
 
-<script defer src="./app-v204.min.js"></script>
+<script defer src="./app-v205.min.js"></script>
 
 </head>
 
@@ -437,6 +437,9 @@
 
       <button class="btn small" onclick="exportData()">导出数据</button>
     <button class="btn small" onclick="exportWinRateList()" style="border-color:var(--gold);color:var(--gold)">导出胜率清单</button>
+    <button class="btn small" onclick="exportAllGamesCSV()" style="border-color:var(--gold);color:var(--gold)">导出逐局全量</button>
+    <button class="btn small" onclick="exportAllGamesJSON()" style="border-color:var(--gold);color:var(--gold)">导出全量 JSON</button>
+    <button class="btn small" onclick="showRoleLeaderboard()" style="border-color:var(--gold);color:var(--gold)">角色战绩榜</button>
 
       <button class="btn small" onclick="importData()">导入数据</button>
 
@@ -735,7 +738,7 @@
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义
-  var SW_VERSION = 'v204';
+  var SW_VERSION = 'v205';
 
   // v202：根因修复 —— 删除「每次加载先全量 unregister 再 register」的旧逻辑
   // （旧逻辑导致每次访问都重装 SW、缓存整体重建、全量资源重下，配合慢网直接白屏几十秒）

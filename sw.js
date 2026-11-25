@@ -1,4 +1,5 @@
-/* ==================== Service Worker v204 ==================== */
+/* ==================== Service Worker v205 ==================== */
+// v205：赛后战绩海报（Canvas 生成 PNG）、全量逐局/逐轮/逐身份 CSV 与全量 JSON 导出、角色战绩榜
 // v204：下架发牌模式（删除发牌向导、断点续发、看我的牌及其全部状态与样式），缓存名升级以整体重建
 // v203 策略（根因修复：iOS/Android 卡顿白屏）
 //  ① install 只预缓存核心壳（HTML / JS / CSS / manifest），不再预缓存 voice 目录下的 mp3
@@ -7,15 +8,15 @@
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v204';
+var CACHE_NAME = 'avalon-pwa-v205';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v204',
-  './app-v204.min.js',
+  './style.css?v=v205',
+  './app-v205.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'
