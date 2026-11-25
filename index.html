@@ -18,7 +18,7 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v210">
+<link rel="stylesheet" href="./style.css?v=v211">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
@@ -28,7 +28,7 @@
 
 <!-- v202：首屏只加载 app-v202.min.js；Service Worker 不再预缓存 voice 音频（v201 曾硬编码 258 段约 8MB），改为开局按本局台词按需下载缺段、运行时 cache-first 永久复用；SW 注册去掉全量 unregister，改为标准注册 + 更新提示刷新 -->
 
-<script defer src="./app-v210.min.js"></script>
+<script defer src="./app-v211.min.js"></script>
 
 </head>
 
@@ -241,6 +241,18 @@
       <button class="btn small success" onclick="speakEnd()">发言结束</button>
 
       <button class="btn small" onclick="resetTimer()">重置时间</button>
+
+      <button class="btn small" id="timer-pause-btn" onclick="toggleTimerPause()">暂停</button>
+
+      <button class="btn small" onclick="adjustRoundTimer(-30)">-30s</button>
+
+      <button class="btn small" onclick="adjustRoundTimer(30)">+30s</button>
+
+      <label class="timer-round-edit">本轮
+        <input type="number" id="timer-round-input" value="300" min="5" max="1800" step="5" inputmode="numeric"
+          onchange="applyTimerRoundInput()" onfocus="this.select()">
+        <span>秒</span>
+      </label>
 
       <button class="btn small" onclick="reopenCombinedModal()" style="color:var(--gold-light);border-color:var(--gold)">填写反馈</button>
 
@@ -729,11 +741,11 @@
 
 <script>
 
-// PWA Service Worker 注册 - v210
+// PWA Service Worker 注册 - v211
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义
-  var SW_VERSION = 'v210';
+  var SW_VERSION = 'v211';
 
   // v202：根因修复 —— 删除「每次加载先全量 unregister 再 register」的旧逻辑
   // （旧逻辑导致每次访问都重装 SW、缓存整体重建、全量资源重下，配合慢网直接白屏几十秒）

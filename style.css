@@ -503,8 +503,22 @@ text-shadow:0 0 8px rgba(232,212,139,0.5);
 .timer-display{text-align:center;padding:8px 16px;border-radius:var(--radius);background:var(--parchment);border:2px solid rgba(201,168,76,0.2);margin-bottom:10px;transition:border-color 0.3s,background 0.3s}
 .timer-display.running{border-color:var(--gold)}
 .timer-display.warning{border-color:var(--red-bright);background:linear-gradient(180deg,#2a1a1a,#1a1010);animation:timer-flash 0.6s infinite}
-.timer-display .timer-value{font-size:36px;font-weight:700;color:var(--gold-light);font-variant-numeric:tabular-nums;font-family:var(--font-display)}
+.timer-display .timer-value{font-size:clamp(52px,13vw,72px);line-height:1.05;font-weight:700;color:var(--gold-light);font-variant-numeric:tabular-nums;font-family:var(--font-display)}
 .timer-display.warning .timer-value{color:var(--red-bright)}
+/* v211：暂停态样式 + 本轮时长调整控件 + 窄屏（320~414px）适配 */
+.timer-display.paused{border-color:var(--gold);background:var(--parchment);animation:none}
+.timer-display.paused .timer-value{color:var(--text-dim)}
+.timer-display.paused .timer-label{color:var(--gold)}
+#timer-btns{flex-wrap:wrap;row-gap:6px}
+.timer-round-edit{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--text-dim);min-height:36px}
+.timer-round-edit input{width:68px;padding:4px 6px;font-size:14px;text-align:center;border-radius:var(--radius-sm);border:1px solid rgba(201,168,76,0.35);background:var(--parchment);color:var(--text);font-variant-numeric:tabular-nums}
+.timer-round-edit input:focus{outline:none;border-color:var(--gold)}
+@media (max-width:414px){
+  .timer-display{padding:6px 10px}
+  .timer-display .timer-value{font-size:clamp(46px,14vw,64px)}
+  #timer-btns .btn.small{padding:6px 10px;font-size:13px}
+  .timer-round-edit input{width:60px}
+}
 .timer-display .timer-label{font-size:12px;color:var(--text-dim)}
 @keyframes timer-flash{0%,100%{opacity:1}50%{opacity:0.5}}
 .review-section{margin-top:8px;text-align:center}
