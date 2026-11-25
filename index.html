@@ -18,7 +18,7 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v206">
+<link rel="stylesheet" href="./style.css?v=v207">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
@@ -28,7 +28,7 @@
 
 <!-- v202：首屏只加载 app-v202.min.js；Service Worker 不再预缓存 voice 音频（v201 曾硬编码 258 段约 8MB），改为开局按本局台词按需下载缺段、运行时 cache-first 永久复用；SW 注册去掉全量 unregister，改为标准注册 + 更新提示刷新 -->
 
-<script defer src="./app-v206.min.js"></script>
+<script defer src="./app-v207.min.js"></script>
 
 </head>
 
@@ -198,7 +198,7 @@
 
   </div>
 
-  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;">版本: v204</div>
+  <div id="version-info" style="text-align:center;color:#666;font-size:12px;margin-top:20px;"></div>
 
 </section>
 
@@ -512,10 +512,6 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="page-footer-version" style="position:fixed;bottom:4px;right:8px;color:#555;font-size:11px;opacity:0.7;z-index:1000;pointer-events:none;user-select:none">版本: v204</div>
-
-
-
 <!-- 夜间模式切换按钮 -->
 
 <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleNightMode()" title="切换夜间模式">&#9790;</button>
@@ -734,11 +730,11 @@
 
 <script>
 
-// PWA Service Worker 注册 - v202
+// PWA Service Worker 注册 - v207
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义
-  var SW_VERSION = 'v206';
+  var SW_VERSION = 'v207';
 
   // v202：根因修复 —— 删除「每次加载先全量 unregister 再 register」的旧逻辑
   // （旧逻辑导致每次访问都重装 SW、缓存整体重建、全量资源重下，配合慢网直接白屏几十秒）
@@ -759,7 +755,7 @@ if('serviceWorker' in navigator){
     swReloadOnce('已更新到 ' + SW_VERSION + '，正在刷新…');
   }
 
-  navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./'}).then(function(reg){
+  navigator.serviceWorker.register('./sw.js?v=' + SW_VERSION, {scope:'./', updateViaCache:'none'}).then(function(reg){
     console.log('[SW] ' + SW_VERSION + ' registered:', reg.scope);
     if(reg.waiting) swNoticeWaiting(reg, reg.waiting);
     reg.addEventListener('updatefound', function(){

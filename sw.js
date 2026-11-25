@@ -1,4 +1,6 @@
-/* ==================== Service Worker v206 ==================== */
+/* ==================== Service Worker v207 ==================== */
+// v207：删除右下角固定版本号；页脚/设置页版本号一律由 JS 按 SW_VERSION 动态写入（不再写死文本）；
+//       导航请求改 no-store，绕过 GitHub Pages 的 HTTP 缓存，避免旧 index.html 被长期缓存导致版本号停在老版本
 // v206：生成海报入口从赛后结束页迁移到历史对局——历史列表条目可直接出海报，详情弹窗新增「生成海报」按钮；
 //       海报数据改由历史记录读取，默认仍不显示身份
 // v205：赛后战绩海报（Canvas 生成 PNG）、全量逐局/逐轮/逐身份 CSV 与全量 JSON 导出、角色战绩榜
@@ -10,15 +12,15 @@
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v206';
+var CACHE_NAME = 'avalon-pwa-v207';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v206',
-  './app-v206.min.js',
+  './style.css?v=v207',
+  './app-v207.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'
@@ -113,7 +115,8 @@ function networkFirst(cache, request, timeoutMs) {
         if (cached) done(cached);
       }).catch(function () {});
     }, timeoutMs);
-    fetch(request).then(function (resp) {
+    // no-store：绕过 GitHub Pages 的 HTTP 缓存，导航一律以线上最新 HTML 为准
+    fetch(request, { cache: 'no-store' }).then(function (resp) {
       clearTimeout(timer);
       if (resp && resp.status === 200 && resp.type === 'basic') {
         cache.put(request, resp.clone());
@@ -137,7 +140,7 @@ self.addEventListener('fetch', function (e) {
   if (url.origin !== self.location.origin) return;
   if (e.request.mode === 'navigate') {
     e.respondWith(caches.open(CACHE_NAME).then(function (cache) {
-      return networkFirst(cache, e.request, 1200);
+      return networkFirst(cache, e.request, 3000);
     }));
     return;
   }
