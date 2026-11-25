@@ -1,4 +1,7 @@
-/* ==================== Service Worker v207 ==================== */
+/* ==================== Service Worker v208 ==================== */
+// v208：彻底删除赛后评分系统（rv 全模块、结束页「本局评分」、历史详情评分区块、胜率清单平均评分列）；
+//       删除「生成海报」全部入口与海报模块（与截图功能重叠）；截图改为统一「预览 + 分享到微信」（系统分享面板/保存图片），
+//       游戏中浮动截图与历史对局截图均可在手机端直接分享到微信
 // v207：删除右下角固定版本号；页脚/设置页版本号一律由 JS 按 SW_VERSION 动态写入（不再写死文本）；
 //       导航请求改 no-store，绕过 GitHub Pages 的 HTTP 缓存，避免旧 index.html 被长期缓存导致版本号停在老版本
 // v206：生成海报入口从赛后结束页迁移到历史对局——历史列表条目可直接出海报，详情弹窗新增「生成海报」按钮；
@@ -12,15 +15,15 @@
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v207';
+var CACHE_NAME = 'avalon-pwa-v208';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v207',
-  './app-v207.min.js',
+  './style.css?v=v208',
+  './app-v208.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'
