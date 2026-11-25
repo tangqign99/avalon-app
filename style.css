@@ -1524,12 +1524,11 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
   .nv-end-actions .nv-end-action{flex:1 1 30%;min-width:0;font-size:13.5px;padding:10px 8px}
 }
 
-/* ==================== v202 P1：发牌 / 公共大屏 / 票型看板 ==================== */
+/* ==================== v202 P1：公共大屏 / 票型看板 ==================== */
 
-/* setup 底部：左发牌 右开始游戏 */
+/* setup 底部：开始游戏 */
 .nv-setup-actions{display:flex;gap:10px;justify-content:center;align-items:stretch;flex-wrap:nowrap;max-width:520px;margin:0 auto}
 .nv-setup-actions .btn{flex:1 1 0;min-width:0;min-height:52px;padding:12px 10px;font-size:18px;white-space:nowrap}
-.nv-deal-open-btn{background:linear-gradient(135deg,rgba(74,144,217,.22),rgba(74,144,217,.06));border:1px solid var(--blue);color:var(--blue-light,#99bbff);font-weight:700}
 .nv-start-btn{font-size:20px;padding:15px 24px}
 
 /* 游戏页顶部大屏切换 */
@@ -1573,40 +1572,6 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 /* 全屏浮层通用 */
 .nv-fullscreen{position:fixed;inset:0;z-index:3200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 20%,#241d12 0%,#0d0b08 70%);padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
-/* 发牌向导 */
-.nv-deal-panel{width:100%;max-width:520px;display:flex;flex-direction:column;align-items:center;gap:12px;padding:6px 0}
-.nv-deal-title{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--gold-light);letter-spacing:2px}
-.nv-deal-desc{font-size:13px;color:var(--text-dim);text-align:center;line-height:1.6;max-width:420px}
-.nv-deal-seats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
-.nv-deal-seat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-family:var(--font);cursor:pointer;min-height:56px;overflow:hidden}
-.nv-deal-seat b{font-size:13px;color:var(--gold)}
-.nv-deal-seat span{font-size:12.5px;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nv-deal-seat.active{border-color:var(--gold);background:linear-gradient(135deg,rgba(201,168,76,.22),rgba(201,168,76,.05));box-shadow:0 0 0 2px rgba(201,168,76,.25) inset}
-.nv-deal-seat.active b,.nv-deal-seat.active span{color:var(--gold-light)}
-.nv-deal-foot{display:flex;gap:10px;width:100%;margin-top:4px}
-.nv-deal-foot .btn{flex:1 1 0;min-width:0;min-height:46px;font-size:15px;white-space:nowrap}
-.nv-deal-skiprow{width:100%;text-align:center;margin-top:2px}
-.nv-deal-link{background:none;border:none;color:var(--text-dim);font-size:13px;text-decoration:underline;cursor:pointer;padding:10px 12px;min-height:40px;font-family:var(--font)}
-.nv-deal-progress{align-self:stretch;text-align:center;font-size:13px;color:var(--gold);letter-spacing:1px;border:1px solid var(--border);border-radius:999px;padding:5px 10px;background:rgba(201,168,76,.06)}
-.nv-deal-handover{font-size:15px;color:var(--text-dim);margin-top:8px}
-.nv-deal-who{font-size:30px;font-weight:800;color:var(--gold-light);letter-spacing:2px;text-align:center;line-height:1.35;word-break:break-all}
-.nv-deal-hint{font-size:13px;color:var(--text-dim);text-align:center}
-.nv-deal-view{width:100%;max-width:420px;min-height:120px;font-size:24px;font-weight:800;letter-spacing:3px;margin-top:6px}
-.nv-deal-name{font-size:16px;color:var(--gold);font-weight:700}
-.nv-deal-card{width:100%;max-width:420px;border-radius:var(--radius);border:2px solid var(--border);padding:22px 18px;text-align:center;background:linear-gradient(160deg,#2a2318,#1a1610);display:flex;flex-direction:column;align-items:center;gap:10px}
-.nv-deal-card.good{border-color:rgba(74,201,74,.55);box-shadow:0 0 24px rgba(74,201,74,.12) inset}
-.nv-deal-card.evil{border-color:rgba(196,74,74,.6);box-shadow:0 0 24px rgba(196,74,74,.14) inset}
-.nv-deal-card.neutral{border-color:rgba(217,138,32,.55)}
-.nv-deal-card.title{border-color:rgba(74,144,217,.55)}
-.nv-deal-role{font-family:var(--font-display);font-size:36px;font-weight:800;color:var(--gold-light);letter-spacing:4px;line-height:1.2}
-.nv-deal-card.evil .nv-deal-role{color:#ff8f8f}
-.nv-deal-card.good .nv-deal-role{color:#9be89b}
-.nv-deal-card.title .nv-deal-role{color:#9cc4ff}
-.nv-deal-camp{font-size:14px;color:var(--text-dim);letter-spacing:2px}
-.nv-deal-tip{font-size:14px;color:var(--text);line-height:1.7;max-width:340px}
-.nv-deal-next{width:100%;max-width:420px;min-height:56px;font-size:17px;font-weight:700}
-.nv-deal-finish{width:100%;max-width:420px;min-height:64px;font-size:20px;font-weight:800;letter-spacing:2px;margin-top:6px}
-
 /* 公共大屏 / 桌面模式 */
 .nv-bigscreen{width:100%;max-width:1200px;display:flex;flex-direction:column;gap:14px;padding:4px 0}
 .nv-bigscreen-head{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding-bottom:10px;flex-wrap:wrap}
@@ -1631,10 +1596,6 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
   .nv-setup-actions{gap:8px}
   .nv-setup-actions .btn{font-size:15px;padding:10px 6px;min-height:48px}
   .nv-setup-actions .nv-start-btn{font-size:17px}
-  .nv-deal-seats{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .nv-deal-who{font-size:24px}
-  .nv-deal-role{font-size:30px}
-  .nv-deal-foot .btn{font-size:13.5px}
   .nv-bs-k{min-width:4.4em}
 }
 /* 横屏大屏优化 */
@@ -1646,21 +1607,3 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
   .nv-bs-v{font-size:clamp(14px,1.8vw,22px)}
 }
 
-/* ===== v202 P2：断点续发入口 + 看我的牌 ===== */
-.nv-deal-resume-row{display:none;width:100%;margin-top:2px;text-align:center}
-.nv-deal-resume-row .nv-deal-link{color:var(--gold);font-size:13.5px;letter-spacing:.5px;padding:8px 12px;min-height:36px}
-.nv-deal-resume-row .nv-deal-link:active{color:var(--gold-light)}
-.nv-peek-btn{background:linear-gradient(135deg,rgba(201,168,76,.16),rgba(201,168,76,.04));border:1px solid rgba(201,168,76,.75);color:var(--gold-light);font-weight:700;min-height:34px;padding:6px 14px;text-align:center;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
-.nv-peek-btn:active{background:linear-gradient(135deg,rgba(201,168,76,.30),rgba(201,168,76,.10))}
-.nv-peek-overlay{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
-.nv-peek-panel{max-width:420px}
-.nv-peek-panel .nv-deal-card{width:100%;max-width:420px}
-@media (max-width:400px){
-  .nv-peek-panel .nv-deal-role{font-size:32px}
-  .nv-peek-panel .nv-deal-tip{font-size:13.5px}
-}
-@media (orientation:landscape) and (max-height:520px){
-  .nv-peek-panel{gap:8px}
-  .nv-peek-panel .nv-deal-card{padding:12px 16px;gap:6px}
-  .nv-peek-panel .nv-deal-role{font-size:28px}
-}
