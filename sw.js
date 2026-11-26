@@ -1,4 +1,10 @@
-/* ==================== Service Worker v212 ==================== */
+/* ==================== Service Worker v213 ==================== */
+// v213：设置页玩家名称下拉默认显示名池第一个（原先占位名「玩家N」被追加到末尾，导致下拉显示最后一项）；
+//       删除计时条「-30s」「+30s」按钮，保留「本轮」秒数输入框（计时中仍可直接改本轮时长）；
+//       彻底删除「大屏模式」（游戏页入口按钮、全屏浮层、nvBig* / nvRenderBig 全部函数与样式），保留局内实时票型看板；
+//       再次修复游戏内截图：截图内身份解析不再依赖缺失的 state.identities，像素上限降到 800 万、重试 3 次、
+//       toBlob 返回 null 时用 toDataURL 兜底，微信内改用 dataURL 预览以便长按保存/转发，并修正可选规则区标题误写；
+//       全局 UI 精修：卡片/按钮/输入框/计时条/浮动按钮视觉与触感统一，弹窗入场动画与安全区适配
 // v212：移除数据管理页「清理删除标记」按钮及其说明文本（该入口用于清空 avalon_deleted_keys 本地删除黑名单）；
 //       底层黑名单机制完整保留——loadDeletedKeys/saveDeletedKeys 与 avalon_deleted_keys 的写入、云端同步过滤逻辑均不变，
 //       已删除的对局记录仍不会被云端同步重新拉回；顺带修正换座按钮二次点击误显示「已清理删除标记」提示的文案。
@@ -26,15 +32,15 @@
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v212';
+var CACHE_NAME = 'avalon-pwa-v213';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v212',
-  './app-v212.min.js',
+  './style.css?v=v213',
+  './app-v213.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'

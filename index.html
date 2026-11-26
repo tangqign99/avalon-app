@@ -18,7 +18,7 @@
 
 <link rel="manifest" href="./manifest.json">
 
-<link rel="stylesheet" href="./style.css?v=v212">
+<link rel="stylesheet" href="./style.css?v=v213">
 
 <link rel="preconnect" href="https://nzbpopxrxniixnhnqktw.supabase.co" crossorigin>
 
@@ -26,9 +26,9 @@
 
 <!-- v186：Supabase SDK 不再随首屏加载，由 app-v202.min.js 在首次交互后按需注入 -->
 
-<!-- v202：首屏只加载 app-v202.min.js；Service Worker 不再预缓存 voice 音频（v201 曾硬编码 258 段约 8MB），改为开局按本局台词按需下载缺段、运行时 cache-first 永久复用；SW 注册去掉全量 unregister，改为标准注册 + 更新提示刷新 -->
+<!-- v202：首屏只加载 app-v213.min.js；Service Worker 不再预缓存 voice 音频（v201 曾硬编码 258 段约 8MB），改为开局按本局台词按需下载缺段、运行时 cache-first 永久复用；SW 注册去掉全量 unregister，改为标准注册 + 更新提示刷新 -->
 
-<script defer src="./app-v212.min.js"></script>
+<script defer src="./app-v213.min.js"></script>
 
 </head>
 
@@ -200,12 +200,6 @@
 
   </div>
 
-  <div class="nv-game-topbar">
-
-    <button class="btn small nv-big-toggle" id="nv-big-toggle" onclick="nvBigToggle()">大屏模式</button>
-
-  </div>
-
   <div class="round-tracker" id="round-tracker"></div>
 
   <div class="nv-vote-board" id="nv-vote-board" style="display:none"></div>
@@ -229,10 +223,6 @@
       <button class="btn small" onclick="resetTimer()">重置时间</button>
 
       <button class="btn small" id="timer-pause-btn" onclick="toggleTimerPause()">暂停</button>
-
-      <button class="btn small" onclick="adjustRoundTimer(-30)">-30s</button>
-
-      <button class="btn small" onclick="adjustRoundTimer(30)">+30s</button>
 
       <label class="timer-round-edit">本轮
         <input type="number" id="timer-round-input" value="300" min="5" max="1800" step="5" inputmode="numeric"
@@ -470,10 +460,6 @@
 </section>
 
 
-
-<!-- v202 P1：公共大屏 / 桌面模式浮层（只读公开信息） -->
-
-<div class="nv-fullscreen nv-bigscreen-overlay" id="nv-big-overlay" style="display:none"></div>
 
 <!-- 复盘弹窗（全局） -->
 
@@ -727,11 +713,11 @@
 
 <script>
 
-// PWA Service Worker 注册 - v212
+// PWA Service Worker 注册 - v213
 if('serviceWorker' in navigator){
 
   // v186：SW_VERSION 提到外层作用域，避免 then 回调链中引用未定义
-  var SW_VERSION = 'v212';
+  var SW_VERSION = 'v213';
 
   // v202：根因修复 —— 删除「每次加载先全量 unregister 再 register」的旧逻辑
   // （旧逻辑导致每次访问都重装 SW、缓存整体重建、全量资源重下，配合慢网直接白屏几十秒）

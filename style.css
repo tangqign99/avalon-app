@@ -1538,16 +1538,12 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
   .nv-end-actions .nv-end-action{flex:1 1 30%;min-width:0;font-size:13.5px;padding:10px 8px}
 }
 
-/* ==================== v202 P1：公共大屏 / 票型看板 ==================== */
+/* ==================== 局内实时票型看板 ==================== */
 
 /* setup 底部：开始游戏 */
 .nv-setup-actions{display:flex;gap:10px;justify-content:center;align-items:stretch;flex-wrap:nowrap;max-width:520px;margin:0 auto}
 .nv-setup-actions .btn{flex:1 1 0;min-width:0;min-height:52px;padding:12px 10px;font-size:18px;white-space:nowrap}
 .nv-start-btn{font-size:20px;padding:15px 24px}
-
-/* 游戏页顶部大屏切换 */
-.nv-game-topbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:6px}
-.nv-big-toggle{background:linear-gradient(135deg,rgba(201,168,76,.18),rgba(201,168,76,.04));border:1px solid var(--gold);color:var(--gold-light);font-weight:700}
 
 /* 票型看板 */
 .nv-vote-board{margin:0 0 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-panel);overflow:hidden}
@@ -1583,41 +1579,88 @@ background:linear-gradient(180deg,var(--gold),rgba(201,168,76,0.1))
 .nv-vb-result.ok{color:var(--green-bright);font-weight:700}
 .nv-vb-result.bad{color:var(--red-bright);font-weight:700}
 
-/* 全屏浮层通用 */
-.nv-fullscreen{position:fixed;inset:0;z-index:3200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 20%,#241d12 0%,#0d0b08 70%);padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-
-/* 公共大屏 / 桌面模式 */
-.nv-bigscreen{width:100%;max-width:1200px;display:flex;flex-direction:column;gap:14px;padding:4px 0}
-.nv-bigscreen-head{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding-bottom:10px;flex-wrap:wrap}
-.nv-bigscreen-title{font-family:var(--font-display);font-size:clamp(20px,3.4vw,34px);font-weight:800;color:var(--gold-light);letter-spacing:4px}
-.nv-bigscreen-exit{margin-left:auto;font-family:var(--font);font-size:clamp(13px,1.6vw,18px);padding:10px 20px;border-radius:var(--radius);border:1px solid var(--gold);background:rgba(201,168,76,.12);color:var(--gold-light);font-weight:700;cursor:pointer}
-.nv-bigscreen-body{display:flex;flex-direction:column;gap:10px}
-.nv-bigscreen-row{display:flex;align-items:baseline;gap:14px;border:1px solid rgba(201,168,76,.16);border-radius:var(--radius);padding:clamp(8px,1.4vh,16px) clamp(10px,1.6vw,20px);background:rgba(35,30,21,.55)}
-.nv-bs-k{flex:0 0 auto;font-size:clamp(12px,1.5vw,18px);color:var(--gold);letter-spacing:2px;font-weight:700;min-width:5.2em}
-.nv-bs-v{flex:1 1 auto;min-width:0;font-size:clamp(16px,2.2vw,30px);color:var(--text-bright);font-weight:700;line-height:1.45;word-break:break-word}
-.nv-bigscreen-row.nv-bs-main{border-color:var(--gold);background:linear-gradient(135deg,rgba(201,168,76,.16),rgba(201,168,76,.03))}
-.nv-bigscreen-row.nv-bs-main .nv-bs-v{font-size:clamp(20px,3vw,40px)}
-.nv-bs-phase{color:var(--gold-light)}
-.nv-bs-score .nv-bs-v{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline}
-.nv-bs-good{color:#9be89b}
-.nv-bs-evil{color:#ff8f8f}
-.nv-bs-sep{color:var(--text-dim)}
-.nv-bigscreen-row.nv-bs-winner{border-color:var(--gold);background:linear-gradient(135deg,rgba(201,168,76,.22),rgba(201,168,76,.05))}
-.nv-bigscreen-row.nv-bs-winner .nv-bs-v{color:var(--gold-light)}
-
 /* 窄屏收敛 */
 @media (max-width:430px){
   .nv-setup-actions{gap:8px}
   .nv-setup-actions .btn{font-size:15px;padding:10px 6px;min-height:48px}
   .nv-setup-actions .nv-start-btn{font-size:17px}
-  .nv-bs-k{min-width:4.4em}
-}
-/* 横屏大屏优化 */
-@media (orientation:landscape) and (max-height:520px){
-  .nv-bigscreen{gap:8px}
-  .nv-bigscreen-head{padding-bottom:6px}
-  .nv-bigscreen-row{padding:6px 14px}
-  .nv-bigscreen-row.nv-bs-main .nv-bs-v{font-size:clamp(18px,2.6vw,28px)}
-  .nv-bs-v{font-size:clamp(14px,1.8vw,22px)}
 }
 
+/* ==================== v213：全局 UI 精修 ==================== */
+:root{
+  --shadow-1:0 1px 2px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.25);
+  --shadow-2:0 6px 20px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.3);
+  --ring:0 0 0 2px rgba(232,212,139,.65);
+  --ease:cubic-bezier(.2,.8,.25,1);
+}
+
+/* 布局：底部安全区 + 更顺的滚动惯性 */
+main{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch}
+.page{gap:14px}
+
+/* 卡片：层次更清楚，标题带金色引导条 */
+.card{border-radius:14px;box-shadow:var(--shadow-1);transition:border-color .18s var(--ease),box-shadow .18s var(--ease)}
+@media (hover:hover){.card:hover{border-color:rgba(201,168,76,.42);box-shadow:var(--shadow-2)}}
+.card h2{position:relative;padding-left:11px;line-height:1.35}
+.card h2::before{content:'';position:absolute;left:0;top:.26em;bottom:.26em;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--gold-light),rgba(201,168,76,.15));box-shadow:0 0 10px rgba(201,168,76,.4)}
+
+/* 按钮：按下有反馈、键盘聚焦有光圈 */
+.btn{-webkit-tap-highlight-color:transparent;transition:transform .12s var(--ease),background .18s var(--ease),border-color .18s var(--ease),box-shadow .18s var(--ease),color .18s var(--ease)}
+.btn:active{transform:scale(.965)}
+.btn:focus-visible,.count-btn:focus-visible,.nav-btns button:focus-visible{outline:none;box-shadow:var(--ring)}
+
+/* 顶部导航：当前页金色下划线 */
+.nav-btns button{transition:color .16s var(--ease),background .16s var(--ease)}
+.nav-btns button.active{position:relative;color:var(--gold-light)}
+.nav-btns button.active::after{content:'';position:absolute;left:12px;right:12px;bottom:2px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+
+/* 下拉框：统一自绘箭头，点击区域更高 */
+select{-webkit-appearance:none;appearance:none;min-height:40px;padding-right:30px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);
+  background-position:calc(100% - 17px) calc(50% + 1px),calc(100% - 12px) calc(50% + 1px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+  transition:border-color .16s var(--ease),box-shadow .16s var(--ease)}
+select:focus{outline:none;border-color:var(--gold);box-shadow:var(--ring)}
+
+/* 设置页玩家行：序号改成圆形徽标，下拉占满剩余宽度 */
+.player-setup-row .idx{flex:0 0 auto;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 30% 25%,rgba(201,168,76,.24),rgba(201,168,76,.06));border:1px solid rgba(201,168,76,.35);font-size:13px;font-weight:700;color:var(--gold-light);letter-spacing:0}
+.player-setup-row select{flex:1 1 auto;min-width:0}
+
+/* 计时条：更厚的质感、暂停态更明确 */
+.timer-display{border-radius:14px;box-shadow:var(--shadow-1);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.06)),var(--parchment)}
+.timer-display .timer-value{text-shadow:0 0 20px rgba(232,212,139,.3)}
+.timer-display.warning .timer-value{text-shadow:0 0 26px rgba(255,96,96,.45)}
+.timer-display.paused{box-shadow:inset 0 0 0 1px rgba(201,168,76,.3),var(--shadow-1)}
+.timer-display.paused .timer-value{opacity:.8}
+#timer-btns{gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed rgba(201,168,76,.2)}
+#timer-btns .btn.small{min-height:36px;padding:7px 12px}
+.timer-round-edit{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;border:1px solid rgba(201,168,76,.3);background:rgba(201,168,76,.08);color:var(--gold);font-weight:700;min-height:36px}
+.timer-round-edit input{width:54px;border:none;background:transparent;color:var(--gold-light);font-weight:700;text-align:center;padding:2px 0;font-variant-numeric:tabular-nums}
+.timer-round-edit input:focus{outline:none;border-color:transparent;box-shadow:none}
+
+/* 浮动按钮：胶囊形 + 毛玻璃，避免遮挡正文观感 */
+.undo-float-btn,.screenshot-float-btn{border-radius:999px;border:1px solid rgba(255,255,255,.16);box-shadow:var(--shadow-1);backdrop-filter:saturate(140%) blur(6px);-webkit-backdrop-filter:saturate(140%) blur(6px);font-weight:700;letter-spacing:.5px;transition:transform .12s var(--ease),opacity .18s var(--ease),box-shadow .18s var(--ease)}
+.undo-float-btn:active,.screenshot-float-btn:active{transform:scale(.94)}
+.screenshot-float-btn[disabled]{opacity:.6;pointer-events:none}
+
+/* 弹窗：入场动画 + 背景虚化 */
+.modal{border-radius:16px;box-shadow:var(--shadow-2);border-color:rgba(201,168,76,.3)}
+.modal-overlay.active{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+@keyframes v213rise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.modal-overlay.active .modal{animation:v213rise .22s var(--ease)}
+
+@media (prefers-reduced-motion:reduce){
+  .modal-overlay.active .modal{animation:none}
+  .btn:active{transform:none}
+}
+
+/* 窄屏收敛 */
+@media (max-width:430px){
+  .card{padding:12px}
+  #timer-btns{gap:6px}
+  #timer-btns .btn.small{font-size:12.5px;padding:6px 9px;min-height:34px}
+  .timer-round-edit{padding:2px 8px;font-size:12px;min-height:34px}
+  .timer-round-edit input{width:46px}
+  .player-setup-row .idx{width:30px;height:30px;font-size:12px}
+}
+/* ==================== v213 end ==================== */
