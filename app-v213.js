@@ -1649,7 +1649,7 @@ function restoreLeaderConfirmedStageAfterUndo() {
   if (!m || m.leader === null || m.leader === undefined) return false;
   if (m.team && m.team.length > 0) return false;
   if (m.result) return false;
-  if (m.votes && Object.keys(m.votes).length > 0) return false;
+  if (m.votes && Object.keys(m.votes || {}).length > 0) return false;
   if (state._teamConfirmedPending) return false;
   NV_PROMPT = 'confirmed';     // 播报卡片可按「开始语音播报」
   NV_ASKED = true;             // 已询问过，不重复弹出
@@ -2347,7 +2347,7 @@ function renderStepPanel() {
     return;
   }
 
-  var votesConfirmed = Object.keys(m.votes).length > 0;
+  var votesConfirmed = Object.keys(m.votes || {}).length > 0;
 
   // v181：开局选队长页 —— 上方「选择队长」模块，下方原「开始语音播报 / 跳过播报」
   if (m.leader === null && (NV_PROMPT === 'choose' || NV_PROMPT === 'confirmed') && state.currentRound === 0) {
@@ -13610,7 +13610,7 @@ function nvRoundAttempts(m) {
   for (i = 0; i < la.length; i++) {
     out.push({ leader: la[i].leader, team: (la[i].team || []).slice(), votes: la[i].votes || {}, pending: false });
   }
-  var hasCur = !!(m && m.votes && Object.keys(m.votes).length > 0);
+  var hasCur = !!(m && m.votes && Object.keys(m.votes || {}).length > 0);
   if (hasCur) {
     var dup = false;
     if (out.length) {
