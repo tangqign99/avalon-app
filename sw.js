@@ -1,4 +1,7 @@
-/* ==================== Service Worker v211 ==================== */
+/* ==================== Service Worker v212 ==================== */
+// v212：移除数据管理页「清理删除标记」按钮及其说明文本（该入口用于清空 avalon_deleted_keys 本地删除黑名单）；
+//       底层黑名单机制完整保留——loadDeletedKeys/saveDeletedKeys 与 avalon_deleted_keys 的写入、云端同步过滤逻辑均不变，
+//       已删除的对局记录仍不会被云端同步重新拉回；顺带修正换座按钮二次点击误显示「已清理删除标记」提示的文案。
 // v211：发言计时（全体发言 / 轮流发言）支持游戏内调整本轮时长并沿用至本局后续轮次与后续发言人（仅本局，不改设置页默认值），
 //       新增暂停 / 继续（沿用剩余秒数，避免 30 秒与最后 10 秒语音提示重复播放）；
 //       倒计时数字放大并适配 320~414px 窄屏；
@@ -23,15 +26,15 @@
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v211';
+var CACHE_NAME = 'avalon-pwa-v212';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v211',
-  './app-v211.min.js',
+  './style.css?v=v212',
+  './app-v212.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'
