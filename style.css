@@ -1664,3 +1664,52 @@ select:focus{outline:none;border-color:var(--gold);box-shadow:var(--ring)}
   .player-setup-row .idx{width:30px;height:30px;font-size:12px}
 }
 /* ==================== v213 end ==================== */
+
+/* ==================== v214 个人主页改版 ==================== */
+.pp-hero{background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.22);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px}
+.pp-hero-top{display:flex;align-items:center;gap:10px;min-width:0}
+.pp-avatar{flex:0 0 auto;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8b6914);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.pp-hero-id{flex:1 1 auto;min-width:0}
+.pp-name{font-size:17px;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pp-hero-sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pp-hero-rate{flex:0 0 auto;text-align:right}
+.pp-hero-rate-lab{font-size:11px;color:var(--text-dim);white-space:nowrap}
+.pp-hero-rate-num{font-size:28px;font-weight:700;line-height:1.1}
+.pp-track{height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-top:8px}
+.pp-fill{height:100%;border-radius:4px}
+.pp-fill-gold{background:var(--gold-light)}
+.pp-fill-good{background:var(--green-bright)}
+.pp-fill-evil{background:var(--red-bright)}
+.pp-hero-nums{display:flex;gap:6px;margin-top:10px}
+.pp-numcell{flex:1 1 0;min-width:0;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:7px 4px;text-align:center}
+.pp-num{font-size:19px;font-weight:700;line-height:1.15}
+.pp-lab{font-size:10.5px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pp-bars{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.pp-bar-row{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px}
+.pp-bar-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px}
+.pp-bar-name{font-weight:600;white-space:nowrap}
+.pp-bar-val{font-size:12px;white-space:nowrap}
+.pp-bar-games{color:var(--text-dim)}
+.pp-abilities{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.pp-abl{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 12px;min-width:0}
+.pp-abl-red{background:rgba(255,102,102,0.06);border-color:rgba(255,102,102,0.2)}
+.pp-abl-blue{background:rgba(120,170,255,0.06);border-color:rgba(120,170,255,0.22)}
+.pp-abl-toggle{cursor:pointer}
+.pp-abl-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.pp-abl-title{font-size:12px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pp-abl-chip{flex:0 0 auto;font-size:10px;color:var(--text-dim);border:1px solid var(--border);border-radius:6px;padding:1px 5px}
+.pp-abl-open .pp-abl-chip{color:var(--gold-light);border-color:rgba(201,168,76,0.5)}
+.pp-abl-main{font-size:26px;font-weight:700;line-height:1.15;margin-top:6px;overflow-wrap:anywhere}
+.pp-abl-sub{font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
+.pp-abl-sub2{font-size:11px;color:var(--text-dim);margin-top:1px;overflow-wrap:anywhere}
+.pp-abl-warn{font-size:10.5px;color:var(--gold-light);margin-top:4px;line-height:1.4}
+.pp-abl-note{display:none;font-size:10.5px;color:var(--text-dim);line-height:1.55;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.12);overflow-wrap:anywhere}
+@media (max-width:430px){
+  .pp-abilities{grid-template-columns:1fr}
+  .pp-hero{padding:12px}
+  .pp-hero-rate-num{font-size:25px}
+  .pp-abl-main{font-size:24px}
+  .pp-numcell{padding:6px 3px}
+}
+/* ==================== v214 end ==================== */
+
