@@ -1724,3 +1724,157 @@ select:focus{outline:none;border-color:var(--gold);box-shadow:var(--ring)}
 }
 /* ==================== v215 end ==================== */
 
+/* ==================== v216 start ==================== */
+/* ① 统计页「个人数据」区块：一行一名玩家，点击进入个人主页 */
+.card-h2-sub{display:inline-block;font-size:12px;font-weight:400;letter-spacing:0;color:var(--text-dim);white-space:normal}
+#personal-data-card h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px}
+.personal-data-list{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pd-row{
+  display:flex;align-items:center;gap:10px;min-width:0;min-height:60px;
+  padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);
+  border:1px solid var(--border);cursor:pointer;
+  transition:border-color .16s var(--ease),background .16s var(--ease),transform .12s var(--ease);
+  -webkit-tap-highlight-color:transparent;
+}
+.pd-row:active{transform:scale(.995);background:rgba(201,168,76,.10);border-color:rgba(201,168,76,.45)}
+@media (hover:hover){.pd-row:hover{border-color:rgba(201,168,76,.45);background:rgba(201,168,76,.06)}}
+.pd-avatar{
+  flex:0 0 auto;width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,#c9a84c,#8b6914);color:#fff;
+  font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;
+}
+.pd-body{flex:1 1 auto;min-width:0}
+.pd-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.pd-name{flex:1 1 auto;min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-right{flex:0 0 auto;display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+.pd-rate{font-size:19px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.pd-games{font-size:12px;color:var(--text-dim)}
+.pd-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;min-width:0}
+.pd-tag{
+  display:inline-flex;align-items:center;gap:3px;font-size:11.5px;color:var(--text-dim);
+  background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;
+  padding:1px 6px;white-space:nowrap;
+}
+.pd-tag b{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.pd-arrow{flex:0 0 auto;color:var(--gold);font-size:18px;line-height:1;opacity:.75}
+.pd-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:13px}
+
+/* ④ 历史对局下方导出类按钮：手机端网格排布 + 图标 + 触控区 ≥44px */
+.export-action-row{gap:8px;overflow:visible;width:100%}
+.export-action-row .btn.small{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-width:0;min-height:46px;font-size:14px;font-weight:600;line-height:1.25;
+  padding:10px;white-space:normal;text-align:center;letter-spacing:.2px;border-radius:10px;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .12s var(--ease),background .16s var(--ease),border-color .16s var(--ease);
+}
+.export-action-row .btn.small:active{transform:scale(.97)}
+.export-action-row .eb-ico{flex:0 0 auto;font-size:15px;line-height:1;opacity:.95}
+.export-action-row .export-btn-gold{border-color:var(--gold);color:var(--gold)}
+.export-action-row .export-btn-gold:active,
+.export-action-row .export-btn-gold.selected{background:linear-gradient(180deg,rgba(201,168,76,.3),rgba(139,115,32,.42));color:var(--gold-light)}
+.export-action-row .export-btn-primary{
+  background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border-color:transparent;font-weight:700;
+  box-shadow:0 2px 8px rgba(46,204,113,.25);
+}
+.export-action-row .export-btn-primary:active{background:linear-gradient(135deg,#229954,#27ae60)}
+
+/* ④ 导出按钮断点：手机 2 列网格 / 平板 flex 横排 / 桌面不换行 */
+@media (max-width:767px){
+  .export-action-row{display:grid;grid-template-columns:1fr 1fr;justify-content:stretch}
+  .export-action-row .btn.small{width:100%}
+}
+@media (min-width:768px){
+  .export-action-row{display:flex;flex-wrap:wrap;justify-content:center}
+  .export-action-row .btn.small{width:auto;min-height:44px;font-size:14px}
+}
+@media (min-width:1024px){
+  .export-action-row{flex-wrap:nowrap;justify-content:center;overflow-x:auto}
+  .export-action-row .btn.small{flex:0 0 auto;width:auto;white-space:nowrap;min-height:44px;padding:8px 12px;font-size:13.5px}
+}
+/* ③ 平板／手机适配：能力指标区 320 单列、≥390 两列、≥768 三列 */
+@media (max-width:389px){
+  .pp-abilities{grid-template-columns:1fr}
+}
+@media (min-width:390px) and (max-width:767px){
+  .pp-abilities{grid-template-columns:1fr 1fr}
+}
+@media (min-width:768px){
+  .pp-abilities{grid-template-columns:repeat(3,1fr)}
+  .pp-avatar{width:52px;height:52px;font-size:24px}
+  .pp-name{font-size:18px}
+  .pp-hero-rate-num{font-size:30px}
+  .pp-abl-main{font-size:28px}
+  .pp-abl-sub,.pp-abl-sub2,.pp-abl-note{font-size:12px}
+  .stat-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+}
+/* 手机：次要信息与触控区统一收敛 */
+@media (max-width:430px){
+  .export-action-row{grid-template-columns:1fr 1fr;gap:8px}
+  .export-action-row .btn.small{font-size:14px;min-height:46px;padding:10px 6px;gap:4px}
+  .pd-row{padding:10px}
+  .pd-name{font-size:14px}
+  .pd-rate{font-size:18px}
+  .pd-tag{font-size:12px}
+  .pp-abl-sub,.pp-abl-sub2{font-size:12px}
+  .pp-abl-warn,.pp-abl-note{font-size:12px}
+  .pp-hero-sub{font-size:12px}
+}
+/* 平板：个人数据双列、弹窗更宽但留边距 */
+@media (min-width:768px){
+  .personal-data-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+  .pd-row{padding:12px 14px;min-height:64px}
+  .pd-avatar{width:42px;height:42px;font-size:19px}
+  .pd-name{font-size:15px}
+  .pd-rate{font-size:21px}
+  .pd-games{font-size:12.5px}
+  .pd-tag{font-size:12px;padding:2px 7px}
+  .export-action-row .btn.small{font-size:14px;min-height:44px}
+}
+@media (min-width:768px) and (max-width:1023px){
+  .modal{width:min(720px,92vw);max-width:min(720px,92vw);max-height:86vh}
+}
+@media (min-width:1024px){
+  .personal-data-list{grid-template-columns:1fr 1fr 1fr}
+}
+/* 手机弹窗：接近全屏，内容区独立滚动，避免横向溢出 */
+@media (max-width:520px){
+  .modal{
+    width:100vw;max-width:100vw;
+    height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;
+    padding:13px;border-radius:0;margin:0;overscroll-behavior:contain;
+  }
+  .modal h2{font-size:17px}
+  .modal .modal-actions{gap:8px;flex-wrap:wrap}
+  .modal .modal-actions .btn{min-height:44px;flex:1 1 auto}
+  #page-stats .card{min-width:0}
+}
+/* 横屏手机：压低弹窗高度，保证内容可滚 */
+@media (max-height:460px) and (orientation:landscape){
+  .modal{max-height:calc(100vh - 12px);max-height:calc(100dvh - 12px);padding:12px}
+  .pd-row{min-height:52px}
+}
+/* ② 战绩概览 / 今日胜率 / 筛选栏：手机与平板断点 */
+@media (max-width:767px){
+  .stat-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .stat-card{min-height:72px}
+  .stat-card .stat-value{font-size:24px}
+  .stat-card .stat-sub{font-size:13px}
+  .stat-card .stat-label{font-size:12px}
+  .win-rate-cards{grid-template-columns:1fr}
+  .win-rate-card .wc-sub{font-size:12px}
+  .filter-row{flex-direction:column;align-items:stretch;gap:8px}
+  .filter-row .filter-label{min-width:0;font-size:12px}
+  .filter-row .filter-select,
+  .filter-row .filter-input{width:100%;min-height:44px;font-size:13px;min-width:0;box-sizing:border-box}
+  .filter-row .filter-clear-btn{width:100%;min-height:44px;font-size:13px}
+  .filter-row .filter-sep{display:none}
+  .history-filter-bar{padding:12px;gap:10px}
+}
+@media (min-width:768px){
+  .stat-grid{grid-template-columns:repeat(4,1fr)}
+  .stat-card{min-height:72px}
+  .win-rate-cards{grid-template-columns:1fr 1fr}
+  .win-rate-card .wc-sub{font-size:12px}
+}
+/* ==================== v216 end ==================== */
