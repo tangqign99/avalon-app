@@ -1,4 +1,8 @@
-/* ==================== Service Worker v217 ==================== */
+/* ==================== Service Worker v218 ==================== */
+// v218：统计页「个人数据」区块下移到「历史对局」之后（今日胜率之前），与个人主页区块分离层级；
+//       展示由卡片网格改为清单式 —— 整块细边容器 + 行分隔线，手机/平板/桌面统一单列逐行，
+//       头像、胜率配色、指标标签、点击钻取主页行为全部保留，UI 主题、字体、配色沿用 v216/v217；
+//       纯 HTML/CSS 结构层调整，不改统计口径与 computePlayerMetrics、不改历史录入与存储结构
 // v217：修复「掩护梅林（被刺率）」统计口径 —— ①分母改按当场最终阵营判定（此前用角色名白名单，
 //       导致「兰斯洛特(蓝)」翻转为红、「兰斯洛特(红)」翻转为红时仍被计入好人分母，分母虚高、被刺率被系统性压低），
 //       现改为 getFinalFaction(role, flipped) === 'good'，flipped 取 rec.lancelotFlips[id.index]，混子仍按跟随目标解析；
@@ -58,15 +62,15 @@
 //  ③ 升级到本版本时，把旧缓存里已下载的 /voice/ 音频迁移进新缓存，用户不必为换版本重下
 //  ④ 沿用 v198 的导航 network-first(1.2s 回退)、静态 cache-first、跨域接口完全不接管
 // v201（历史）：音色收敛为晓晓 + 云扬；v199：音频按 pathname 忽略 Range 命中缓存
-var CACHE_NAME = 'avalon-pwa-v217';
+var CACHE_NAME = 'avalon-pwa-v218';
 var CACHE_PREFIX = 'avalon-pwa-';
 var VOICE_SEG = '/voice/';
 // 核心壳：首屏必显资源。音频一律不进这里（按需下载）
 var ASSETS = [
   './',
   './index.html',
-  './style.css?v=v217',
-  './app-v217.min.js',
+  './style.css?v=v218',
+  './app-v218.min.js',
   './images/parchment-texture.webp',
   './manifest.json',
   './voice/manifest.json'

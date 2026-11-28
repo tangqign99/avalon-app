@@ -1878,3 +1878,40 @@ select:focus{outline:none;border-color:var(--gold);box-shadow:var(--ring)}
   .win-rate-card .wc-sub{font-size:12px}
 }
 /* ==================== v216 end ==================== */
+
+/* ==================== v218 start ==================== */
+/* ① 个人数据：由卡片网格改为清单式（整块细边容器 + 行分隔线），沿用 v216 配色/字体/头像/胜率色 */
+.personal-data-list{
+  display:flex;flex-direction:column;gap:0;min-width:0;
+  border:1px solid rgba(201,168,76,.18);border-radius:var(--radius-sm);
+  background:rgba(0,0,0,.12);overflow:hidden;
+}
+.pd-row{
+  display:flex;align-items:center;gap:10px;min-width:0;min-height:58px;
+  padding:9px 12px;border-radius:0;background:transparent;
+  border:0;border-bottom:1px solid rgba(201,168,76,.14);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:background .16s var(--ease);
+}
+.pd-row:last-child{border-bottom:0}
+.pd-row:active{transform:none;background:rgba(201,168,76,.10);border-color:rgba(201,168,76,.14)}
+@media (hover:hover){.pd-row:hover{background:rgba(201,168,76,.06);border-color:rgba(201,168,76,.14)}}
+.pd-avatar{width:34px;height:34px;font-size:15px}
+.pd-arrow{font-size:16px;opacity:.6}
+@media (max-width:430px){
+  .personal-data-list{display:flex;flex-direction:column;gap:0}
+  .pd-row{padding:9px 10px;min-height:56px}
+  .pd-avatar{width:32px;height:32px;font-size:14px}
+}
+@media (min-width:768px){
+  .personal-data-list{display:flex;flex-direction:column;gap:0}
+  .pd-row{padding:10px 14px;min-height:60px}
+  .pd-avatar{width:38px;height:38px;font-size:17px}
+}
+@media (min-width:1024px){
+  .personal-data-list{display:flex;flex-direction:column;gap:0}
+}
+@media (max-height:460px) and (orientation:landscape){
+  .pd-row{min-height:52px}
+}
+/* ==================== v218 end ==================== */
