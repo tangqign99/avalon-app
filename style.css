@@ -1705,11 +1705,22 @@ select:focus{outline:none;border-color:var(--gold);box-shadow:var(--ring)}
 .pp-abl-warn{font-size:10.5px;color:var(--gold-light);margin-top:4px;line-height:1.4}
 .pp-abl-note{display:none;font-size:10.5px;color:var(--text-dim);line-height:1.55;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.12);overflow-wrap:anywhere}
 @media (max-width:430px){
-  .pp-abilities{grid-template-columns:1fr}
   .pp-hero{padding:12px}
   .pp-hero-rate-num{font-size:25px}
   .pp-abl-main{font-size:24px}
   .pp-numcell{padding:6px 3px}
 }
 /* ==================== v214 end ==================== */
+
+/* ==================== v215 start ==================== */
+/* v215：能力指标区新增「梅林 · 被刺率」，2 列等宽网格；390px 及以上两列（第三张自动换行），低于 390px 单列 */
+.pp-abl-gold{background:rgba(201,168,76,0.06);border-color:rgba(201,168,76,0.24)}
+.pp-abilities{grid-template-columns:1fr 1fr}
+@media (min-width:390px){
+  .pp-abilities{grid-template-columns:1fr 1fr}
+}
+@media (max-width:389px){
+  .pp-abilities{grid-template-columns:1fr}
+}
+/* ==================== v215 end ==================== */
 
